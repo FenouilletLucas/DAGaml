@@ -20,5 +20,21 @@ struct
 
 end;;
 
+module type D =
+sig
+	module H : GRAPH_HEADER
+	type node = H.node
+	type edge = H.edge
+	type leaf = H.leaf
+end;;
+
+module D1(H:GRAPH_HEADER) : D =
+struct
+	module H = H
+	type node = H.node
+	type edge = H.edge
+	type leaf = H.leaf
+end;;
+
 module TestDAG = UDAG(HeaderTest);;
 module ReduceDAG = Reduce.Create(TestDAG)(TestDAG);;

@@ -3,14 +3,14 @@ module type HEADER = sig
 	type leaf
 end
 
-module UBDAG(Header:HEADER):
+module type MODULE_UBDAG =
 sig
+	module H:HEADER
+
 	type ident
 
-	type tree  =
-		| Leaf of Header.leaf
-		| Node of pnode
-	and  node  = Header.node * tree * tree
+	type tree  = (H.leaf, pnode) Utils.gnode
+	and  node  = H.node * tree * tree
 	and	 pnode
 
 	val get_ident : pnode -> ident
@@ -43,7 +43,7 @@ sig
 		val apply : 'value manager -> ('value nnd) -> 'value nnd
 	end
 	
-	module M1T(ODeco:Map.OrderedType) :
+	module M1T(ODeco:Map.OrderedType):
 	sig
 		type deco = ODeco.t
 		type 'a nd = pnode -> deco -> 'a
@@ -60,3 +60,5 @@ sig
 		val apply : 'value manager -> ('value nd) -> 'value nd
 	end
 end
+
+module UBDAG(H:HEADER) : MODULE_UBDAG with module H = H

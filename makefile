@@ -9,7 +9,8 @@ all:
 	$(OB) \
 		test/test_udag.native \
 		test/test_urdag.native \
-		test/test_ubdag.native
+		test/test_ubdag.native \
+		test/test_subdag.native
 
 clean:
 	ocamlbuild -clean
