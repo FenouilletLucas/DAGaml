@@ -15,8 +15,8 @@ module EmptyGraph(H:HEADER) =
 struct
     module H = H
 
-    type node_ident
-    type edge_ident
+    type node_ident = int
+    type edge_ident = int
 
     type node_ref =
         | NIdent of node_ident
@@ -33,6 +33,10 @@ struct
         edge : H.edge;
         nodes_out : node_ref list;
         nodes_int : node_ref list;
+    }
+
+    type manager = {
+        node_ident = 
     }
 
 end
