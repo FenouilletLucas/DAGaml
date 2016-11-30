@@ -84,18 +84,18 @@ struct
 	(* Internal Binary OPerator *)
 	struct
                 type lld = (M.leaf * M.leaf) * D0.t
-                module LLD : Map.OrderedType with t = lld =
+                module LLD : Map.OrderedType with type t = lld =
                 struct
                         type t = lld
-                        let compare (x, t) (x', t') = match Pervasive.compare x x' with 0 -> (D0.compare t t') | x -> x
+                        let compare (x, t) (x', t') = match Pervasives.compare x x' with 0 -> (D0.compare t t') | x -> x
                 end
 		module MEMO0 = Ubdag.M0T(LLD)
                 type bld = (bool * M.leaf) * D0.t
                 (* true = Node * Leaf, false = Leaf * Node *)
-                module BLD : Map.OrderedType with t = bld =
+                module BLD : Map.OrderedType with type t = bld =
                 struct
                         type t = bld
-                        let compare (x, t) (x', t') = match Pervasive.compare x x' with 0 -> (D0.compare t t') | x -> x
+                        let compare (x, t) (x', t') = match Pervasives.compare x x' with 0 -> (D0.compare t t') | x -> x
                 end
 		module MEMO1 = G.M1T(BLD)
 		module MEMO2 = G.M2T(D0)
@@ -116,33 +116,34 @@ struct
 			let apply2 = MEMO2.apply memo2 in
 			let push = push man
 			and pull = pull man in
-                        let rec calcrec x y = match solver x y with
+                        let rec calcrec (x:edge) (y:edge) = match D0.solver (x, y) with
                         | Utils.MEdge f -> f
-                        | Utils.MNode (t, (c, n1, n2)) -> D0.compose (match n1, n2 with
+                        | Utils.MNode (t, (c, n1, n2)) -> D0.compose t (match n1, n2 with
                                 | Leaf l1, Leaf l2 ->   apply0 fun0 ((l1, l2), c)
-                                | Leaf l , Node n  ->   apply1 fun1 ((false, l), c) n
-                                | Node n , Leaf l  ->   apply1 fun1 ((true,  l), c) n
-                                | Node n1, Node n2 ->   apply2 fun2 c n1 n2
+                                | Leaf (l:M.leaf ) , Node (n:G.pnode)  ->   apply1 fun1 n ((false, l), (c:D0.t))
+                                | Node (n:G.pnode) , Leaf (l:M.leaf )  ->   apply1 fun1 n ((true,  l), c)
+                                | Node n1, Node n2 ->   apply2 fun2 n1 n2 c
+			)
                         and fun0 ((l1, l2), c) = calc c (Leaf l1) (Leaf l2)
-                        and fun1 ((b, l), c) n = if b
+                        and fun1 n ((b, l), c) = if b
                                 then calc c (Node n) (Leaf l)
                                 else calc c (Leaf l) (Node n)
-                        and fun2 c n n' = calc c (Node n) (Node n')
-                        and calc compact n1 n2 = apply	(fun tx ty compact ->
-				let fx, fy = D0.decomp tx ty compact in
+                        and fun2 n n' c = calc c (Node n) (Node n')
+                        and calc compact nx ny =
+				let fx, fy = D0.decomp nx ny compact in
 				let fx0, fx1 = pull fx
 				and fy0, fy1 = pull fy in
 				let f0 = calcrec fx0 fy0
-				let f1 = calcrec fx1 fy1 in
+				and f1 = calcrec fx1 fy1 in
 				push f0 f1
 			in
-		{
-			man  = man;
-			calc = calcrec
-			memo0 = memo0;
-			memo1 = memo1;
-			memo2 = memo2;
-		}
+			{
+				man  = man;
+				calc = calcrec;
+				memo0 = memo0;
+				memo1 = memo1;
+				memo2 = memo2;
+			}
 	end
 end
 
