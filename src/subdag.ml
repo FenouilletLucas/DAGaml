@@ -77,50 +77,71 @@ struct
 		type transform
 		val compose : transform -> edge -> edge
 		val  decomp : G.tree -> G.tree -> t -> edge * edge
-		val  solver : edge * edge -> (edge, (transform * t)) Utils.merge
+		val  solver : edge * edge -> (edge, (transform * (t*G.tree*G.tree))) Utils.merge
 	end
 	
 	module IBOP(D0:MODELE_IBOP) =
 	(* Internal Binary OPerator *)
 	struct
-		module MEMO0 = Ubdag.M0T(D0)
-		module MEMO1 = G.M1T(D0)
+                type lld = (M.leaf * M.leaf) * D0.t
+                module LLD : Map.OrderedType with t = lld =
+                struct
+                        type t = lld
+                        let compare (x, t) (x', t') = match Pervasive.compare x x' with 0 -> (D0.compare t t') | x -> x
+                end
+		module MEMO0 = Ubdag.M0T(LLD)
+                type bld = (bool * M.leaf) * D0.t
+                (* true = Node * Leaf, false = Leaf * Node *)
+                module BLD : Map.OrderedType with t = bld =
+                struct
+                        type t = bld
+                        let compare (x, t) (x', t') = match Pervasive.compare x x' with 0 -> (D0.compare t t') | x -> x
+                end
+		module MEMO1 = G.M1T(BLD)
 		module MEMO2 = G.M2T(D0)
 		type memo = {
 			man  : manager;
 			calc : edge -> edge -> edge;
-			memo0		: edge MEMO0.manager;
-			memo1_nl	: edge MEMO1.manager;
-			memo1_ln	: edge MEMO1.manager;
-			memo2		: edge MEMO2.manager;
+			memo0	: edge MEMO0.manager;
+			memo1	: edge MEMO1.manager;
+			memo2	: edge MEMO2.manager;
 		}
 		
 		let makeman man hsize=
-			let memo = MEMO.makeman hsize in
-			let apply = MEMO.apply memo in
+			let memo0  = MEMO0.makeman hsize in
+			let apply0 = MEMO0.apply memo0 in
+			let memo1  = MEMO1.makeman hsize in
+			let apply1 = MEMO1.apply memo1 in
+			let memo2  = MEMO2.makeman hsize in
+			let apply2 = MEMO2.apply memo2 in
 			let push = push man
 			and pull = pull man in
-			let rec calc compact = apply	(fun tx ty compact ->
+                        let rec calcrec x y = match solver x y with
+                        | Utils.MEdge f -> f
+                        | Utils.MNode (t, (c, n1, n2)) -> D0.compose (match n1, n2 with
+                                | Leaf l1, Leaf l2 ->   apply0 fun0 ((l1, l2), c)
+                                | Leaf l , Node n  ->   apply1 fun1 ((false, l), c) n
+                                | Node n , Leaf l  ->   apply1 fun1 ((true,  l), c) n
+                                | Node n1, Node n2 ->   apply2 fun2 c n1 n2
+                        and fun0 ((l1, l2), c) = calc c (Leaf l1) (Leaf l2)
+                        and fun1 ((b, l), c) n = if b
+                                then calc c (Node n) (Leaf l)
+                                else calc c (Leaf l) (Node n)
+                        and fun2 c n n' = calc c (Node n) (Node n')
+                        and calc compact n1 n2 = apply	(fun tx ty compact ->
 				let fx, fy = D0.decomp tx ty compact in
 				let fx0, fx1 = pull fx
 				and fy0, fy1 = pull fy in
-				let f0 = match solver fx0 fy0 with
-					| Utils.MEdge f -> f
-					| Utils.MNode (t, c) -> D0.compose t (calc c)
-				in
-				let f1 = match solver fx1 fy1 with
-					| Utils.MEdge f -> f
-					| Utils.MNode (t, c) -> D0.compose t (calc c)
-				in
+				let f0 = calcrec fx0 fy0
+				let f1 = calcrec fx1 fy1 in
 				push f0 f1
-											) compact
 			in
 		{
 			man  = man;
-			calc = (fun x y -> match solver x y with
-				| Utils.MEdge z -> z
-				| Utils.MNode (t, c) -> D0.compose t (calc c));
-			memo = memo;
+			calc = calcrec
+			memo0 = memo0;
+			memo1 = memo1;
+			memo2 = memo2;
 		}
 	end
 end
