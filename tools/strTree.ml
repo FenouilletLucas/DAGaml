@@ -93,3 +93,50 @@ let to_option to_a = function
 						)
 	| _				->	assert false
 
+
+
+
+(* get colored version of str *)
+let colorize color str =
+	if color > 0
+	then "\027[" ^ (string_of_int color) ^ "m" ^ str ^ "\027[0m"
+	else str
+
+
+type enum =
+	| T000
+	| T001
+	| T010
+	| T011
+	| T100
+	| T101
+	| T110
+	| T111
+
+(* print colored tree *)
+let tree_print print =
+	(* draw UTF-8 tree line *)
+	let conv = function
+		| T000 -> "   "
+		| T001 -> ",  "
+		| T010 -> "-- "
+		| T011 -> ",- "
+		| T100 -> "'  "
+		| T101 -> "│  "
+		| T110 -> "└─ "
+		| T111 -> "├─ "
+	in
+	let print_row row =
+		print (StrUtil.catmap""conv(List.rev row));
+	in
+	let rec print_tree row0 rows = function
+		| Tree.Leaf leaf	-> print_row row0; print leaf; print "\n";
+		| Tree.Node liste	-> match liste with
+			| []		-> print_row row0; print "|\n";
+			| [x]		-> print_tree (T010::row0) (T000::rows) x
+			| x::next	-> print_tree (T011::row0) (T101::rows) x; print_tree_list rows next;
+	and print_tree_list row = function
+		| tree::[]		-> print_tree (T110::row) (T000::row) tree
+		| tree::next	-> print_tree (T111::row) (T101::row) tree; print_tree_list row next
+		| []			-> ()
+	in List.iter (print_tree [] [])

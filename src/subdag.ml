@@ -15,7 +15,7 @@ module type MODELE_SUBDAG = sig
 	val compose : ('t -> 'i) -> edge -> 't e -> 't e
 	
 end
-module type MODULE_SUBDAG =
+(*module type MODULE_SUBDAG =
 (* M = Modele *)
 sig
 	module M : MODELE_SUBDAG
@@ -37,11 +37,12 @@ sig
 	val pull : manager -> edge -> edge *  edge
 	val compose : M.edge -> edge -> edge
 end
-
-module SUBDAG(M0:MODELE_SUBDAG):MODULE_SUBDAG with
+*)
+module SUBDAG(M0:MODELE_SUBDAG)
+(*:MODULE_SUBDAG with
 		type M.node = M0.node
 	and type M.edge = M0.edge
-	and type M.leaf = M0.leaf
+	and type M.leaf = M0.leaf *)
 =
 (* M = Modele *)
 struct
@@ -143,7 +144,14 @@ struct
 				memo0 = memo0;
 				memo1 = memo1;
 				memo2 = memo2;
-			}
+			}, calcrec
+		let newman man = makeman man 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo0:"; MEMO0.dump_stat man.memo0];
+			Tree.Node [Tree.Leaf "memo1:"; MEMO1.dump_stat man.memo1];
+			Tree.Node [Tree.Leaf "memo2:"; MEMO2.dump_stat man.memo2]
+		]
 	end
 end
 

@@ -37,3 +37,25 @@ assert(T.pull man z' = (y, x));;
 assert(T.pull man z  = (x, y));;
 assert(T.pull man y  = (x, x));;
 assert(x = ((), Utils.Leaf ()));;
+
+module IBA_M : T.MODELE_IBOP =
+struct
+	type t = unit
+	let compare () () = 0
+	type transform = unit
+	let compose () x = x
+	let decomp x y () = (((), x), ((), y))
+	let solver = function
+		| (((), Utils.Leaf ()):T.edge), ((), y)
+		| ((), y), (((), Utils.Leaf ()):T.edge) -> Utils.MEdge ((), y)
+		| ((), x), ((), y) -> Utils.MNode ((), ((), x, y))
+end;;
+
+module IBA = T.IBOP(IBA_M);;
+
+let iba_man, iba = IBA.newman man;;
+let xy = iba x y;;
+let yy = iba y y;;
+StrTree.tree_print print_string [IBA.dump_stat iba_man];;
+
+exit 0;;

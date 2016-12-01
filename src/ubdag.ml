@@ -20,6 +20,11 @@ struct
 		clcCnt = ref 0;
 	}
 
+	let dump_stat man = Tree.Node [
+		Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
+		Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
+	]
+
 	let newman_default_hsize = 10000
 	
 	let newman () = makeman newman_default_hsize
@@ -85,6 +90,8 @@ sig
 
 		val makeman : int -> 'value manager
 		val newman  : unit -> 'value manager
+
+		val dump_stat : 'value manager -> StrTree.tree
 	
 		val test : 'value manager -> bool nnd
 		val push : 'value manager -> ('value -> unit) nnd
@@ -102,6 +109,8 @@ sig
 
 		val makeman : int -> 'value manager
 		val newman  : unit -> 'value manager
+		
+		val dump_stat : 'value manager -> StrTree.tree
 	
 		val test : 'value manager -> bool nd
 		val push : 'value manager -> ('value -> unit) nd
@@ -194,6 +203,11 @@ struct
 			clcCnt = ref 0;
 		}
 
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
+			Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
+		]
+
 		let newman_default_hsize = 10000
 		
 		let newman () = makeman newman_default_hsize
@@ -258,6 +272,11 @@ struct
 			hitCnt : int ref;
 			clcCnt : int ref;
 		}
+
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
+			Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
+		]
 
 		let makeman hsize = {
 			assoc  = MemoN.create hsize;
