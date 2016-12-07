@@ -10,7 +10,8 @@ all:
 		test/test_udag.native \
 		test/test_urdag.native \
 		test/test_ubdag.native \
-		test/test_subdag.native
+		test/test_subdag.native \
+		test/test_grobdd_cp.native
 
 clean:
 	ocamlbuild -clean
