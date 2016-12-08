@@ -117,20 +117,20 @@ type enum =
 let tree_print print =
 	(* draw UTF-8 tree line *)
 	let conv = function
-		| T000 -> "   "
-		| T001 -> ",  "
-		| T010 -> "-- " (* FIXME *)
-		| T011 -> ",- " (* FIXME *)
-		| T100 -> "'  " (* FIXME *)
-		| T101 -> "│  "
-		| T110 -> "└─ "
-		| T111 -> "├─ "
+		| T000 -> "  "
+		| T001 -> "┌ "
+		| T010 -> "──"
+		| T011 -> "┌─"
+		| T100 -> "└ "
+		| T101 -> "│ "
+		| T110 -> "└─"
+		| T111 -> "├─"
 	in
 	let print_row row =
 		print (StrUtil.catmap""conv(List.rev row));
 	in
 	let rec print_tree row0 rows = function
-		| Tree.Leaf leaf	-> print_row row0; print leaf; print "\n";
+		| Tree.Leaf leaf	-> print_row row0; print " "; print leaf; print "\n";
 		| Tree.Node liste	-> match liste with
 			| []		-> print_row row0; print "|\n";
 			| [x]		-> print_tree (T010::row0) (T000::rows) x
