@@ -1,16 +1,127 @@
-module type HEADER = sig
-	type node
-	type leaf
+module M0T(ODeco:Map.OrderedType) =
+struct
+	module MemoD = Map.Make(ODeco) 
+	type deco = ODeco.t
+	type 'a manager = {
+		assoc  : 'a MemoD.t ref;
+		hitCnt : int ref;
+		clcCnt : int ref;
+	}
+
+	let makeman hsize = {
+		assoc  = ref MemoD.empty;
+		hitCnt = ref 0;
+		clcCnt = ref 0;
+	}
+
+	let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+
+	let newman_default_hsize = 10000
+	
+	let newman () = makeman newman_default_hsize
+
+	let test man d =
+		MemoD.mem d (!(man.assoc))
+	
+	let push man d x =
+		man.assoc := (MemoD.add d x (!(man.assoc)));
+		()
+	
+	let pull man d =
+		try
+			Some(MemoD.find d (!(man.assoc)))
+		with
+			Not_found -> None
+
+	let apply man func d =
+		try
+		(
+			let x = MemoD.find d (!(man.assoc)) in
+			incr man.hitCnt;
+			x
+		)
+		with	Not_found ->
+		(
+			let x = func d in
+			incr man.clcCnt;
+			assert(not (MemoD.mem d (!(man.assoc))));
+			man.assoc := (MemoD.add d x (!(man.assoc)));
+			x
+		)
 end
 
-module UBDAG(Header:HEADER) =
+module type MODULE_UBDAG =
+sig
+	module H:Udag.UDAG_HEADER
+
+	type ident
+
+	type tree  = (H.leaf, pnode) Utils.gnode
+	and  node  = H.node * tree * tree
+	and	 pnode
+
+	val get_ident : pnode -> ident
+	
+	val equal_tree : tree -> tree -> bool
+	val equal_node : node -> node -> bool
+
+	type manager
+
+	val makeman : int -> manager
+
+	val newman : unit -> manager
+	val push : manager -> node -> pnode
+	val pull : manager -> pnode -> node
+	
+	module M2T(ODeco:Map.OrderedType):
+	sig
+		type deco = ODeco.t
+		type 'a nnd = pnode -> pnode -> deco -> 'a
+		type 'value manager
+
+		val makeman : int -> 'value manager
+		val newman  : unit -> 'value manager
+
+		val dump_stat : 'value manager -> StrTree.tree
+	
+		val test : 'value manager -> bool nnd
+		val push : 'value manager -> ('value -> unit) nnd
+		
+		val pull : 'value manager -> ('value option) nnd
+
+		val apply : 'value manager -> ('value nnd) -> 'value nnd
+	end
+	
+	module M1T(ODeco:Map.OrderedType):
+	sig
+		type deco = ODeco.t
+		type 'a nd = pnode -> deco -> 'a
+		type 'value manager
+
+		val makeman : int -> 'value manager
+		val newman  : unit -> 'value manager
+		
+		val dump_stat : 'value manager -> StrTree.tree
+	
+		val test : 'value manager -> bool nd
+		val push : 'value manager -> ('value -> unit) nd
+		
+		val pull : 'value manager -> ('value option) nd
+
+		val apply : 'value manager -> ('value nd) -> 'value nd
+	end
+end
+
+module UBDAG(H:Udag.UDAG_HEADER) : MODULE_UBDAG with type H.node = H.node and type H.leaf = H.leaf =
 struct
 	type ident = int
 
+	module H = H
+
 	type tree  =
-		| Leaf of Header.leaf
+		| Leaf of H.leaf
 		| Node of pnode
-	and	 node  = (Header.node * tree * tree)
+	and	 node  = (H.node * tree * tree)
 	and  pnode = {ident : ident; node : node}
 
 	let get_ident pnode = pnode.ident
@@ -22,6 +133,8 @@ struct
 
 	let equal_node (d, t0, t1) (d', t0', t1') =
 		(d = d')&&(equal_tree t0 t0')&&(equal_tree t1 t1')
+
+	(* let dump man ed *)
 
 	module HNode : Hashtbl.HashedType with type t = node =
 	struct
