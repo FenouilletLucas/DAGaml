@@ -20,10 +20,7 @@ struct
 		clcCnt = ref 0;
 	}
 
-	let dump_stat man = Tree.Node [
-		Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
-		Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
-	]
+	let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 	let newman_default_hsize = 10000
 	
@@ -203,10 +200,7 @@ struct
 			clcCnt = ref 0;
 		}
 
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
-			Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
-		]
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		
@@ -273,10 +267,7 @@ struct
 			clcCnt : int ref;
 		}
 
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "hit count:"; StrTree.of_int(!(man.hitCnt))];
-			Tree.Node [Tree.Leaf "clc count:"; StrTree.of_int(!(man.clcCnt))]
-		]
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let makeman hsize = {
 			assoc  = MemoN.create hsize;
