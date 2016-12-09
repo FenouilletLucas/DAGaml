@@ -112,23 +112,23 @@ sig
 	end
 end
 
-module UBDAG(H:Udag.UDAG_HEADER) : MODULE_UBDAG with type H.node = H.node and type H.leaf = H.leaf =
+module UBDAG(H0:Udag.UDAG_HEADER) : MODULE_UBDAG with
+		type H.node = H0.node
+	and type H.leaf = H0.leaf
+=
 struct
 	type ident = int
 
-	module H = H
-
-	type tree  =
-		| Leaf of H.leaf
-		| Node of pnode
+	module H = H0
+	type tree = (H.leaf, pnode) Utils.gnode
 	and	 node  = (H.node * tree * tree)
 	and  pnode = {ident : ident; node : node}
 
 	let get_ident pnode = pnode.ident
 	
 	let equal_tree x y = match x, y with
-		| Leaf x, Leaf y -> x = y
-		| Node x, Node y -> (x.ident = y.ident)&&(assert(x.node==y.node); true)
+		| Utils.Leaf x, Utils.Leaf y -> x = y
+		| Utils.Node x, Utils.Node y -> (x.ident = y.ident)&&(assert(x.node==y.node); true)
 		| _ -> false
 
 	let equal_node (d, t0, t1) (d', t0', t1') =
@@ -142,8 +142,8 @@ struct
 		let equal = equal_node
 
 		let hash_tree = function
-			| Leaf leaf	-> Hashtbl.hash leaf
-			| Node node -> node.ident
+			| Utils.Leaf leaf	-> Hashtbl.hash leaf
+			| Utils.Node node -> node.ident
 		let hash (d, x, y) = Hashtbl.hash (d, hash_tree x, hash_tree y)
 	end
 	module HPNode : Hashtbl.HashedType with type t = pnode =
@@ -198,6 +198,8 @@ struct
 			hitCnt = ref 0;
 			clcCnt = ref 0;
 		}
+
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		
@@ -269,6 +271,8 @@ struct
 			hitCnt = ref 0;
 			clcCnt = ref 0;
 		}
+
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		
