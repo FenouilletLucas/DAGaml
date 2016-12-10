@@ -1,6 +1,4 @@
-open Subdag
-
-module UnitH : MODELE_SUBDAG with
+module UnitH : Subdag.MODELE with
 		type node = unit
 	and	type edge = unit
 	and type leaf = unit
@@ -18,7 +16,7 @@ struct
 	let push _ (((), nx):'t e) (((), ny): 't e) = Utils.MNode ((():edge), (((), nx, ny):'t n))
 	let pull _ (((), nx):'t e) = match nx with
 		| Utils.Leaf ()	-> assert false
-		| Utils.Node n	-> Utils.RNode (fun (((), nx, ny):'t n) -> (((), nx):'t e), (((), ny): 't e))
+		| Utils.Node n	-> Utils.MNode (fun (((), nx, ny):'t n) -> (((), nx):'t e), (((), ny): 't e))
 	let pull_node _ (((), nx, ny):'t n) = ((((), nx):'t e), (((), ny):'t e))
 	let compose _ (():edge) (x:'t e)  = x
 
@@ -37,7 +35,7 @@ struct
 
 end;;
 
-module T = SUBDAG(UnitH);;
+module T = Subdag.MODULE(UnitH);;
 
 let man = T.newman();;
 

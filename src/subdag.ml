@@ -1,6 +1,6 @@
 open Utils
 
-module type MODELE_SUBDAG = sig
+module type MODELE = sig
 	type leaf
 	type edge
 	type node
@@ -29,6 +29,7 @@ module type MODELE_SUBDAG = sig
 
 end
 
+
 (*module type MODULE_SUBDAG =
 (* M = Modele *)
 sig
@@ -52,7 +53,9 @@ sig
 	val compose : M.edge -> edge -> edge
 end
 *)
-module SUBDAG(M0:MODELE_SUBDAG)
+
+
+module MODULE(M0:MODELE)
 (*:MODULE_SUBDAG with
 		type M.node = M0.node
 	and type M.edge = M0.edge
@@ -78,8 +81,8 @@ struct
 		| MNode (e, (n:G.node)) -> (e, Utils.Node (G.push man (n:G.node)))
 
 	let pull man ((_, n)as e) = match M.pull G.get_ident e with
-		| REdge (x, y) -> (x, y)
-		| RNode f -> match n with
+		| MEdge (x, y) -> (x, y)
+		| MNode f -> match n with
 			| Utils.Leaf _ -> assert false
 			| Utils.Node p -> f(G.pull man p)
 
@@ -168,4 +171,3 @@ struct
 		]
 	end
 end
-

@@ -1,5 +1,3 @@
-open Subdag
-
 type edge_mu_state = P | S
 type node_mu_state = SS | SP | PS
 
@@ -62,12 +60,12 @@ let pull_node _ (c, ix, iy) =
 let pull getid ((bx, lx), i) = match lx with
 	| [] -> assert false
 	| h::lx' -> let e' = (bx, lx') in match h with
-		| P -> Utils.REdge ((e', i), (e', i))
-		| S -> Utils.RNode (fun node ->
+		| P -> Utils.MEdge ((e', i), (e', i))
+		| S -> Utils.MNode (fun node ->
 			let x', y' = pull_node getid node in
 			((compose e' x'), (compose e' y')))
 
-module GroBdd_CP_M : MODELE_SUBDAG with
+module GroBdd_CP_M : Subdag.MODELE with
 		type node = node_state
 	and	type edge = edge_state
 	and type leaf = unit
@@ -87,20 +85,64 @@ struct
 	let compose _ = compose
 	
 	let pull_node = pull_node
+	
+	let dump_node_mu_state x = Tree.Leaf(match x with
+		| SS -> "0"
+		| SP -> "1"
+		| PS -> "2")
+	
+	let load_node_mu_state = function
+		| Tree.Node _ -> assert false
+		| Tree.Leaf x -> match x with
+			| "0" -> SS
+			| "1" -> SP
+			| "2" -> PS
+			| _	  -> assert false
+	
+	let dump_edge_mu_state x = Tree.Leaf(match x with
+		| S -> "S"
+		| P -> "P")
+	
+	let load_edge_mu_state = function
+		| Tree.Node _ -> assert false
+		| Tree.Leaf x -> match x with
+			| "S" -> S
+			| "P" -> P
+			| _   -> assert false
+
+	let dump_node   = Some (fun (b, lxy) -> Tree.Node ((StrTree.of_bool b)::(List.map dump_node_mu_state lxy)))
+	let load_node   = Some (function Tree.Node (b::lxy) -> (StrTree.to_bool b, List.map load_node_mu_state lxy) | _ -> assert false)
+	let dot_of_node = None
+	
+	let dump_edge   = Some (fun (b, l) -> Tree.Node ((StrTree.of_bool b)::(List.map dump_edge_mu_state l)))
+	let load_edge   = Some (function Tree.Node (b::lxy) -> (StrTree.to_bool b, List.map load_edge_mu_state lxy) | _ -> assert false)
+	let dot_of_edge = Some (fun (b, l) -> String.concat "" ((if b then "-" else "+")::(List.map(function S -> "S" | P -> "P")l)))
+
+	let dump_leaf   = Some StrTree.of_unit
+	let load_leaf   = Some StrTree.to_unit
+	let dot_of_leaf = Some (fun () -> "0")
 end;;
 
-module T = SUBDAG(GroBdd_CP_M);;
+module T = Subdag.MODULE(GroBdd_CP_M);;
 
 let man = T.newman();;
 
-let c0 = T.push_leaf (false, []) ();;
-let c1 = T.push_leaf (true , []) ();;
-let x1 = T.push man c0 c1;;
-let nx1 = T.push man c1 c0;;
-let x01 = T.push man x1 x1;;
-let nx01 = T.push man nx1 nx1;;
-let x10 = T.push man (T.push_leaf (false, [P]) ()) (T.push_leaf (true, [P]) ());;
-let nx10 = T.push man (T.push_leaf (true, [P]) ()) (T.push_leaf (false, [P]) ());;
+let make_const b n = T.push_leaf (b, MyList.ntimes P n) ();;
+
+let make_ident man b n = T.push man (make_const b n) (make_const (not b) n);;
+
+let push_pass ((b, l), i) = ((b, P::l), i)
+
+let no ((b, l), i) = ((not b, l), i)
+
+let c0 = make_const false 0;;
+let c1 = make_const true 0;;
+let x1 = make_ident man false 0;; (* function x -> x *)
+let nx1 = make_ident man true 0;; (* function x -> -x *)
+let x01 = T.push man x1 x1;; (* function x y -> y *)
+let nx01 = T.push man nx1 nx1;; (* function x y -> -y *)
+let x10 = make_ident man false 1;;
+let nx10 = make_ident man true 1;;
 
 
 type and_node_state = (bool*bool*(node_mu_state list))
