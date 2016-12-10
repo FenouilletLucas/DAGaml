@@ -1,9 +1,3 @@
-module type HEADER = sig
-	type node
-	type leaf
-end
-
-
 module M0T(ODeco:Map.OrderedType) =
 struct
 	module MemoD = Map.Make(ODeco) 
@@ -56,9 +50,10 @@ struct
 		)
 end
 
+
 module type MODULE_UBDAG =
 sig
-	module H:HEADER
+	module H:Udag.UDAG_HEADER
 
 	type ident
 
@@ -118,12 +113,16 @@ sig
 	end
 end
 
-module UBDAG(H:HEADER) : MODULE_UBDAG with type H.node = H.node and type H.leaf = H.leaf =
+
+module UBDAG(H0:Udag.UDAG_HEADER) : MODULE_UBDAG with
+		type H.node = H0.node
+	and type H.leaf = H0.leaf
+=
 struct
-	module H = H
 	type ident = int
 
-	type tree  = (H.leaf, pnode) Utils.gnode
+	module H = H0
+	type tree = (H.leaf, pnode) Utils.gnode
 	and	 node  = (H.node * tree * tree)
 	and  pnode = {ident : ident; node : node}
 
@@ -136,6 +135,8 @@ struct
 
 	let equal_node (d, t0, t1) (d', t0', t1') =
 		(d = d')&&(equal_tree t0 t0')&&(equal_tree t1 t1')
+
+	(* let dump man ed *)
 
 	module HNode : Hashtbl.HashedType with type t = node =
 	struct
@@ -274,6 +275,8 @@ struct
 			hitCnt = ref 0;
 			clcCnt = ref 0;
 		}
+
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		

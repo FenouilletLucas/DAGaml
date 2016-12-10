@@ -41,7 +41,8 @@ module type UDAG_HEADER = sig
 	val dot_of_node : (int -> node -> string) option
 
 end
-module	UDAG	(Header:UDAG_HEADER) =
+
+module UDAG (Header:UDAG_HEADER) =
 struct
 	type ident = int
 
@@ -167,3 +168,57 @@ struct
                 )
 
 end
+
+
+module STRTREE_HEADER : UDAG_HEADER with
+		type leaf = StrTree.tree
+	and type edge = StrTree.tree
+	and type node = StrTree.tree
+=
+struct
+	type leaf = StrTree.tree
+	type edge = StrTree.tree
+	type node = StrTree.tree
+
+	let dump_leaf = Some (fun x -> x)
+	let load_leaf = Some (fun x -> x)
+	let dot_of_leaf = Some (fun x -> StrTree.dump_tree x)
+
+	let dump_edge = Some (fun x -> x)
+	let load_edge = Some (fun x -> x)
+	let dot_of_edge = Some (fun x -> StrTree.dump_tree x)
+
+	let dump_node = Some (fun x -> x)
+	let load_node = Some (fun x -> x)
+	let dot_of_node = Some (fun _ x -> StrTree.dump_tree x)
+end
+
+module STRTREE_UDAG = UDAG(STRTREE_HEADER)
+
+module STRING_HEADER : UDAG_HEADER with
+		type leaf = string
+	and type edge = string
+	and type node = (int option) * string
+=
+struct
+	type leaf = string
+	type edge = string
+	type node = (int option) * string
+
+	let dump_leaf = Some (fun x -> Tree.Leaf x)
+	let load_leaf = Some (function Tree.Leaf x -> x | _ -> assert false)
+	let dot_of_leaf = Some (fun x -> x)
+
+	let dump_edge = Some (fun x -> Tree.Leaf x)
+	let load_edge = Some (function Tree.Leaf x -> x | _ -> assert false)
+	let dot_of_edge = Some (fun x -> x)
+
+	let dump_node = Some (function (None, x) -> Tree.Leaf x | (Some i, x) -> Tree.Node [StrTree.of_int i; Tree.Leaf x])
+	let load_node = Some (function
+		| Tree.Leaf x -> (None, x)
+		| Tree.Node [i; Tree.Leaf x] -> (Some(StrTree.to_int i), x)
+		| _ -> assert false)
+	let dot_of_node = Some (fun _ (_, x) -> x)
+end
+
+module STRING_UDAG = UDAG(STRING_HEADER)

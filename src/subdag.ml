@@ -1,8 +1,9 @@
 open Utils
 
 module type MODELE_SUBDAG = sig
-	include Ubdag.HEADER
+	type leaf
 	type edge
+	type node
 
 	type 't gn = (leaf, 't) Utils.gnode
 	type 't n = node * 't gn * 't gn
@@ -12,9 +13,22 @@ module type MODELE_SUBDAG = sig
 	val pull : ('t -> 'i) -> 't e -> ('t e, 't n) unmerge
 
 	val pull_node : ('t -> 'i) -> 't n -> 't e * 't e
-	val compose : ('t -> 'i) -> edge -> 't e -> 't e
+	val compose : ('t -> 'i) -> edge -> 't e -> 't e	
 	
+	val dump_leaf : (leaf -> StrTree.tree) option
+	val load_leaf : (StrTree.tree -> leaf) option
+	val dot_of_leaf : (leaf -> string) option
+
+	val dump_edge : (edge -> StrTree.tree) option
+	val load_edge : (StrTree.tree -> edge) option
+	val dot_of_edge : (edge -> string) option
+	
+	val dump_node : (node -> StrTree.tree) option
+	val load_node : (StrTree.tree -> node) option
+	val dot_of_node : (int -> node -> string) option
+
 end
+
 (*module type MODULE_SUBDAG =
 (* M = Modele *)
 sig

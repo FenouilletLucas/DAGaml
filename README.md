@@ -15,8 +15,9 @@ Implements syntactically canonical DAG: each node (edges' order included) is uni
 Implements syntactically canonical Recursive DAG, i.e. nodes are either regular nodes or a rooted DAGs themselves. Thus, we add a special kind of leaf called Output
 
 ## UBDAG(leaf, node)
-Implements Binary DAG using ephemeron to weakly record nodes in the unique table.
+Implements syntactically canonical Binary DAG using ephemeron to weakly record nodes in the unique table.
 Implements memoization facilities using weakly referenced inputs
+Remarq : This module does not support data on edges, such data can be move to their parent's node's data field. This transformation is reversible as edges are ordered and the graph is directed.
 
 
 # Why ?
@@ -28,4 +29,4 @@ Also, feel free to send me links to articles/reports that could help design this
 If you want to help me design this tool but you have no idea how : contact me.
 
 # Installation
-you should have installed ocaml, then clone this repository
+you should have installed ocaml (4.04 at least), then clone this repository
