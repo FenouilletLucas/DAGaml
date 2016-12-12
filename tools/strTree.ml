@@ -40,6 +40,14 @@ let rec load_tree strlist =
 
 let dump treelist = StrUtil.catmap "\n" dump_tree treelist
 
+let dumpfile treelist target =
+	let file = open_out target in
+	let output_string = output_string file in
+	List.iter (fun tree -> output_string (dump_tree tree); output_string "\n";) treelist;
+	close_out file;
+	()
+
+
 let print treelist =
 	print_string(dump treelist);
 	print_newline()
@@ -53,6 +61,20 @@ let load text =
 			| "["	-> let leaf, tail' = load_leaf tail in aux (leaf::carry) tail'
 			| text	-> aux ((Tree.Leaf (unpack_text text))::carry) tail
 	in aux [] strlist
+
+let loadfile target =
+	let file = open_in target in
+	let read() =
+		try Some(input_line file)
+		with End_of_file -> None
+	in
+	let rec loop carry = match read () with
+		| Some line -> loop (line::carry)
+		| None -> String.concat "\n" (List.rev carry)
+	in
+	load (loop [])
+
+		
 
 let to_pretty =
 	let lvlstr lvl text = (StrUtil.ntimes " " lvl)^text^"\n" in

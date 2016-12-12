@@ -162,6 +162,12 @@ module L : sig
   val to_string : t -> string
   val of_string : string -> t
   val print : Format.formatter -> t -> unit
+
+  val to_bool_array : t -> bool array
+  val of_bool_array : bool array -> t
+
+  val to_hexa_string : t -> string
+  val of_hexa_string : string -> t
 end
 
 (* With most significant bits first. *)
@@ -170,6 +176,12 @@ module M : sig
   val to_string : t -> string
   val of_string : string -> t
   val print : Format.formatter -> t -> unit
+  
+  val to_bool_array : t -> bool array
+  val of_bool_array : bool array -> t
+
+  val to_hexa_string : t -> string
+  val of_hexa_string : string -> t
 end
 
 (*s {\bf Input/output in a machine-independent format.}

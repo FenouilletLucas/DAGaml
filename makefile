@@ -1,11 +1,13 @@
 #NUMS=/usr/lib/ocaml/nums
 #LIBS=-lib /usr/lib64/ocaml/nums
 #LIBS=-lib /usr/lib/ocaml/nums
-SRCS=-Is tools,src
+SRCS=-Is tools,src,bitv
 NPROC=$(shell nproc)
 OB=ocamlbuild -j $(NPROC) -r $(LIBS) $(SRCS)
 
-all:
+all: extra tests
+
+tests:
 	$(OB) \
 		test/test_udag.native \
 		test/test_urdag.native \
@@ -13,6 +15,11 @@ all:
 		test/test_subdag.native \
 		test/test_grobdd_cp.native \
 		test/test_tacx_cp.native
+
+extra:
+	$(OB) \
+		bitv/bitv.native
+
 
 clean:
 	ocamlbuild -clean

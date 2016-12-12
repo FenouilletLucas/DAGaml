@@ -29,8 +29,8 @@ struct
 	let load_edge = Some StrTree.to_unit
 	let dot_of_edge = None
 
-	let dump_leaf = Some StrTree.of_unit
-	let load_leaf = Some StrTree.to_unit
+	let dump_leaf = Some (fun () -> Tree.Node [])
+	let load_leaf = Some (function Tree.Node [] -> ((), Utils.Leaf ()) | _ -> assert false)
 	let dot_of_leaf = None
 
 end;;

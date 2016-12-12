@@ -1,5 +1,3 @@
-open Udag
-
 module HeaderTest =
 struct
 	type node = unit
@@ -22,13 +20,13 @@ end;;
 
 module type D =
 sig
-	module H : GRAPH_HEADER
+	module H : Udag.GRAPH_HEADER
 	type node = H.node
 	type edge = H.edge
 	type leaf = H.leaf
 end;;
 
-module D1(H:GRAPH_HEADER) : D =
+module D1(H:Udag.GRAPH_HEADER) : D =
 struct
 	module H = H
 	type node = H.node
@@ -36,5 +34,5 @@ struct
 	type leaf = H.leaf
 end;;
 
-module TestDAG = UDAG(HeaderTest);;
+module TestDAG = Udag.UDAG(HeaderTest);;
 module ReduceDAG = Reduce.Create(TestDAG)(TestDAG);;

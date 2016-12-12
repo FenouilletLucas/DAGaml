@@ -33,7 +33,7 @@ struct
 		with
 			Not_found -> None
 
-	let apply man func d =
+	let apply (man:'a manager) (func:(deco -> 'a)) (d:deco) =
 		try
 		(
 			let x = MemoD.find d (!(man.assoc)) in
@@ -111,6 +111,29 @@ sig
 
 		val apply : 'value manager -> ('value nd) -> 'value nd
 	end
+
+	module MLeaf:
+	sig
+		type 'value manager
+
+		val makeman : int -> 'value manager
+		val newman : unit -> 'value manager
+
+		val dump_stat : 'value manager -> StrTree.tree
+		val apply : 'value manager -> (H.leaf -> 'value) -> H.leaf -> 'value
+	end
+
+	module MNode:
+	sig
+		type 'value manager
+
+		val makeman : int -> 'value manager
+		val newman  : unit -> 'value manager
+
+		val dump_stat : 'value manager -> StrTree.tree
+		val apply : 'value manager -> (pnode -> 'value) -> pnode -> 'value
+	end
+
 end
 
 
@@ -329,4 +352,57 @@ struct
 				MemoN.add man.assoc n memoD;
 				aux memoD	
 	end
+	module MLeaf =
+	struct
+		module H =
+		struct
+			type t = H.leaf
+			let compare = Pervasives.compare
+		end
+		module M = M0T(H)
+
+		type 'a manager = 'a M.manager
+		let makeman = M.makeman
+		let newman = M.newman
+
+		let dump_stat = M.dump_stat
+		let apply = M.apply
+	end
+	module MNode =
+	struct
+		module ET = Ephemeron.K1.Make(HPNode)
+		type 'a manager = {
+			assoc  : 'a ET.t;
+			hitCnt : int ref;
+			clcCnt : int ref;
+		}
+
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+
+		let makeman hsize = {
+			assoc  = ET.create hsize;
+			hitCnt = ref 0;
+			clcCnt = ref 0;
+		}
+
+		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+
+		let newman_default_hsize = 10000
+		
+		let newman () = makeman newman_default_hsize
+
+		let apply man func n =
+			try
+				let x = ET.find man.assoc n in
+				incr man.hitCnt;
+				x
+			with
+				Not_found ->
+					let x = func n in
+					incr man.clcCnt;
+					ET.add man.assoc n x;
+					x
+	end
+
 end
+

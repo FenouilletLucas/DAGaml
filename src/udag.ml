@@ -84,9 +84,9 @@ struct
 			| Some dump -> dump
 			| None		-> (fun _ -> StrTree.of_unit())
 		in
-		let dump_next_t parcours = function
+		let dump_next_t (parcours: ident -> unit) = function
 			| Leaf leaf -> [Tree.Leaf "Leaf"; dump_leaf leaf]
-			| NodeRef ident -> [Tree.Leaf "NodeRef"; StrTree.of_int ident]
+			| NodeRef ident -> parcours ident; [Tree.Leaf "NodeRef"; StrTree.of_int ident]
 		in
 		let dump_edge_t parcours =
             let dump_next_t = dump_next_t parcours in
@@ -98,21 +98,22 @@ struct
 			function ((node, edges) : node_t) -> (dump_node node)::(List.map dump_edge_t edges)
 		in fun udag edges ->
 			let memo = MemoTable.create (H2Table.length udag.unique) in
-			let apply = MemoTable.apply memo in
+			let apply : (ident -> unit) -> ident -> unit = MemoTable.apply memo in
 			let liste = ref [] in
-			let push x = liste:=(x::(!liste)) in
+			let push x =
+				liste:=(x::(!liste)) in
 			let revret () =
 				let temp = List.rev (!liste) in
 				liste := [];
 				temp
 			in
 
-			let rec parcours ident = apply ident	(fun ident ->
+			let rec parcours ident : unit = apply	((fun ident ->
 				(
 					let node : node_t = H2Table.pull udag.unique ident in
-					push (Tree.Node ((StrTree.of_int ident)::(dump_node_t parcours node)))
+					push (Tree.Node ((StrTree.of_int ident)::(dump_node_t (parcours: ident -> unit) node)));
 				)
-													)
+											):ident -> unit) (ident:ident)
 			in
 			let liste_edges =	(
 				List.map (dump_edge_t parcours) edges
@@ -166,6 +167,66 @@ struct
 			)
 			| _ -> assert false
                 )
+	
+	module type MODELE_VISITOR =
+	sig
+		type xedge
+		type xnode
+		type extra
+
+		val do_leaf : extra -> leaf -> xnode
+		val do_edge : extra -> edge -> xnode -> xedge
+		val do_node : extra -> node -> xedge list -> xnode
+	end
+
+	module VISITOR(M0:MODELE_VISITOR) =
+	struct
+		type mymanager = {
+			man : manager;
+			extra : M0.extra;
+			calc : edge_t -> M0.xedge;
+			memLeaf : (leaf, M0.xnode) MemoTable.t;
+			memEdge : ((edge * M0.xnode), M0.xedge) MemoTable.t;
+			memNode : (ident, M0.xnode) MemoTable.t;
+		}
+
+		type manager = mymanager
+
+		let makeman man extra hsize =
+			let memLeaf, memEdge, memNode = MemoTable.(create hsize, create hsize, create hsize) in
+			let appLeaf, appEdge, appNode = MemoTable.(apply memLeaf, apply memEdge, apply memNode) in
+			let rec calcrec (edge, next) =
+				 calcedge edge (match next with
+					| Leaf leaf -> calcleaf leaf
+					| NodeRef node -> calcnode node)
+			and		calcleaf leaf = appLeaf (M0.do_leaf extra) leaf
+			and		calcedge edge xnode = appEdge (fun (edge, xnode) -> M0.do_edge extra edge xnode) (edge, xnode)
+			and		calcnode ident = appNode (fun ident ->
+				let node, edgelist = pull man ident in
+				M0.do_node extra node (List.map calcrec edgelist)) ident
+			in
+			{
+				man = man;
+				extra = extra;
+				calc = calcrec;
+				memLeaf = memLeaf;
+				memEdge = memEdge;
+				memNode = memNode;
+			}, calcrec
+
+		let newman man extra = makeman man extra (H2Table.length man.unique)
+
+		let calc man = man.calc
+
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memLeaf];
+			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memEdge];
+			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stat man.memNode];
+		]
+
+
+
+	end
 
 end
 
@@ -193,7 +254,6 @@ struct
 	let dot_of_node = Some (fun _ x -> StrTree.dump_tree x)
 end
 
-module STRTREE_UDAG = UDAG(STRTREE_HEADER)
 
 module STRING_HEADER : UDAG_HEADER with
 		type leaf = string
@@ -221,4 +281,6 @@ struct
 	let dot_of_node = Some (fun _ (_, x) -> x)
 end
 
-module STRING_UDAG = UDAG(STRING_HEADER)
+
+module StrTree = UDAG(STRTREE_HEADER)
+module String = UDAG(STRING_HEADER)

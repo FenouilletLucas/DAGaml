@@ -4,6 +4,32 @@ type node_mu_state = SS | SP | PS
 type edge_state = bool * (edge_mu_state list)
 type node_state = bool * (node_mu_state list)
 
+type node_cstate = Bitv.t
+type edge_cstate = Bitv.t
+
+let cedge (b, l) = Bitv.L.of_bool_array (Array.of_list (b::(List.map(function S -> true | P -> false)l)))
+let dedge cnode = match Array.to_list(Bitv.L.to_bool_array cnode) with
+	| b::l -> (b, List.map(function true -> S | false -> P))
+	| _ -> assert false
+
+let cnode ((b, l):node_state) : node_cstate = Bitv.L.of_bool_array (Array.of_list (b::(List.flatten(List.map(function SS -> [false; false] | SP -> [false; true] | PS -> [true; false])l))))
+
+let mappair (f:'a * 'a -> 'b) (l:'a list) : 'b list =
+	let rec aux (carry:'b list) : 'b list = function
+		| []			-> List.rev carry
+		| x::y::next	-> aux ((f (x, y))::carry) next
+		| _				-> assert false
+	in aux []
+
+let dnode_aux = function
+	| false, false -> SS
+	| false, true  -> SP
+	| true,  false -> PS
+	| true, true   -> assert false
+
+let dnode (cnode:node_cstate) : node_state = match Array.to_list(Bitv.L.to_bool_array cnode) with
+	| b::l -> (b, mappair dnode_aux l)
+	| _ -> assert false
 
 let merge =
 	let func = function
@@ -65,15 +91,27 @@ let pull getid ((bx, lx), i) = match lx with
 			let x', y' = pull_node getid node in
 			((compose e' x'), (compose e' y')))
 
+let push getid ex ey =
+	match push getid ex ey with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (node, nx', ny')) -> Utils.MNode (e, (cnode node, nx', ny'))
+
+let pull getid e =
+	match pull getid e with
+	| Utils.MEdge (ex, ey) -> Utils.MEdge (ex, ey)
+	| Utils.MNode f -> Utils.MNode (fun (node, nx, ny) -> f(dnode node, nx, ny))
+
+let pull_node getid (cnode, nx, ny) = pull_node getid (dnode cnode, nx, ny)
+
 module GroBdd_CP_M : Subdag.MODELE with
-		type node = node_state
-	and	type edge = edge_state
+		type node = node_cstate
+	and	type edge = edge_cstate
 	and type leaf = unit
 =
 struct
 	
-	type node = node_state
-	type edge = edge_state
+	type node = node_cstate
+	type edge = edge_cstate
 	type leaf = unit
 
 	type 't gn = (leaf, 't) Utils.gnode
@@ -86,7 +124,7 @@ struct
 	
 	let pull_node = pull_node
 	
-	let dump_node_mu_state x = Tree.Leaf(match x with
+	let dump_node_mu_state x = Tree.Leaf (match x with
 		| SS -> "0"
 		| SP -> "1"
 		| PS -> "2")
@@ -118,8 +156,8 @@ struct
 	let load_edge   = Some (function Tree.Node (b::lxy) -> (StrTree.to_bool b, List.map load_edge_mu_state lxy) | _ -> assert false)
 	let dot_of_edge = Some (fun (b, l) -> String.concat "" ((if b then "-" else "+")::(List.map(function S -> "S" | P -> "P")l)))
 
-	let dump_leaf   = Some StrTree.of_unit
-	let load_leaf   = Some StrTree.to_unit
+	let dump_leaf   = Some (fun () -> Tree.Node [])
+	let load_leaf   = Some (function Tree.Node [] -> ((false, []), Utils.Leaf ()) | _ -> assert false)
 	let dot_of_leaf = Some (fun () -> "0")
 end;;
 
@@ -242,5 +280,37 @@ let nx1 = T.push man nx0 nx0;;
 assert(nx01 ^? nx10 =?? x01 ^? x10);;
 
 StrTree.tree_print print_string [AND.dump_stat and_man; XOR.dump_stat xor_man];;
+
+let dump_man = Udag.StrTree.newman ();;
+
+let edges = T.dump man dump_man [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
+
+let dump_edges = Udag.StrTree.dump dump_man edges;;
+
+StrTree.tree_print print_string [dump_edges];;
+StrTree.dumpfile [dump_edges] "test.sdml";;
+
+let new_man = T.newman();;
+
+let new_edges = T.load new_man dump_man edges;;
+
+let dump_new_man = Udag.StrTree.newman ();;
+
+let newnew_edges = T.dump new_man dump_new_man new_edges;;
+
+StrTree.tree_print print_string [Udag.StrTree.dump dump_new_man newnew_edges];;
+
+let strtree = match StrTree.loadfile "test.sdml" with [tree] -> tree | _ -> assert false;;
+let loaded_strman, loaded_stredges = (match Udag.StrTree.load with Some f -> f | _ -> assert false) strtree;;
+let loaded_man = T.newman ();;
+let loaded_edges = T.load loaded_man loaded_strman loaded_stredges;;
+
+
+let dump_loaded_man = Udag.StrTree.newman ();;
+let dump_edges = T.dump loaded_man dump_loaded_man loaded_edges;;
+
+StrTree.tree_print print_string [Udag.StrTree.dump dump_loaded_man dump_edges];;
+
+
 
 exit 0;;

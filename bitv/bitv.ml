@@ -541,8 +541,9 @@ Joan.Thibault@ens-rennes.fr
 	let to_bool_array v =
 		let n = v.length in
 		let s = Array.make n false in
+		let p = pos n in
 		for i = 0 to n - 1 do
-			if unsafe_get v i then Array.unsafe_set (p i) true
+			if unsafe_get v i then Array.unsafe_set s (p i) true
 		done;
 		s
 	
@@ -551,9 +552,61 @@ Joan.Thibault@ens-rennes.fr
 		let v = create n false in
 		let p = pos n in
 		for i = 0 to n - 1 do
-			if (Array.unsafe_get (p i)) then unsafe_set v (p i) true
+			if (Array.unsafe_get s (p i)) then unsafe_set v (p i) true
 		done;
 		v
+	
+	let to_hexa_string =
+		let tochar x =
+			assert(x>=0);
+			if x < 10
+			then Char.chr(StrUtil.char_0+x)
+			else if x < 10 + 26
+			then Char.chr(StrUtil.char_A+(x-10))
+			else if x < 10 + 26 + 26
+			then Char.chr(StrUtil.char_a+(x-10-26))
+			else (assert false)
+		in
+		let toint l = match List.map (function false -> 0 | true -> 1) l with
+			| [x0; x1; x2; x3]	->    x0+2*x1+4*x2+8*x3
+			| [x0; x1; x2]		-> 16+x0+2*x1+4*x2
+			| [x0; x1]			-> 24+x0+2*x1
+			| [x0]				-> 28+x0
+			| _					-> assert false
+		in
+		let rec go carry = function
+			| x0::x1::x2::x3::next -> go ((toint [x0; x1; x2; x3])::carry) next
+			| [] -> StrUtil.implode (List.map tochar (List.rev carry))
+			| next -> go ((toint next)::carry) []
+		in (fun v -> go [] (Array.to_list(to_bool_array v)))
+	
+	let of_hexa_string =
+		let ofchar x =
+			if (x >= '0')&&(x <= '9')
+			then Char.code x - StrUtil.char_0
+			else if (x>='A')&&(x<='Z')
+			then Char.code x - StrUtil.char_A + 10
+			else if (x>='a')&&(x<='z')
+			then Char.code x - StrUtil.char_a + 36
+			else (assert false)
+		in
+		let ofint x =
+			let rec aux n c x =
+				assert(n>=0);
+				if n = 0 then (assert(x=0); (List.rev c))
+				else aux (n-1) ((x mod 2 = 1)::c) (x/2)	
+			in
+			if x < 16
+			then aux 4 [] x
+			else if x < 24
+			then aux 3 [] (x-16)
+			else if x < 28
+			then aux 2 [] (x-24)
+			else if x < 10
+			then aux 1 [] (x-28)
+			else (assert false)
+		in
+		(fun s -> of_bool_array (Array.of_list (List.flatten (List.map (fun c -> ofint(ofchar c))   (StrUtil.explode s)))))
 
 end
 module L = S(struct let least_first = true end)
