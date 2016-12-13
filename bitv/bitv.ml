@@ -602,7 +602,7 @@ Joan.Thibault@ens-rennes.fr
 			then aux 3 [] (x-16)
 			else if x < 28
 			then aux 2 [] (x-24)
-			else if x < 10
+			else if x < 30
 			then aux 1 [] (x-28)
 			else (assert false)
 		in

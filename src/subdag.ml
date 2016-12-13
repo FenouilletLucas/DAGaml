@@ -24,7 +24,7 @@ module type MODELE = sig
 	val dot_of_edge : (edge -> string) option
 	
 	val dump_node : (node -> StrTree.tree) option
-	val load_node : (StrTree.tree -> node) option
+	val load_node : (StrTree.tree -> edge * edge) option
 	val dot_of_node : (int -> node -> string) option
 
 end
@@ -117,6 +117,7 @@ struct
 	let compose = M.compose G.get_ident
 
 	module MEdge =
+	(* name conflict with Utils.merge.MEdge *)
 	struct
 		module D0 =
 		struct
@@ -170,11 +171,57 @@ struct
 		type extra
 
 		val do_leaf : extra -> M.leaf -> xnode 
-		val do_node : extra -> G.node -> (xnode, xnode -> xnode -> xnode) Utils.merge
+		val do_node : extra -> M.node -> (xnode, xnode -> xnode -> xnode) Utils.merge
 		val do_edge : extra -> M.edge -> xnode -> xedge
 
 	end
-	
+
+	module NODE_VISITOR(D0:MODELE_NODE_VISITOR)=
+	struct
+		type memo = {
+			man  : manager;
+			extra : D0.extra;
+			calc : edge -> D0.xedge;
+			memoLeaf: D0.xnode G.MLeaf.manager;
+			memoEdge: D0.xedge MEdge.manager;
+			memoNode: D0.xnode G.MNode.manager;
+		}
+		
+		let makeman man extra hsize =
+			let memoLeaf  = G.MLeaf.makeman hsize in
+			let applyLeaf = G.MLeaf.apply memoLeaf in
+			let memoEdge  = MEdge.makeman man hsize in
+			let applyEdge = MEdge.apply memoEdge in
+			let memoNode  = G.MNode.makeman hsize in
+			let applyNode = G.MNode.apply memoNode in
+			let rec calcrec = function
+				| Utils.Leaf leaf -> calcleaf leaf
+				| Utils.Node node -> calcnode node
+			and		calcedge edge = applyEdge (fun (edge, gnode) -> D0.do_edge extra edge (calcrec gnode)) edge
+			and		calcleaf leaf = applyLeaf (D0.do_leaf extra) leaf
+			and		calcnode node = applyNode (fun node ->
+				let (node:M.node), (nx:G.tree), (ny:G.tree) = G.pull man node in
+				match D0.do_node extra node with
+				| Utils.MEdge xnode -> xnode
+				| Utils.MNode merger -> merger (calcrec nx) (calcrec ny)) node
+			in
+			{
+				man  = man;
+				extra = extra;
+				calc = calcedge;
+				memoLeaf = memoLeaf;
+				memoEdge = memoEdge;
+				memoNode = memoNode;
+			}, calcedge
+		let newman man extra = makeman man extra 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo leaf:"; G.MLeaf.dump_stat man.memoLeaf];
+			Tree.Node [Tree.Leaf "memo edge:"; MEdge.dump_stat man.memoEdge];
+			Tree.Node [Tree.Leaf "memo node:"; G.MNode.dump_stat man.memoNode]
+		]
+	end
+
 	module type MODELE_EDGE_VISITOR =
 	sig
 		type xedge
@@ -324,7 +371,7 @@ struct
 		
 	end
 
-	module MODELE_DUMP : MODELE_EDGE_VISITOR with
+	module MODELE_DUMP_EDGE : MODELE_EDGE_VISITOR with
 			type xedge = Udag.StrTree.edge_t
 		and type extra = Udag.StrTree.manager
 	=
@@ -348,14 +395,47 @@ struct
 			in ((Utils.MNode merger):(xedge, (xedge -> xedge -> xedge))Utils.merge)
 
 	end
+	
+	module MODELE_DUMP_NODE : MODELE_NODE_VISITOR with
+			type xnode = Udag.StrTree.next_t
+		and type xedge = Udag.StrTree.edge_t
+		and type extra = Udag.StrTree.manager
 
-	module DUMP = EDGE_VISITOR(MODELE_DUMP)
+	=
+	struct
+		type xnode = Udag.StrTree.next_t
+		type xedge = Udag.StrTree.edge_t
+		type extra = Udag.StrTree.manager
 
-	let dump man dump_man =
-		let man, calc = DUMP.makeman man dump_man 10000 in
+		let dump_leaf = match M.dump_leaf with
+			| Some f -> f
+			| None -> (fun _ -> assert false)
+
+		let dump_node = match M.dump_node  with
+			| Some f -> f
+			| None -> (fun _ -> assert false)
+
+		let dump_edge = match M.dump_edge with
+			| Some f -> f
+			| None -> (fun _ -> assert false)
+
+		let do_leaf extra leaf = Udag.StrTree.Leaf (dump_leaf leaf)
+		let do_node extra node : (xnode, xnode -> xnode -> xnode) Utils.merge =
+			let node = dump_node node in
+			Utils.MNode(fun son0 son1 -> Udag.StrTree.NodeRef (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
+
+		let do_edge (extra:extra) edge son = (Tree.Node [dump_edge edge], son)
+
+	end
+
+	(* module DUMP_EDGE = NODE_VISITOR(MODELE_DUMP_EDGE) *)
+	module DUMP_NODE = NODE_VISITOR(MODELE_DUMP_NODE)
+
+	let dump man dump_man : edge list -> MODELE_DUMP_NODE.xedge list =
+		let man, calc = DUMP_NODE.makeman man dump_man 10000 in
 		List.map calc
 	
-	module MODELE_LOAD : Udag.StrTree.MODELE_VISITOR with
+	module MODELE_LOAD_NODE : Udag.StrTree.MODELE_VISITOR with
 			type xedge = edge
 		and type xnode = edge
 		and type extra = manager
@@ -365,22 +445,25 @@ struct
 		type xnode = edge
 		type extra = manager
 
-		let load_leaf = match M.load_leaf with
-			| None -> (fun _ -> assert false)
-			| Some f -> f
+		let unop default = function Some x -> x | None -> default
 
-		let load_edge = match M.load_edge with
-			| None -> (fun _ -> assert false)
-			| Some f -> f
+		let load_leaf = unop (fun _ -> assert false) M.load_leaf
+		let load_edge = unop (fun _ -> assert false) M.load_edge
+		let load_node = unop (fun _ -> assert false) M.load_node
 
 		let do_leaf _ leaf = load_leaf leaf
-		let do_edge _ edge xnode = compose (load_edge edge) xnode
-		let do_node man node xedgelist = match node, xedgelist with
-			| (Tree.Node []), [edge0; edge1] -> push man edge0 edge1
+		let do_edge _ = function
+			| Tree.Node [] -> (fun xnode -> xnode)
+			| Tree.Node [edge] -> (fun xnode -> compose (load_edge edge) xnode)
+			|  _ -> assert false
+		let do_node man node xedgelist =
+			let edgex, edgey = load_node node in
+			match xedgelist with
+			| [edge0; edge1] -> push man (compose edgex edge0) (compose edgey edge1)
 			| _ -> assert false
 	end
 
-	module LOAD = Udag.StrTree.VISITOR(MODELE_LOAD)
+	module LOAD = Udag.StrTree.VISITOR(MODELE_LOAD_NODE)
 
 	let load man dump_man =
 		let man, calc = LOAD.newman dump_man man in

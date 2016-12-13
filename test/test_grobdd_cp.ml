@@ -9,13 +9,13 @@ type edge_cstate = Bitv.t
 
 let cedge (b, l) = Bitv.L.of_bool_array (Array.of_list (b::(List.map(function S -> true | P -> false)l)))
 let dedge cnode = match Array.to_list(Bitv.L.to_bool_array cnode) with
-	| b::l -> (b, List.map(function true -> S | false -> P))
+	| b::l -> (b, List.map(function true -> S | false -> P)l)
 	| _ -> assert false
 
 let cnode ((b, l):node_state) : node_cstate = Bitv.L.of_bool_array (Array.of_list (b::(List.flatten(List.map(function SS -> [false; false] | SP -> [false; true] | PS -> [true; false])l))))
 
-let mappair (f:'a * 'a -> 'b) (l:'a list) : 'b list =
-	let rec aux (carry:'b list) : 'b list = function
+let mappair (f:'a * 'a -> 'b) : 'a list -> 'b list =
+	let rec aux (carry:'b list) : 'a list -> 'b list = function
 		| []			-> List.rev carry
 		| x::y::next	-> aux ((f (x, y))::carry) next
 		| _				-> assert false
@@ -105,13 +105,13 @@ let pull_node getid (cnode, nx, ny) = pull_node getid (dnode cnode, nx, ny)
 
 module GroBdd_CP_M : Subdag.MODELE with
 		type node = node_cstate
-	and	type edge = edge_cstate
+	and	type edge = edge_state
 	and type leaf = unit
 =
 struct
 	
 	type node = node_cstate
-	type edge = edge_cstate
+	type edge = edge_state
 	type leaf = unit
 
 	type 't gn = (leaf, 't) Utils.gnode
@@ -124,36 +124,12 @@ struct
 	
 	let pull_node = pull_node
 	
-	let dump_node_mu_state x = Tree.Leaf (match x with
-		| SS -> "0"
-		| SP -> "1"
-		| PS -> "2")
-	
-	let load_node_mu_state = function
-		| Tree.Node _ -> assert false
-		| Tree.Leaf x -> match x with
-			| "0" -> SS
-			| "1" -> SP
-			| "2" -> PS
-			| _	  -> assert false
-	
-	let dump_edge_mu_state x = Tree.Leaf(match x with
-		| S -> "S"
-		| P -> "P")
-	
-	let load_edge_mu_state = function
-		| Tree.Node _ -> assert false
-		| Tree.Leaf x -> match x with
-			| "S" -> S
-			| "P" -> P
-			| _   -> assert false
-
-	let dump_node   = Some (fun (b, lxy) -> Tree.Node ((StrTree.of_bool b)::(List.map dump_node_mu_state lxy)))
-	let load_node   = Some (function Tree.Node (b::lxy) -> (StrTree.to_bool b, List.map load_node_mu_state lxy) | _ -> assert false)
+	let dump_node   = Some (Extra.(Bitv.L.to_hexa_string >> StrTree.of_string))
+	let load_node   = Some (Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> dnode >> uncompact))
 	let dot_of_node = None
 	
-	let dump_edge   = Some (fun (b, l) -> Tree.Node ((StrTree.of_bool b)::(List.map dump_edge_mu_state l)))
-	let load_edge   = Some (function Tree.Node (b::lxy) -> (StrTree.to_bool b, List.map load_edge_mu_state lxy) | _ -> assert false)
+	let dump_edge   = Some (Extra.(cedge >> Bitv.L.to_hexa_string >> StrTree.of_string))
+	let load_edge   = Some (Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> dedge))
 	let dot_of_edge = Some (fun (b, l) -> String.concat "" ((if b then "-" else "+")::(List.map(function S -> "S" | P -> "P")l)))
 
 	let dump_leaf   = Some (fun () -> Tree.Node [])

@@ -21,8 +21,8 @@ struct
 	let compose _ (():edge) (x:'t e)  = x
 
 
-	let dump_node = Some StrTree.of_unit
-	let load_node = Some StrTree.to_unit
+	let dump_node = Some (fun () -> Tree.Node [])
+	let load_node = Some (function Tree.Node [] -> (), () | _ -> assert false)
 	let dot_of_node = None
 
 	let dump_edge = Some StrTree.of_unit
