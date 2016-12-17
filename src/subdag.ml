@@ -527,7 +527,7 @@ struct
 		type transform
 		val compose : transform -> edge -> edge
 		val  decomp : G.tree -> G.tree -> t -> edge * edge
-		val  solver : edge * edge -> (edge, (transform * (t*G.tree*G.tree))) Utils.merge
+		val  solver : (G.pnode -> G.ident) -> edge * edge -> (edge, (transform * (t*G.tree*G.tree))) Utils.merge
 	end
 	
 	module IBOP(D0:MODELE_IBOP) =
@@ -568,7 +568,7 @@ struct
 			let apply2 = MEMO2.apply memo2 in
 			let push = push man
 			and pull = pull man in
-				let rec calcrec (x:edge) (y:edge) = match D0.solver (x, y) with
+				let rec calcrec (x:edge) (y:edge) = match D0.solver G.get_ident (x, y) with
 				| Utils.MEdge f -> f
 				| Utils.MNode (t, (c, n1, n2)) -> D0.compose t (match n1, n2 with
 					| Leaf l1, Leaf l2 ->   apply0 fun0 ((l1, l2), c)

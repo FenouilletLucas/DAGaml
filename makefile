@@ -5,7 +5,7 @@ SRCS=-Is tools,src,bitv
 NPROC=$(shell nproc)
 OB=ocamlbuild -j $(NPROC) -r $(LIBS) $(SRCS)
 
-all: extra tests
+all: tests
 
 tests:
 	$(OB) \
@@ -18,7 +18,9 @@ tests:
 
 extra:
 	$(OB) \
-		bitv/bitv.native
+		bitv/bitv.native \
+		grobdd/gops.native \
+		grobdd/cp.native
 
 
 clean:

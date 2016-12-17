@@ -23,7 +23,7 @@ module type MODELE = sig
 	val dot_of_edge : (edge -> string) option
 	
 	val dump_node : (node -> StrTree.tree) option
-	val load_node : (StrTree.tree -> node) option
+	val load_node : (StrTree.tree -> tag * edge * edge) option
 	val dot_of_node : (int -> node -> string) option
 
 end
@@ -39,7 +39,35 @@ module MODULE(M0:MODELE)
 (* M = Modele *)
 struct
 	module M = M0
-	module G = Ubdag.UBDAG(M)
+	module MODELE =
+	struct
+		type leaf = M0.leaf
+		type edge = M0.edge
+		type node = M0.node
+
+		type 't gn = (leaf, 't) Utils.gnode
+		type 't n = node * 't gn * 't gn
+		type 't e = edge * 't gn
+
+		let push = M0.push
+		let pull = M0.pull
+		let pull_node = M0.pull_node
+		let compose = M0.compose
+		
+		let dump_leaf = None
+		let load_leaf = None
+		let dot_of_leaf = None
+
+		let dump_edge = None
+		let load_edge = None
+		let dot_of_edge = None
+		
+		let dump_node = None
+		let load_node = None
+		let dot_of_node = None
+
+	end
+	module G = Ubdag.UBDAG(MODELE)
 	
 	type edge = M.edge * G.tree
 	

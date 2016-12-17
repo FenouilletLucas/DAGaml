@@ -56,7 +56,7 @@ struct
 	type transform = unit
 	let compose () x = x
 	let decomp x y () = (((), x), ((), y))
-	let solver = function
+	let solver _ = function
 		| (((), Utils.Leaf ()):T.edge), ((), y)
 		| ((), y), (((), Utils.Leaf ()):T.edge) -> Utils.MEdge ((), y)
 		| ((), x), ((), y) -> Utils.MNode ((), ((), x, y))
