@@ -1,0 +1,145 @@
+let strdump_node = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
+let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.binload_node >> Gops.node_split)
+
+let strdump_tacx = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
+let strload_tacx = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.binload_tacx >> Gops.tacx_split)
+
+let strdump_edge = Extra.(Gops.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.of_string)
+let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.binload_edge)
+
+let dot_of_edge (b, l) =
+	String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l))
+
+let strdump_leaf = (fun () -> Tree.Node [])
+let strload_leaf = (function Tree.Node [] -> ((false, []), Utils.Leaf ()) | _ -> assert false)
+
+module GroBdd_CP_M : Subdag.MODELE with
+		type node = Types.node_cstate
+	and	type edge = Types.edge_state
+	and type leaf = unit
+=
+struct
+	
+	type node = Types.node_cstate
+	type edge = Types.edge_state
+	type leaf = unit
+
+	type 't gn = (leaf, 't) Utils.gnode
+	type 't n = node * 't gn * 't gn	
+	type 't e = edge * 't gn
+
+	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge =
+		Gops.node_push_cons
+	let pull = Gops.node_pull
+	let compose _ = Gops.compose
+	
+	let pull_node = Gops.node_pull_node
+	
+	let dump_node   = Some strdump_node
+	let load_node   = Some strload_node
+	let dot_of_node = None
+	
+	let dump_edge   = Some strdump_edge
+	let load_edge   = Some strload_edge
+	let dot_of_edge = Some dot_of_edge
+
+	let dump_leaf   = Some strdump_leaf
+	let load_leaf   = Some strload_leaf
+	let dot_of_leaf = Some (fun () -> "0")
+end
+
+module GroBdd_CP = Subdag.MODULE(GroBdd_CP_M)
+
+let newman = GroBdd_CP.newman
+
+let make_const b n = GroBdd_CP.push_leaf (b, MyList.ntimes Types.P n) ();;
+
+let make_ident man b n = GroBdd_CP.push man (make_const b n) (make_const (not b) n);;
+
+let push_pass ((b, l), i) = ((b, Types.P::l), i)
+
+let no ((b, l), i) = ((not b, l), i)
+
+let is_root = function
+	| ((b, l), Utils.Leaf ()) -> Some b
+	| _ -> None 
+
+let get_root b ((_, l), _) = ((b, MyList.ntimes Types.P (List.length l)), Utils.Leaf ())
+
+let (=??) (ex, ix) (ey, iy) = match ix, iy with
+	| Utils.Leaf (), Utils.Leaf () -> ex = ey
+	| Utils.Node nx, Utils.Node ny -> (nx == ny) && (ex = ey)
+	| _ -> false
+
+module AND_M : GroBdd_CP.MODELE_IBOP =
+struct
+	type t = Bitv.t
+	let compare = Pervasives.compare
+	type transform = Types.edge_state
+	let compose = Gops.compose
+	let decomp x y c =
+		let ((bx, by), lxy) = Gops.binload_node_and c in
+		let lx, ly = Gops.split_pair lxy in
+		((bx, lx), x), ((by, ly), y)
+	let solver = Gops.node_solve_and
+end;;
+
+module XOR_M : GroBdd_CP.MODELE_IBOP =
+struct
+	type t = Bitv.t
+	let compare = Pervasives.compare
+	type transform = Types.edge_state
+	let compose = Gops.compose
+	let decomp x y c =
+		let lxy = Gops.binload_node_xor c in
+		let lx, ly = Gops.split_pair lxy in
+		((false, lx), x), ((false, ly), y)
+	let solver = Gops.node_solve_xor
+end;;
+
+module AND = GroBdd_CP.IBOP(AND_M);;
+module XOR = GroBdd_CP.IBOP(XOR_M);;
+
+
+module TACX_CP_M : TaggedSubdag.MODELE with
+		type node = Types.tacx_cstate
+	and	type edge = Types.edge_state
+	and type leaf = unit
+	and type tag  = Types.op_tag
+=
+struct
+	
+	type node = Types.tacx_cstate
+	type edge = Types.edge_state
+	type leaf = unit
+	type tag  = Types.op_tag
+
+	type 't gn = (leaf, 't) Utils.gnode
+	type 't n = node * 't gn * 't gn	
+	type 't e = edge * 't gn
+
+	let push = Gops.tacx_push
+	let pull = Gops.tacx_pull
+	let compose _ = Gops.compose
+	
+	let pull_node = Gops.tacx_pull_node
+	
+	let dump_node   = Some strdump_tacx
+	let load_node   = Some strload_tacx
+	let dot_of_node = None
+	
+	let dump_edge   = Some strdump_edge
+	let load_edge   = Some strload_edge
+	let dot_of_edge = Some dot_of_edge
+
+	let dump_leaf   = Some StrTree.of_unit
+	let load_leaf   = Some StrTree.to_unit
+	let dot_of_leaf = Some (fun () -> "0")
+end
+
+module TACX_CP = TaggedSubdag.MODULE(TACX_CP_M)
+
+
+let ( *! ) man x y = TACX_CP.push man Types.Cons x y
+let ( &! ) man x y = TACX_CP.push man Types.And x y
+and ( ^! ) man x y = TACX_CP.push man Types.Xor x y
