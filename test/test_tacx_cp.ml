@@ -6,8 +6,6 @@ let ( *! ) = Cp.( *! ) man
 and ( &! ) = Cp.( &! ) man
 and ( ^! ) = Cp.( ^! ) man;;
 
-let man = Cp.newman();;
-
 let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes Types.P n) ();;
 
 let make_ident b n = (make_const b n) *! (make_const (not b) n);;
@@ -45,6 +43,28 @@ assert(c1 ^! c0 =!! c1);;
 assert(c1 ^! c1 =!! c0);;
 
 assert(nx01 ^! nx10 =!! x01 ^! x10);;
+
+let dump_man = Udag.StrTree.newman ();;
+
+let edges = [nx01; nx10; nx01 ^! nx10; x01; x10; x01 ^! x10];;
+let dump_edges = T.dump man dump_man edges;;
+
+let dump_edges = Udag.StrTree.dump dump_man dump_edges;;
+
+StrTree.tree_print print_string [dump_edges];;
+StrTree.dumpfile [dump_edges] "test.cp.tacx";;
+
+let groman = Cp.newman ();;
+
+let evaman, mapcalc = Cp.EVAL.newman man groman;;
+
+let eval_edges = mapcalc edges;;
+
+let dump_edges = Cp.GroBdd_CP.dump groman dump_man eval_edges;;
+let dump_edges = Udag.StrTree.dump dump_man dump_edges;;
+
+StrTree.tree_print print_string [dump_edges];;
+StrTree.dumpfile [dump_edges] "test.cp.pure";;
 
 (*StrTree.tree_print print_string [AND.dump_stat and_man; XOR.dump_stat xor_man];;*)
 

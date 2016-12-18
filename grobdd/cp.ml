@@ -10,8 +10,10 @@ let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.bin
 let dot_of_edge (b, l) =
 	String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l))
 
+let default_leaf = ((false, []), Utils.Leaf ())
+
 let strdump_leaf = (fun () -> Tree.Node [])
-let strload_leaf = (function Tree.Node [] -> ((false, []), Utils.Leaf ()) | _ -> assert false)
+let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
 module GroBdd_CP_M : Subdag.MODELE with
 		type node = Types.node_cstate
@@ -132,14 +134,54 @@ struct
 	let load_edge   = Some strload_edge
 	let dot_of_edge = Some dot_of_edge
 
-	let dump_leaf   = Some StrTree.of_unit
-	let load_leaf   = Some StrTree.to_unit
+	let dump_leaf   = Some strdump_leaf
+	let load_leaf   = Some strload_leaf
 	let dot_of_leaf = Some (fun () -> "0")
 end
 
 module TACX_CP = TaggedSubdag.MODULE(TACX_CP_M)
 
-
 let ( *! ) man x y = TACX_CP.push man Types.Cons x y
 let ( &! ) man x y = TACX_CP.push man Types.And x y
 and ( ^! ) man x y = TACX_CP.push man Types.Xor x y
+
+module EVAL =
+struct
+	module EVAL_VISITOR =
+	struct
+		type xnode = GroBdd_CP.edge
+		type xedge = GroBdd_CP.edge
+		type cons = xedge -> xedge -> xedge
+		type extra = cons * cons * cons (* (a, c, x) *)
+
+		let do_leaf _ () = default_leaf
+		let do_node (a, c, x) = Extra.(Gops.binload_tacx >> Gops.tacx_split >> (fun (tag, edgeX, edgeY) ->
+			let merge = Types.(match tag with And -> a | Cons -> c | Xor -> x) in
+			Utils.MNode (fun nodeX nodeY -> merge (Gops.compose edgeX nodeX) (Gops.compose edgeY nodeY))))
+		let do_edge _ = Gops.compose
+	end
+
+	module EVAL = TACX_CP.NODE_VISITOR(EVAL_VISITOR)
+
+	type manager = {
+		grobdd : GroBdd_CP.manager;
+		andman : AND.manager;
+		xorman : XOR.manager;
+		theman : EVAL.manager;
+		calc   : TACX_CP.edge -> GroBdd_CP.edge
+	}
+
+	let newman tacx man =
+		let c = GroBdd_CP.push man in
+		let aman, a = AND.newman man
+		and xman, x = XOR.newman man in
+		let theman, calc = EVAL.newman tacx (a, c, x) in
+		{
+			grobdd = man;
+			andman = aman;
+			xorman = xman;
+			theman = theman;
+			calc = calc
+		}, List.map calc
+
+end

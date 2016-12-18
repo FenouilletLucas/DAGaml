@@ -50,7 +50,8 @@ StrTree.tree_print print_string [Cp.AND.dump_stat and_man; Cp.XOR.dump_stat xor_
 
 let dump_man = Udag.StrTree.newman ();;
 
-let edges = Cp.GroBdd_CP.dump man dump_man [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
+let edges = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
+let edges = Cp.GroBdd_CP.dump man dump_man edges;;
 
 let dump_edges = Udag.StrTree.dump dump_man edges;;
 

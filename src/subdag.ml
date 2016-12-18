@@ -186,6 +186,8 @@ struct
 			memoEdge: D0.xedge MEdge.manager;
 			memoNode: D0.xnode G.MNode.manager;
 		}
+
+		type manager = memo
 		
 		let makeman man extra hsize =
 			let memoLeaf  = G.MLeaf.makeman hsize in
@@ -558,6 +560,8 @@ struct
 			memo1	: edge MEMO1.manager;
 			memo2	: edge MEMO2.manager;
 		}
+
+		type manager = memo
 		
 		let makeman man hsize=
 			let memo0  = MEMO0.makeman hsize in
