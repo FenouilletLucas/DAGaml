@@ -12,9 +12,7 @@ module type GRAPH = sig
     include GRAPH_HEADER
     type ident
 
-	type next_t =
-		| Leaf of leaf
-		| NodeRef of ident
+	type next_t = (leaf, ident) Utils.gnode
 	type edge_t = edge * next_t
 	type node_t = node * (edge_t list)
     
@@ -50,9 +48,7 @@ struct
     type edge = Header.edge
     type node = Header.node
 
-	type next_t =
-		| Leaf of leaf
-		| NodeRef of ident
+	type next_t = (leaf, ident) Utils.gnode
 	type edge_t = edge * next_t
 	type node_t = node * (edge_t list)
 	
@@ -85,8 +81,8 @@ struct
 			| None		-> (fun _ -> StrTree.of_unit())
 		in
 		let dump_next_t (parcours: ident -> unit) = function
-			| Leaf leaf -> [Tree.Leaf "Leaf"; dump_leaf leaf]
-			| NodeRef ident -> parcours ident; [Tree.Leaf "NodeRef"; StrTree.of_int ident]
+			| Utils.Leaf leaf -> [Tree.Leaf "Leaf"; dump_leaf leaf]
+			| Utils.Node ident -> parcours ident; [Tree.Leaf "Node"; StrTree.of_int ident]
 		in
 		let dump_edge_t parcours =
             let dump_next_t = dump_next_t parcours in
@@ -121,7 +117,56 @@ struct
 			in
 			let liste_nodes =	revret() in
 			Tree.Node [Tree.Node liste_nodes; Tree.Node liste_edges]
-			
+	
+	let to_dot =
+		let dump_leaf = match Header.dot_of_leaf with
+			| Some dump -> dump
+			| None		-> (fun _ -> "")
+		and dump_edge = match Header.dot_of_edge with
+			| Some dump -> dump
+			| None		-> (fun _ -> "")
+		and dump_node = match Header.dot_of_node with
+			| Some dump -> dump
+			| None		-> (fun _  _ -> "")
+		in
+		let dump_next_t (parcours: ident -> unit) getleaf = function
+			| Utils.Leaf leaf -> "L"^(string_of_int (getleaf leaf))
+			| Utils.Node ident -> parcours ident; "N"^(string_of_int ident)
+		in
+		let dump_edge_t parcours getleaf =
+            let dump_next_t = dump_next_t parcours getleaf in
+            fun (edge, next) -> (dump_edge edge, dump_next_t next)
+		in
+		let dump_node_t parcours getleaf =
+			let dump_edge_t = dump_edge_t parcours getleaf in
+			fun ident (node, edges) -> (dump_node ident node, List.map dump_edge_t edges)
+		in fun udag edges print ->
+			let memo = MemoTable.create (H2Table.length udag.unique) in
+			let memo_leaf = H2Table.create 1 0 in
+			let getleaf = H2Table.push memo_leaf in
+			let apply : (ident -> unit) -> ident -> unit = MemoTable.apply memo in
+			let rec parcours ident : unit = apply	((fun ident ->
+				(
+					let node : node_t = H2Table.pull udag.unique ident in
+					let node_ , edges_ = dump_node_t parcours getleaf ident node in
+					let src_ = "N"^(string_of_int ident) in
+					print ( "\t"^src_ ^ " " ^ node_ ^ "\n");
+					List.iter (fun (edge_, dst_) -> print("\t" ^ src_ ^ " -> " ^ dst_ ^ " " ^ edge_^"\n" )) edges_ ;
+				)
+											):ident -> unit) (ident:ident)
+			in
+			List.iteri (fun idx edge ->
+				let edge_, dst_ = dump_edge_t parcours getleaf edge in
+				print ("\tE"^(string_of_int idx)^" -> "^dst_^" "^edge_^"\n" )) edges
+	
+	let to_dot_file udag edges target =
+		let file = open_out target in
+		let print = output_string file in
+		print "digraph G {\n\tedge[fontname=\"courier\"];\n";
+		to_dot udag edges print;
+		print "}\n";
+		close_out file
+
 	let load =
 		match Header.load_leaf with
 			| None -> None
@@ -133,9 +178,9 @@ struct
 			| None -> None
 			| Some load_node ->
 		let load_next getid = function
-			| [Tree.Leaf "Leaf"; leaf] -> Leaf (load_leaf leaf)
-			| [Tree.Leaf "NodeRef"; ident] ->
-					NodeRef (getid (StrTree.to_int ident))
+			| [Tree.Leaf "Leaf"; leaf] -> Utils.Leaf (load_leaf leaf)
+			| [Tree.Leaf "Node"; ident] ->
+					Utils.Node (getid (StrTree.to_int ident))
 			| _ -> assert false
 		in
 		let load_edge getid = function
@@ -197,8 +242,8 @@ struct
 			let appLeaf, appEdge, appNode = MemoTable.(apply memLeaf, apply memEdge, apply memNode) in
 			let rec calcrec (edge, next) =
 				 calcedge edge (match next with
-					| Leaf leaf -> calcleaf leaf
-					| NodeRef node -> calcnode node)
+					| Utils.Leaf leaf -> calcleaf leaf
+					| Utils.Node node -> calcnode node)
 			and		calcleaf leaf = appLeaf (M0.do_leaf extra) leaf
 			and		calcedge edge xnode = appEdge (fun (edge, xnode) -> M0.do_edge extra edge xnode) (edge, xnode)
 			and		calcnode ident = appNode (fun ident ->

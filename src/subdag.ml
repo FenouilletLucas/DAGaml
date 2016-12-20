@@ -389,14 +389,45 @@ struct
 			| Some x -> x
 
 		let do_leaf extra edge leaf =
-			((dump_edge edge, Udag.StrTree.Leaf (dump_leaf leaf)):Udag.StrTree.edge_t)
+			((dump_edge edge, Utils.Leaf (dump_leaf leaf)):Udag.StrTree.edge_t)
 
 		let do_node extra edge =
 			let merger edge0 edge1 =
-				((dump_edge edge, Udag.StrTree.NodeRef (Udag.StrTree.push extra (Tree.Node [], [edge0; edge1]))):Udag.StrTree.edge_t)
+				((dump_edge edge, Utils.Node (Udag.StrTree.push extra (Tree.Node [], [edge0; edge1]))):Udag.StrTree.edge_t)
 			in ((Utils.MNode merger):(xedge, (xedge -> xedge -> xedge))Utils.merge)
 
 	end
+
+	module MODELE_TO_DOT_EDGE : MODELE_EDGE_VISITOR with
+			type xedge = Udag.String.edge_t
+		and type extra = Udag.String.manager
+	=
+	struct
+		type xedge = Udag.String.edge_t
+		type extra = Udag.String.manager
+		
+		let dump_edge = match M.dot_of_edge with
+			| None -> (fun _ -> "")
+			| Some x -> x
+		and dump_leaf = match M.dot_of_leaf with
+			| None -> (fun _ -> "")
+			| Some x -> x
+
+		let do_leaf extra edge leaf =
+			((dump_edge edge, Utils.Leaf (dump_leaf leaf)):Udag.String.edge_t)
+
+		let do_node extra edge =
+			let merger edge0 edge1 =
+				((dump_edge edge, Utils.Node (Udag.String.push extra ((None, ""), [edge0; edge1]))):Udag.String.edge_t)
+			in ((Utils.MNode merger):(xedge, (xedge -> xedge -> xedge))Utils.merge)
+
+	end
+	
+	module TO_DOT_EDGE = EDGE_VISITOR(MODELE_TO_DOT_EDGE)
+	
+	let to_dot man strman : edge list -> MODELE_TO_DOT_EDGE.xedge list =
+		let man, calc = TO_DOT_EDGE.makeman man strman 10000 in
+		List.map calc
 	
 	module MODELE_DUMP_NODE : MODELE_NODE_VISITOR with
 			type xnode = Udag.StrTree.next_t
@@ -421,16 +452,16 @@ struct
 			| Some f -> f
 			| None -> (fun _ -> assert false)
 
-		let do_leaf extra leaf = Udag.StrTree.Leaf (dump_leaf leaf)
+		let do_leaf extra leaf = Utils.Leaf (dump_leaf leaf)
 		let do_node extra node : (xnode, xnode -> xnode -> xnode) Utils.merge =
 			let node = dump_node node in
-			Utils.MNode(fun son0 son1 -> Udag.StrTree.NodeRef (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
+			Utils.MNode(fun son0 son1 -> Utils.Node (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
 
 		let do_edge (extra:extra) edge son = (Tree.Node [dump_edge edge], son)
 
 	end
 
-	(* module DUMP_EDGE = NODE_VISITOR(MODELE_DUMP_EDGE) *)
+	(* module DUMP_EDGE = EDGE_VISITOR(MODELE_DUMP_EDGE) *)
 	module DUMP_NODE = NODE_VISITOR(MODELE_DUMP_NODE)
 
 	let dump man dump_man : edge list -> MODELE_DUMP_NODE.xedge list =

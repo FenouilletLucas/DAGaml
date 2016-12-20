@@ -26,6 +26,8 @@ module type MODELE = sig
 	val load_node : (StrTree.tree -> tag * edge * edge) option
 	val dot_of_node : (int -> node -> string) option
 
+	val dot_of_tag : (tag -> string) option
+
 end
 
 
@@ -302,10 +304,10 @@ struct
 			| Some f -> f
 			| None -> (fun _ -> assert false)
 
-		let do_leaf extra leaf = Udag.StrTree.Leaf (dump_leaf leaf)
+		let do_leaf extra leaf = Utils.Leaf (dump_leaf leaf)
 		let do_node extra node : (xnode, xnode -> xnode -> xnode) Utils.merge =
 			let node = dump_node node in
-			Utils.MNode(fun son0 son1 -> Udag.StrTree.NodeRef (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
+			Utils.MNode(fun son0 son1 -> Utils.Node (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
 
 		let do_edge (extra:extra) edge son = (Tree.Node [dump_edge edge], son)
 
@@ -317,7 +319,43 @@ struct
 	let dump man dump_man : edge list -> MODELE_DUMP_NODE.xedge list =
 		let man, calc = DUMP_NODE.makeman man dump_man 10000 in
 		List.map calc
+
+	module MODELE_TO_DOT_EDGE : MODELE_EDGE_VISITOR with
+			type xedge = Udag.String.edge_t
+		and type extra = Udag.String.manager
+	=
+	struct
+		type xedge = Udag.String.edge_t
+		type extra = Udag.String.manager
+		
+		let dump_edge = match M.dot_of_edge with
+			| None -> (fun _ -> "")
+			| Some x -> x
+		and dump_leaf = match M.dot_of_leaf with
+			| None -> (fun _ -> "")
+			| Some x -> x
+		and dump_tag = match M.dot_of_tag with
+			| None -> (fun _ -> "")
+			| Some x -> x
+
+		let do_leaf extra edge leaf =
+			((dump_edge edge, Utils.Leaf (dump_leaf leaf)):Udag.String.edge_t)
+
+		let do_node extra edge =
+			let merger tag edge0 edge1 =
+				((dump_edge edge, Utils.Node (Udag.String.push extra ((None, dump_tag tag), [edge0; edge1]))):Udag.String.edge_t)
+			in ((Utils.MNode merger):(xedge, (M.tag -> xedge -> xedge -> xedge))Utils.merge)
+
+	end
 	
+	module TO_DOT_EDGE = EDGE_VISITOR(MODELE_TO_DOT_EDGE)
+	
+	let to_dot man strman : edge list -> MODELE_TO_DOT_EDGE.xedge list =
+		let man, calc = TO_DOT_EDGE.makeman man strman 10000 in
+		List.map calc
+	
+
+
 	module MODELE_LOAD_NODE : Udag.StrTree.MODELE_VISITOR with
 			type xedge = edge
 		and type xnode = edge

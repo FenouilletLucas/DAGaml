@@ -21,9 +21,9 @@ struct
 
     let push dst_udag =
         let rec pnext = function
-            | Leaf leaf     -> Dst.Leaf leaf
-            | NodeRef ident -> Dst.NodeRef ident
-            | Node node     -> Dst.NodeRef (pnode node)
+            | Leaf leaf     -> Utils.Leaf leaf
+            | NodeRef ident -> Utils.Node ident
+            | Node node     -> Utils.Node (pnode node)
         and     pedge = function ((edge, next):edge_t) ->
             (edge, pnext next)
         and     pnode = function ((node, edges):node_t) ->
@@ -33,8 +33,8 @@ struct
     let apply man src_udag dst_udag fleaf fedge fnode edges =
         let apply = MemoTable.apply man.memotable in
         let pnext p = function
-            | Src.Leaf leaf -> fleaf leaf
-            | Src.NodeRef ident -> p ident
+            | Utils.Leaf leaf -> fleaf leaf
+            | Utils.Node ident -> p ident
         in
         let pedge p = function (edge, next) ->
             fedge edge (pnext p next)

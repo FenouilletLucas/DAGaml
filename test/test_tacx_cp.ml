@@ -26,11 +26,7 @@ let x10 = make_ident false 1;;
 let nx10 = make_ident true 1;;
 
 
-let (=!!) (ex, ix) (ey, iy) = match ix, iy with
-	| Utils.Leaf (), Utils.Leaf () -> ex = ey
-	| Utils.Node nx, Utils.Node ny -> (nx == ny) && (ex = ey)
-	| _ -> false
-;;
+let (=!!) = Cp.( =?? );;
 
 assert(c0 &! c0 =!! c0);;
 assert(c0 &! c1 =!! c0);;
@@ -47,6 +43,13 @@ assert(nx01 ^! nx10 =!! x01 ^! x10);;
 let dump_man = Udag.StrTree.newman ();;
 
 let edges = [nx01; nx10; nx01 ^! nx10; x01; x10; x01 ^! x10];;
+
+
+let strman = Udag.String.newman ();;
+let stredges = Cp.TACX_CP.to_dot man strman edges;;
+
+let stredges = Udag.String.to_dot_file strman stredges "test.dot";;
+
 let dump_edges = T.dump man dump_man edges;;
 
 let dump_edges = Udag.StrTree.dump dump_man dump_edges;;

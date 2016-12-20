@@ -14,13 +14,15 @@ tests:
 		test/test_ubdag.native \
 		test/test_subdag.native \
 		test/test_grobdd_cp.native \
+		test/test_nqueens_cp.native \
 		test/test_tacx_cp.native
 
 extra:
 	$(OB) \
 		bitv/bitv.native \
 		grobdd/gops.native \
-		grobdd/cp.native
+		grobdd/cp.native \
+		grobdd/oops.native
 
 
 clean:

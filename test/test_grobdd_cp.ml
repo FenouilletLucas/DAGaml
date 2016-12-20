@@ -49,11 +49,17 @@ assert(nx01 ^? nx10 =?? x01 ^? x10);;
 StrTree.tree_print print_string [Cp.AND.dump_stat and_man; Cp.XOR.dump_stat xor_man];;
 
 let dump_man = Udag.StrTree.newman ();;
+let strman = Udag.String.newman ();;
 
 let edges = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
 let edges = Cp.GroBdd_CP.dump man dump_man edges;;
 
 let dump_edges = Udag.StrTree.dump dump_man edges;;
+
+let stredges = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
+let stredges = Cp.GroBdd_CP.to_dot man strman stredges;;
+
+let stredges = Udag.String.to_dot_file strman stredges "test.dot";;
 
 StrTree.tree_print print_string [dump_edges];;
 StrTree.dumpfile [dump_edges] "test.sdml";;

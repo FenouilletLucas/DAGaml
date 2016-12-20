@@ -8,7 +8,7 @@ let strdump_edge = Extra.(Gops.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.
 let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.binload_edge)
 
 let dot_of_edge (b, l) =
-	String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l))
+	"[label = \""^(String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l)))^"\"];"
 
 let default_leaf = ((false, []), Utils.Leaf ())
 
@@ -47,7 +47,7 @@ struct
 
 	let dump_leaf   = Some strdump_leaf
 	let load_leaf   = Some strload_leaf
-	let dot_of_leaf = Some (fun () -> "0")
+	let dot_of_leaf = Some (function () -> "[label = \"0\"];")
 end
 
 module GroBdd_CP = Subdag.MODULE(GroBdd_CP_M)
@@ -57,6 +57,8 @@ let newman = GroBdd_CP.newman
 let make_const b n = GroBdd_CP.push_leaf (b, MyList.ntimes Types.P n) ();;
 
 let make_ident man b n = GroBdd_CP.push man (make_const b n) (make_const (not b) n);;
+
+let arity ((_, l), _) = List.length l
 
 let push_pass ((b, l), i) = ((b, Types.P::l), i)
 
@@ -137,6 +139,8 @@ struct
 	let dump_leaf   = Some strdump_leaf
 	let load_leaf   = Some strload_leaf
 	let dot_of_leaf = Some (fun () -> "0")
+
+	let dot_of_tag = Some Extra.(Types.(function And -> "A" | Cons -> "C" | Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
 end
 
 module TACX_CP = TaggedSubdag.MODULE(TACX_CP_M)
