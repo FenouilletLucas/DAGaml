@@ -25,7 +25,7 @@ module type MODELE = sig
 	
 	val dump_node : (node -> StrTree.tree) option
 	val load_node : (StrTree.tree -> edge * edge) option
-	val dot_of_node : (int -> node -> string) option
+	val dot_of_node : (node -> string * string * string) option
 
 end
 
@@ -398,34 +398,43 @@ struct
 
 	end
 
-	module MODELE_TO_DOT_EDGE : MODELE_EDGE_VISITOR with
+	module MODELE_TO_DOT_NODE : MODELE_NODE_VISITOR with
 			type xedge = Udag.String.edge_t
+		and type xnode = Udag.String.next_t
 		and type extra = Udag.String.manager
 	=
 	struct
 		type xedge = Udag.String.edge_t
+		type xnode = Udag.String.next_t
 		type extra = Udag.String.manager
 		
 		let dump_edge = match M.dot_of_edge with
 			| None -> (fun _ -> "")
 			| Some x -> x
+		and dump_node = match M.dot_of_node with
+			| None -> (fun _ -> "", "", "")
+			| Some x -> x
 		and dump_leaf = match M.dot_of_leaf with
 			| None -> (fun _ -> "")
 			| Some x -> x
 
-		let do_leaf extra edge leaf =
-			((dump_edge edge, Utils.Leaf (dump_leaf leaf)):Udag.String.edge_t)
+		let do_leaf extra leaf =
+			Utils.Leaf (dump_leaf leaf)
 
-		let do_node extra edge =
-			let merger edge0 edge1 =
-				((dump_edge edge, Utils.Node (Udag.String.push extra ((None, ""), [edge0; edge1]))):Udag.String.edge_t)
-			in ((Utils.MNode merger):(xedge, (xedge -> xedge -> xedge))Utils.merge)
+		let do_node (extra:extra) node =
+			let tnode, tedge0, tedge1 = dump_node node in
+			let merger next0 next1 =
+				Utils.Node (Udag.String.push extra ((None, tnode), [(tedge0, next0); (tedge1, next1)]))
+			in ((Utils.MNode merger):(xnode, (xnode -> xnode -> xnode))Utils.merge)
+
+		let do_edge extra edge next =
+			(dump_edge edge, next)
 
 	end
 	
-	module TO_DOT_EDGE = EDGE_VISITOR(MODELE_TO_DOT_EDGE)
+	module TO_DOT_EDGE = NODE_VISITOR(MODELE_TO_DOT_NODE)
 	
-	let to_dot man strman : edge list -> MODELE_TO_DOT_EDGE.xedge list =
+	let to_dot man strman : edge list -> MODELE_TO_DOT_NODE.xedge list =
 		let man, calc = TO_DOT_EDGE.makeman man strman 10000 in
 		List.map calc
 	

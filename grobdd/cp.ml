@@ -7,8 +7,14 @@ let strload_tacx = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.bin
 let strdump_edge = Extra.(Gops.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.of_string)
 let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> Gops.binload_edge)
 
-let dot_of_edge (b, l) =
-	"[label = \""^(String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l)))^"\"];"
+let dot_of_edge_aux color (b, l) =
+	"[label = \""^(String.concat "" ((if b then "-" else "+")::(List.map Gops.strdump_uniq_elem l)))^"\"; color=\""^color^"\"];"
+
+let dot_of_edge = dot_of_edge_aux "black"
+
+let dot_of_node node =
+	let e0, e1 = Gops.binload_node node |> Gops.node_split in
+	"", (dot_of_edge_aux "red" e0), (dot_of_edge_aux "green" e1)
 
 let default_leaf = ((false, []), Utils.Leaf ())
 
@@ -39,7 +45,7 @@ struct
 	
 	let dump_node   = Some strdump_node
 	let load_node   = Some strload_node
-	let dot_of_node = None
+	let dot_of_node = Some dot_of_node
 	
 	let dump_edge   = Some strdump_edge
 	let load_edge   = Some strload_edge
