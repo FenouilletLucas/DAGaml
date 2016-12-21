@@ -327,5 +327,32 @@ struct
 end
 
 
-module StrTree = UDAG(STRTREE_HEADER)
-module String = UDAG(STRING_HEADER)
+
+module String =
+struct
+	include UDAG(STRING_HEADER)
+	let load = match load with
+		| Some f	-> f
+		| None		-> assert false
+	
+	let loadfile target =
+		load (match StrTree.loadfile target with [] -> assert false | x::_ -> x)
+	
+	let dumpfile udag edges target =
+		StrTree.dumpfile [dump udag edges] target
+
+end
+
+module StrTree =
+struct
+	include UDAG(STRTREE_HEADER)
+	let load = match load with
+		| Some f	-> f
+		| None		-> assert false
+	
+	let loadfile target =
+		load (match StrTree.loadfile target with [] -> assert false | x::_ -> x)
+	
+	let dumpfile udag edges target =
+		StrTree.dumpfile [dump udag edges] target
+end

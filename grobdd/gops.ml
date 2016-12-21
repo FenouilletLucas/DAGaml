@@ -57,6 +57,8 @@ let split_pair uniqXY = List.split(List.map (function
 	| PS -> P, S
 	| SS -> S, S) uniqXY)
 
+let merge_pair uniqX uniqY = List.map2 (fun x y -> match x, y with P, P -> assert false | S, P -> SP | P, S -> PS | S, S -> SS) uniqX uniqY
+
 let bindump_edge (b, l) = b::(bindump_uniq l) |> Array.of_list |> Bitv.L.of_bool_array 
 let binload_edge = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_uniq l) | _ -> assert false)
 
@@ -125,10 +127,12 @@ let solve_and gid (((bx, lx), ix) as x) (((by, ly), iy) as y) =
 	else
 	(
 		let lxy, lxy' = merge_uniq (lx, ly) in
-		let bx, ix, by, iy = if ((gid nx, bx) <= (gid ny, by))
-			then (bx, ix, by, iy)
-			else (by, iy, bx, ix)
+		let lx', ly' = split_pair lxy' in
+		let bx, ix, lx', by, iy, ly' = if ((gid nx, bx, lx') <= (gid ny, by, ly'))
+			then (bx, ix, lx', by, iy, ly')
+			else (by, iy, ly', bx, ix, lx')
 		in
+		let lxy' = merge_pair lx' ly' in
 		Utils.MNode ((false, lxy), (((bx, by), lxy'), ix, iy))
 	)
 

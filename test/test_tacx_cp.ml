@@ -71,4 +71,3 @@ StrTree.dumpfile [dump_edges] "test.cp.pure";;
 
 (*StrTree.tree_print print_string [AND.dump_stat and_man; XOR.dump_stat xor_man];;*)
 
-exit 0;;

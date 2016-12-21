@@ -51,39 +51,11 @@ StrTree.tree_print print_string [Cp.AND.dump_stat and_man; Cp.XOR.dump_stat xor_
 let dump_man = Udag.StrTree.newman ();;
 let strman = Udag.String.newman ();;
 
-let edges = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
-let edges = Cp.GroBdd_CP.dump man dump_man edges;;
+let edges0 = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
 
-let dump_edges = Udag.StrTree.dump dump_man edges;;
+Cp.GroBdd_CP.dumpfile man edges0 "test.cp.pure";;
 
-let stredges = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
-let stredges = Cp.GroBdd_CP.to_dot man strman stredges;;
-
-let stredges = Udag.String.to_dot_file strman stredges "test.dot";;
-
-StrTree.tree_print print_string [dump_edges];;
-StrTree.dumpfile [dump_edges] "test.sdml";;
-
-let new_man = Cp.newman();;
-
-let new_edges = Cp.GroBdd_CP.load new_man dump_man edges;;
-
-let dump_new_man = Udag.StrTree.newman ();;
-
-let newnew_edges = Cp.GroBdd_CP.dump new_man dump_new_man new_edges;;
-
-StrTree.tree_print print_string [Udag.StrTree.dump dump_new_man newnew_edges];;
-
-let strtree = match StrTree.loadfile "test.sdml" with [tree] -> tree | _ -> assert false;;
-let loaded_strman, loaded_stredges = (match Udag.StrTree.load with Some f -> f | _ -> assert false) strtree;;
-let loaded_man = Cp.newman ();;
-let loaded_edges = Cp.GroBdd_CP.load loaded_man loaded_strman loaded_stredges;;
-
-
-let dump_loaded_man = Udag.StrTree.newman ();;
-let dump_edges = Cp.GroBdd_CP.dump loaded_man dump_loaded_man loaded_edges;;
-
-StrTree.tree_print print_string [Udag.StrTree.dump dump_loaded_man dump_edges];;
+let man1, edges1 = Cp.GroBdd_CP.loadfile "test.cp.pure";;
 
 
 

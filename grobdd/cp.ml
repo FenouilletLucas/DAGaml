@@ -50,7 +50,20 @@ struct
 	let dot_of_leaf = Some (function () -> "[label = \"0\"];")
 end
 
-module GroBdd_CP = Subdag.MODULE(GroBdd_CP_M)
+module GroBdd_CP =
+struct
+	include Subdag.MODULE(GroBdd_CP_M)
+	let dumpfile man edges target =
+		let strman = Udag.StrTree.newman() in
+		let stredges = dump man strman edges in
+		Udag.StrTree.dumpfile strman stredges target
+	
+	let loadfile target =
+		let strman, stredges = Udag.StrTree.loadfile target in
+		let man = newman () in
+		let edges = load man strman stredges in
+		man, edges
+end
 
 let newman = GroBdd_CP.newman
 
@@ -143,7 +156,20 @@ struct
 	let dot_of_tag = Some Extra.(Types.(function And -> "A" | Cons -> "C" | Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
 end
 
-module TACX_CP = TaggedSubdag.MODULE(TACX_CP_M)
+module TACX_CP =
+struct
+	include TaggedSubdag.MODULE(TACX_CP_M)
+	let dumpfile man edges target =
+		let strman = Udag.StrTree.newman() in
+		let stredges = dump man strman edges in
+		Udag.StrTree.dumpfile strman stredges target
+	
+	let loadfile target =
+		let strman, stredges = Udag.StrTree.loadfile target in
+		let man = newman () in
+		let edges = load man strman stredges in
+		man, edges
+end
 
 let ( *! ) man x y = TACX_CP.push man Types.Cons x y
 let ( &! ) man x y = TACX_CP.push man Types.And x y

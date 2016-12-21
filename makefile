@@ -15,7 +15,9 @@ tests:
 		test/test_subdag.native \
 		test/test_grobdd_cp.native \
 		test/test_nqueens_cp.native \
-		test/test_tacx_cp.native
+		test/test_tacx_cp.native \
+		test/test_eval_tacx_to_pure_cp.native \
+		test/test_eval_pure_to_dot.native
 
 extra:
 	$(OB) \
