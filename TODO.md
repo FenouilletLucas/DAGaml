@@ -25,3 +25,10 @@
 #Tools
 - add binary tree
 - add tree iterator
+
+#GroBdd
+- implement the polarity-phase invariant version of GroBdd
+- TO THINK: 1-prediction version
+	-- TO THINK: 1-preduction + polarity-phase invariant version
+- TO THINK: last variables packing
+	-- profile: hit count vs arity in AND/XOR.manager

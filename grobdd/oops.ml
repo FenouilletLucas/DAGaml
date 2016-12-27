@@ -105,11 +105,25 @@ let copy_fun copy (func : Cp.TACX_CP.edge) =
 	let tn = MyList.ntimes (Types.S) size
 	and fn = MyList.ntimes (Types.P) size in
 	let subset idx = Tools.subset_t tn fn idx copy in
-	MyList.list_init copy (fun idx -> subset idx ->> func)
+	Array.init copy (fun idx -> subset idx ->> func)
 
 let copy_fun_t copy func =
 	let size = Cp.arity func in
 (* f -> [f(0)...f(1)..., .f(0)...f(1).., etc.] *)
 	let subset idx = MyList.ncopy (Tools.subset Types.S Types.P idx copy) size in
-	MyList.list_init copy (fun idx -> subset idx ->> func)
+	Array.init copy (fun idx -> subset idx ->> func)
+
+let transpose n m mat =
+	Array.init m (fun x -> Array.init n (fun y -> mat.(y).(x)))
+
+let copy_funvect ncopy arity (funvect : Cp.TACX_CP.edge array) =
+	let nfunc = Array.length funvect in
+	let mat = Array.map (copy_fun ncopy) funvect in
+	transpose nfunc ncopy mat
+
+let copy_funvect_t ncopy arity (funvect : Cp.TACX_CP.edge array) =
+	let nfunc = Array.length funvect in
+	let mat = Array.map (copy_fun_t ncopy) funvect in
+	transpose nfunc ncopy mat
+
 

@@ -219,5 +219,47 @@ struct
 			theman = theman;
 			calc = calc
 		}, List.map calc
+	
+	let dump_stat man = Tree.Node [
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd_CP.dump_stat man.grobdd]; *)
+		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	]
 
+
+end
+
+module GroBdd_CP_CntSat =
+struct
+	module CntSat_VISITOR =
+	struct
+		type xnode = BigInt.big_int * BigInt.big_int
+		type xedge = BigInt.big_int
+		type extra = unit
+
+		let cswap b (x, y) = if b then (y, x) else (x, y)
+		let add (x, y) (x', y') = (BigInt.(+) x x', BigInt.(+) y y')
+		let shift n (x, y) = (BigInt.shift_left x n, BigInt.shift_left y n)
+		let p = function Types.P -> true | _ -> false
+
+		let do_leaf () () = (BigInt.zero, BigInt.unit)
+		let do_node ()    = Extra.(Gops.binload_node >> Gops.node_split >> (fun ((bX, lX), (bY, lY)) ->
+			let nX = MyList.count p lX
+			and nY = MyList.count p lY in
+			Utils.MNode (fun x y -> add (shift nX (cswap bX x)) (shift nY (cswap bY y)))))
+		let do_edge () (b, l) (x, y) =
+			let x = if b then y else x in
+			let n = MyList.count p l in
+			BigInt.shift_left x n
+
+	end
+
+	module CntSat = GroBdd_CP.NODE_VISITOR(CntSat_VISITOR)
+
+	let newman man =
+		CntSat.newman man ()
+	
+	let dump_stat = CntSat.dump_stat
+	
 end

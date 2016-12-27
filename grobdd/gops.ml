@@ -57,7 +57,11 @@ let split_pair uniqXY = List.split(List.map (function
 	| PS -> P, S
 	| SS -> S, S) uniqXY)
 
-let merge_pair uniqX uniqY = List.map2 (fun x y -> match x, y with P, P -> assert false | S, P -> SP | P, S -> PS | S, S -> SS) uniqX uniqY
+let merge_pair uniqX uniqY = List.map2 (fun x y -> match x, y with
+	| P, P -> assert false
+	| S, P -> SP
+	| P, S -> PS
+	| S, S -> SS) uniqX uniqY
 
 let bindump_edge (b, l) = b::(bindump_uniq l) |> Array.of_list |> Bitv.L.of_bool_array 
 let binload_edge = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_uniq l) | _ -> assert false)
@@ -94,6 +98,7 @@ let eq getid = function
 	| _								 -> false
 
 let solve_cons getid ((bX, lX) as eX, iX) ((bY, lY) as eY, iY) =
+	assert(List.length lX = List.length lY);
 	if (eq getid (iX, iY)) && (eX = eY)
 	then (Utils.MEdge ((bX, P::lX), iX))
 	else
@@ -113,6 +118,7 @@ let tacx_push_cons gid x y = match solve_cons gid x y with
 let get_root b ((_, l), _) = ((b, MyList.ntimes P (List.length l)), Utils.Leaf ())
 
 let solve_and gid (((bx, lx), ix) as x) (((by, ly), iy) as y) =
+	assert(List.length lx = List.length ly);
 	match ix with
 	| Utils.Leaf () -> Utils.MEdge (if bx then (* x ~ 1 *) y else (* x ~ 0 *) x)
 	| Utils.Node nx ->
@@ -148,7 +154,7 @@ let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (
 let neg ((b, l), i) = ((not b, l), i)
 let cneg x ((b, l), i) = (( x <> b, l), i)
 
-let solve_xor getid ((((bx, lx)), ix)as x) ((((by, ly)), iy)as y) =
+let solve_xor gid ((((bx, lx)), ix)as x) ((((by, ly)), iy)as y) =
 	assert(List.length lx = List.length ly);
 	match ix with
 	| Utils.Leaf () -> Utils.MEdge (cneg bx y)
@@ -161,10 +167,12 @@ let solve_xor getid ((((bx, lx)), ix)as x) ((((by, ly)), iy)as y) =
 	else
 	(
 		let lxy, lxy' = merge_uniq (lx, ly) in
-		let ix, iy = if (getid nx <= getid ny)
-			then (ix, iy)
-			else (iy, ix)
+		let lx', ly' = split_pair lxy' in
+		let ix, lx', iy, ly' = if ((gid nx, lx') <= (gid ny, ly'))
+			then (ix, lx', iy, ly')
+			else (iy, ly', ix, lx')
 		in
+		let lxy' = merge_pair lx' ly' in
 		Utils.MNode ((bx<>by, lxy), (lxy', ix, iy))
 	)
 

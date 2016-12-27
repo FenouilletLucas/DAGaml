@@ -20,13 +20,13 @@ let var_n : T.edge array
 
 let ue_var_n : T.edge = Oops.vect_exactly_one (&!) n var_n;;
 
-let rows : T.edge list
+let rows : T.edge array
 	= Oops.copy_fun_t n ue_var_n;;
-let cols : T.edge list
+let cols : T.edge array
 	= Oops.copy_fun n ue_var_n;;
 
-let et_cols : T.edge = Oops.list_et (&!) cols;;
-let et_rows : T.edge = Oops.list_et (&!) rows;;
+let et_cols : T.edge = Oops.vect_et (&!) cols;;
+let et_rows : T.edge = Oops.vect_et (&!) rows;;
 let n_tower : T.edge = et_cols &! et_rows;;
 
 let liste = ref [];;
@@ -76,13 +76,15 @@ print_string " s.";;
 print_newline();;
 
 
+let name = "workdir/"^(string_of_int n)^"-queens.cp.tacx"
+
 let dump_man = Udag.StrTree.newman ();;
 let dump_queens = T.dump man dump_man [n_queens];;
 let dump_queens = Udag.StrTree.dump dump_man dump_queens;;
-StrTree.dumpfile [dump_queens] "nqueens.cp.tacx";;
+StrTree.dumpfile [dump_queens] name;;
 
 let strman = Udag.String.newman ();;
 let strqueens = T.to_dot man strman [n_queens];;
-Udag.String.to_dot_file strman strqueens "nqueens.cp.tacx.dot";;
+Udag.String.to_dot_file strman strqueens (name^".dot");;
 
 exit 0;;
