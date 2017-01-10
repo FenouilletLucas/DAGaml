@@ -136,10 +136,10 @@ let range_r man =
 	myuint, (myuint <=! (of_int arity (n-1)))
 
 let cat x fxs y fys =
-	let xS = MyList.ntimes (Types.S) x.arity
-	and xP = MyList.ntimes (Types.P) x.arity
-	and yS = MyList.ntimes (Types.S) y.arity
-	and yP = MyList.ntimes (Types.P) y.arity in
+	let xS = MyList.ntimes (CpTypes.S) x.arity
+	and xP = MyList.ntimes (CpTypes.P) x.arity
+	and yS = MyList.ntimes (CpTypes.S) y.arity
+	and yP = MyList.ntimes (CpTypes.P) y.arity in
 	let sp = xS @ yP
 	and ps = xP @ yS in
 	{

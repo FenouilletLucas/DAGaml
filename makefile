@@ -27,11 +27,14 @@ tests:
 extra:
 	$(OB) \
 		bitv/bitv.native \
-		grobdd/gops.native \
+		grobdd/cpGops.native \
+		grobdd/nniGops.native \
 		grobdd/cp.native \
 		grobdd/oops.native \
 		grobdd/myUint.native \
-		test/test_bin_of_int.native
+		test/test_bin_of_int.native \
+		tools/binDump.native \
+		tools/binLoad.native
 
 
 clean:

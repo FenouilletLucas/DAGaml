@@ -6,7 +6,7 @@ let ( *! ) = Cp.( *! ) man
 and ( &! ) = Cp.( &! ) man
 and ( ^! ) = Cp.( ^! ) man;;
 
-let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes Types.P n) ();;
+let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes CpTypes.P n) ();;
 
 let make_ident b n = (make_const b n) *! (make_const (not b) n);;
 

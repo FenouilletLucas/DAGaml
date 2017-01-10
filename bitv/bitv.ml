@@ -556,6 +556,9 @@ Joan.Thibault@ens-rennes.fr
 		done;
 		v
 	
+	let to_bool_list = Extra.(to_bool_array >> Array.to_list)
+	let of_bool_list = Extra.(Array.of_list >> of_bool_array)
+	
 	let to_hexa_string =
 		let tochar x =
 			assert(x>=0);

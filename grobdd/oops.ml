@@ -1,4 +1,4 @@
-let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes Types.P n) ()
+let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes CpTypes.P n) ()
 
 let make_ident man b n = Cp.( *! ) man (make_const (not b) n) (make_const b n)
 
@@ -16,13 +16,13 @@ let f1 man = make_ident man true 0  (* function x -> -x *)
 let (|!) (&!) x y = no ((no x) &! (no y))
 let (=!) (^!) x y = no (x ^! y)
 
-let (-->) x y : Cp.TACX_CP.edge = Gops.compose x y
-let (->>) uniq y : Cp.TACX_CP.edge = Gops.compose ((false, uniq):Types.edge_state) y
+let (-->) x y : Cp.TACX_CP.edge = CpGops.compose x y
+let (->>) uniq y : Cp.TACX_CP.edge = CpGops.compose ((false, uniq):CpTypes.edge_state) y
 
 
 let array_make_n_var man n =
 	let var = t1 man
-	and subset = Tools.subset (Types.S) (Types.P) in
+	and subset = Tools.subset (CpTypes.S) (CpTypes.P) in
 	Array.init n (fun x -> (subset x n) ->> var)
 
 let list_make_n_var man n = Array.to_list(array_make_n_var man n)
@@ -102,15 +102,15 @@ let print_ALLsat pshi psi =
 let copy_fun copy (func : Cp.TACX_CP.edge) =
 	let size = Cp.arity func in
 (* f -> [f..., .f.., ..f., ...f] *)
-	let tn = MyList.ntimes (Types.S) size
-	and fn = MyList.ntimes (Types.P) size in
+	let tn = MyList.ntimes (CpTypes.S) size
+	and fn = MyList.ntimes (CpTypes.P) size in
 	let subset idx = Tools.subset_t tn fn idx copy in
 	Array.init copy (fun idx -> subset idx ->> func)
 
 let copy_fun_t copy func =
 	let size = Cp.arity func in
 (* f -> [f(0)...f(1)..., .f(0)...f(1).., etc.] *)
-	let subset idx = MyList.ncopy (Tools.subset Types.S Types.P idx copy) size in
+	let subset idx = MyList.ncopy (Tools.subset CpTypes.S CpTypes.P idx copy) size in
 	Array.init copy (fun idx -> subset idx ->> func)
 
 let transpose n m mat =

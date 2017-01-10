@@ -1,4 +1,4 @@
-open Types
+open CpTypes
 open Extra
 
 let strdump_uniq_elem = function

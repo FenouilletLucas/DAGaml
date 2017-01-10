@@ -39,17 +39,17 @@ do
 		(n-i3) + (n-j3) = k *)
 	let vars = Oops.array_make_n_var man (k+1) in
 	let uniq = Oops.vect_atmost_one (&!) (k+1) vars in
-	let t0 = Array.make (n*n) (Types.P)
-	and t1 = Array.make (n*n) (Types.P)
-	and t2 = Array.make (n*n) (Types.P)
-	and t3 = Array.make (n*n) (Types.P) in
+	let t0 = Array.make (n*n) (CpTypes.P)
+	and t1 = Array.make (n*n) (CpTypes.P)
+	and t2 = Array.make (n*n) (CpTypes.P)
+	and t3 = Array.make (n*n) (CpTypes.P) in
 	for i = 0 to k
 	do
 		let j = k - i in
-		t0.(i*n			+ j)<-(Types.S);
-		t1.((n-1-i)*n	+ j)<-(Types.S);
-		t2.(i*n			+ (n-1-j))<-(Types.S);
-		t3.((n-1-i)*n	+ (n-1-j))<-(Types.S);
+		t0.(i*n			+ j)<-(CpTypes.S);
+		t1.((n-1-i)*n	+ j)<-(CpTypes.S);
+		t2.(i*n			+ (n-1-j))<-(CpTypes.S);
+		t3.((n-1-i)*n	+ (n-1-j))<-(CpTypes.S);
 	done;
 	let uniq0 = Oops.(->>) (Array.to_list t0) uniq
 	and uniq1 = Oops.(->>) (Array.to_list t1) uniq

@@ -166,6 +166,9 @@ module L : sig
   val to_bool_array : t -> bool array
   val of_bool_array : bool array -> t
 
+  val to_bool_list : t -> bool list
+  val of_bool_list : bool list -> t
+
   val to_hexa_string : t -> string
   val of_hexa_string : string -> t
 end
@@ -179,6 +182,9 @@ module M : sig
   
   val to_bool_array : t -> bool array
   val of_bool_array : bool array -> t
+  
+  val to_bool_list : t -> bool list
+  val of_bool_list : bool list -> t
 
   val to_hexa_string : t -> string
   val of_hexa_string : string -> t
