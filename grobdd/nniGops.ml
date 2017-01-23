@@ -225,7 +225,25 @@ let compose =
 		let b, uniqX = aux [] (uniqC, uniq, (false, MyList.ntimes false (List.length uniqC))) in
 		(b, uniqX |> reduce_iuniq |> uniq_of_iuniq)
 
-let cons_primary uniqX uniqY =
+let ipair_remove_nth =
+	let aux0 n vect =
+		let head, tail = MyList.hdtl_nth (List.length vect - (n+1)) vect in
+		match tail with
+			| x::tail	-> assert(x=false); (head, tail)
+			| _			-> assert false;
+	in
+	let aux1 n (b, opi) = (b, match opi with
+		| None -> None
+		| Some i -> Some(aux0 n i))
+	in
+	let aux2 n = List.map (function
+		| ISS b -> ISS b
+		| ISP x -> ISP (aux1 n x)
+		| IPS x -> IPS (aux1 n x)
+		| IPP (x, y) -> IPP(aux1 n x, aux1 n y))
+	in aux2
+
+let cons_1 uniqX uniqY =
 	let uniqX = iuniq_of_uniq (expand_uniq uniqX)
 	and uniqY = iuniq_of_uniq (expand_uniq uniqY) in
 	let aux =
@@ -238,6 +256,7 @@ let cons_primary uniqX uniqY =
 			| ((bx, []), (by, []), [], []) -> (bx<>by, List.rev carryXY), (bx, List.rev carryZ)
 			| ((bpx, px::px'), (bpy, py::py'), x::x', y::y') ->
 			(
+				assert(List.length x' = List.length y');
 				match x, y with
 				| IS bx, IS by ->
 					let bx = bx <> px
@@ -247,8 +266,12 @@ let cons_primary uniqX uniqY =
 					let bpx, px' = aux0 px (bpx, px') ix
 					and bpy, py' = aux0 py (bpy, py') iy in
 					if ix = iy
-					then aux carryXY					((IP ix)::carryZ)		((bpx, px'), (bpy, py'), x', y')
-					else aux ((IPP (ix, iy))::carryXY)	((IS false)::carryZ)	((bpx, px'), (bpy, py'), x', y')
+					then
+					(
+						let carryXY = ipair_remove_nth (List.length x') carryXY in
+						aux carryXY ((IP ix)::carryZ) ((bpx, px'), (bpy, py'), x', y')
+					)
+					else aux ((IPP (ix, iy))::carryXY) ((IS false)::carryZ) ((bpx, px'), (bpy, py'), x', y')
 				| IS bx, IP iy ->
 					let bx = bx <> px in
 					let bpy, py' = aux0 (py <> bx) (bpy, py') iy in
@@ -268,6 +291,148 @@ let cons_primary uniqX uniqY =
 	let (bp, pair), (bu, uniq) = aux uniqX uniqY in
 	((bp, pair_of_ipair pair), (bu, uniq_of_iuniq uniq))
 
+
+let cons_2 pair =
+	let bi_bi_add (bx, ix) (by, iy) = (bx<>by, add ix iy) in
+	let bopi_bi_add (bx, opix) (by, iy) = (bx<>by, match opix with None -> iy | Some ix -> add ix iy) in
+	let bopi_bopi_add (bx, opix) (by, opiy) = (bx<>by, match opix, opiy with
+		| None, None -> None
+		| Some v, None | None, Some v -> Some v
+		| Some vx, Some vy -> Some (add vx vy)
+	in
+	let deal f = function
+		| (bx, x::x'), (by, y::y'), z -> f x y ((bx, x'), (by, y'), z)
+		| _ -> assert false
+	in
+	let div_ss (v, w, t) = List.map
+		(deal (fun x y (x', y', z') ->
+			let z' = y::z' in
+			if x
+			then (bi_bi_add_v v x', bi_bi_add w y', add t z')
+			else (x', y', z')
+		))
+	in
+	let aux_ss =
+		let rec aux carry = function
+		| [] -> List.rev carry
+		| head::tail -> deal (fun x y (x', y', z') ->
+			let z = (x', y', y::z') in
+			if x
+			then (List.rev(carry))@(div_ss z)
+			(fun x -> aux (z::carry) tail)
+			head
+		in fun (nonelist, coinvarlist) -> (nonelist, aux [] coinvarlist)
+	in
+	let aux_ps v (nonelist, coinvarlist) = (nonelist, List.map
+	(
+		deal
+		(fun x y (x', y', z') ->
+			let z' = (x<>y)::z' in
+			if x
+			then (bopi_bi_add v x', bopi_bi_add v y', z')
+			else (x', y', z')
+		)
+	)
+	coinvarlist)
+	let aux_sp v (nonelist, coinvarlist) = (nonelist, List.map
+	(
+		deal
+		(fun x y (x', y', z') ->
+			(if x then bopi_bi_add v x' else x', y', y::z')
+		)
+
+	)
+	coinvarlist)
+	let n = List.length pair in
+	let aux_pp i ((bv, vv) as v) w state =
+		let (nonelist, coinvarlist) = aux_sp w state in
+		match bopi_bopi_add v w with
+		| (b, None) -> ((b, (bv, (MyList.ntimes false (n-(i+1)))@(true::(MyList.ntimes false i))))::nonelist, coinvarlist)
+		| (bz, Some vz) ->
+		(
+			let x = (bz, vz) in
+			let y = (bv, match vv with None -> (MyList.ntimes false i) | Some v -> v) in
+			let z = true::(MyList.ntimes false (n-(i+1))) in
+			(nonelist, (x, y, z)::coinvarlist)
+		)
+	in
+	let aux_end (nonelist, coinvarlist) =
+		let nonelist = nonelist @ (List.map (function ((bx, []), (by, []), z) -> (bx, (by, List.rev z)) | _ -> assert false) coinvarlist) in
+		let aux0 v = List.map (function (bx, y) -> if bx then bi_bi_add v y else y)
+		let rec aux1 carry = function
+			| []			-> List.rev carry
+			| (bx, y)::tail	-> if bx then (List.rev carry)@(aux0 y tail) else aux1 (y::carry) tail
+		in
+		let aux2 v = List.map (function x::x' -> if x then add v x else x)
+		let rec aux3 carry = function
+			| [] -> List.rev carry, None
+			| (x::x')::tail -> if x then ((List.rev carry)@(aux2 x' tail)), Some x' else aux3 (x'::carry) tail
+		in
+		let rec aux4 state carry = function
+			| 0 -> List.rev carry
+			| n ->
+				let state, elem = aux3 [] state in
+				aux4 state (elem::carry) 0
+
+		let rec aux carry = function
+		| [] -> List.rev carry
+		| head::tail -> deal (fun x y (x', y', z') ->
+			let z = (x', y', y::z') in
+			if x
+			then (List.rev(carry))@(div_ss z)
+			(fun x -> aux (z::carry) tail)
+			head
+		in fun (nonelist, coinvarlist) -> (nonelist, aux [] coinvarlist)
+	in
+	let rec aux coinvarlist = function
+		| [] -> aux_end coinvarlist
+		| x::x' -> match x with
+			| ISS _ -> aux (aux_ss coinvarlist) x'
+			| IPS v -> aux (aux_ps v coinvarlist) x'
+			| ISP v -> aux (aux_sp v coinvarlist) x'
+			| IPP (v, w) -> aux (aux_pp (List.length x') v w coinvarlist) x'
+	in aux ([], [])
+
+	let rec aux0 carry = function
+(*		| (vref, vdiff, carry) *)
+		| ((bx, []), (by, []), []) -> if by then None else Some (bx, Some(List.rev carry))
+		| ((bx, x::x'), (by, y::y'), z::z') -> if y then
+		(
+			match z with
+			| ISS b		-> None
+			| IPS v		-> aux ((not x)::carry) (bopi_bi_add v (bx, x'), bopi_bi_add v (by, y'), z')
+			| ISP v		-> aux (x::carry) ((bx, x'), bopi_bi_add v (by, y'), z')
+			| IPP ((b1, opi1), (b2, opi2)) ->
+			(
+			)
+		)
+		else
+		(
+		)
+		match z with
+			| ISS b -> if y then None else aux0 (bp, x::carry) (x', y', z')
+			| IPS (b, opi) ->
+			( match opi with
+				| None		-> aux0 (bp<>(b&&y), (x<>y)::carry) (x', y', z')
+				| Some i	-> if y
+				then (
+					
+				) else (
+				)
+			(
+			) else
+			(
+			)match opi with
+	let rec aux carryXY carryZ = function
+		| []		-> carryXY, carryZ
+		| x::tail	-> match x with
+			| ISS _ | ISP _ | IPS _ -> aux (x::carryXY) ((IS false)::carryZ) tail
+			| IPP (vx, vy) -> match aux0 (false, []) (vx, (add0 vx vy), carryXY) with
+				| None		-> aux (x::carryXY) ((IS false)::carryZ) tail
+				| Some v	-> aux carryXY ((IP v)::carryZ) (ipair_remove_nth (List.length carryXY) tail)
+	in fun ipair -> aux [] [] (List.rev ipair)
+	
+	
 
 (*
 let cons_primaire uniqX uniqY =
