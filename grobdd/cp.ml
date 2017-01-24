@@ -263,3 +263,42 @@ struct
 	let dump_stat = CntSat.dump_stat
 	
 end
+
+module GroBdd_CP_AllSat =
+struct
+	module AllSat_VISITOR =
+	struct
+		type xnode = (bool option list) * (bool option list)
+		type xedge = (bool option list)
+		type extra = unit
+
+		let cswap b (x, y) = if b then (y, x) else (x, y)
+		let p = function CpTypes.P -> true | _ -> false
+    let compose =
+        let rec aux carry = function
+          | ([], []) -> List.rev carry
+          | (S::x', y::y') -> aux (y::carry) (x', y')
+          | (P::x', y') -> aux (None::carry) (x', y')
+        in function
+          | None -> fun deco elem -> aux [] (deco, elem)
+          | Some b -> fun deco elem -> aux [Some b] (deco, elem)
+
+		let shift deco (x, y) = (List.map (compose (Some false) deco) x, List.map (compose (Some true) deco) y)
+		let add (x, y) (x', y') = (x@x', y@y')
+
+    let do_leaf () () = ([], [[]])
+		let do_node ()    = Extra.(CpGops.binload_node >> CpGops.node_split >> (fun ((bX, lX), (bY, lY)) ->
+			Utils.MNode (fun x y -> add (shift lX (cswap bX x)) (shift lY (cswap bY y)))))
+		let do_edge () (b, l) (x, y) =
+			let x = if b then y else x in
+      compose None l x
+	end
+
+	module AllSat = GroBdd_CP.NODE_VISITOR(AllSat_VISITOR)
+
+	let newman man =
+		AllSat.newman man ()
+	
+	let dump_stat = AllSat.dump_stat
+	
+end
