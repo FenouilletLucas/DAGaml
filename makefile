@@ -28,6 +28,7 @@ extra:
 	$(OB) \
 		bitv/bitv.native \
 		grobdd/cpGops.native \
+		grobdd/bsev.native \
 		grobdd/nniGops.native \
 		grobdd/cp.native \
 		grobdd/oops.native \

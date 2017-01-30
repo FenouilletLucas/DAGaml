@@ -7,6 +7,7 @@ let list_init n f =
 		| n -> aux ((f(n-1))::carry) (n-1)
 	in aux [] n
 
+let init = list_init
 
 let option_cons = function
 	| None -> (fun l -> l)
