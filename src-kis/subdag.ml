@@ -141,9 +141,9 @@ struct
     let newman man extra = makeman man extra 10000
     let calc man = man.calc
     let dump_stat man = Tree.Node [
-      Tree.Node [Tree.Leaf "memo leaf:"; G.MLeaf.dump_stat man.memoLeaf];
-      Tree.Node [Tree.Leaf "memo edge:"; MEdge.dump_stat man.memoEdge];
-      Tree.Node [Tree.Leaf "memo node:"; G.MNode.dump_stat man.memoNode]
+      Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memoLeaf];
+      Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memoEdge];
+      Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stat man.memoNode]
     ]
   end
 
@@ -157,48 +157,25 @@ struct
   end
 
 
-  module EDGE_VISITOR(D0:MODELE_EDGE_VISITOR) =
+  module EDGE_VISITOR(MV:MODELE_EDGE_VISITOR) =
   struct
-
-    type eleaf = M.edge * M.leaf
-    module ELeaf : Map.OrderedType with
-      type t = eleaf
-    =
-    struct
-      type t = eleaf
-      let compare = Pervasives.compare
-    end
-
-    module MEL = Ubdag.M0T(ELeaf)
-
-    module ENode : Map.OrderedType with
-      type t = M.edge
-    =
-    struct
-      type t = M.edge
-      let compare = Pervasives.compare
-    end
-
-    module MEN = G.M1T(ENode)
 
     type memo = {
       man     : manager;
       extra   : D0.extra;
-      calc    : edge -> D0.xedge;
-      memo0  : D0.xedge MEL.manager;
-      memo1  : D0.xedge MEN.manager;
+      calc    : edge -> MV.xedge;
+      memoLeaf: (M.edge * M.leaf,  MV.xedge) MemoTable.t;
+      memoNode: (M.edge * G.pnode, MV.xedge) MemoTable.t;
     }
 
     let makeman man extra hsize=
-      let memo0  = MEL.makeman hsize in
-      let apply0 = MEL.apply memo0 in
-      let memo1  = MEN.makeman hsize in
-      let apply1 = MEN.apply memo1 in
+      let memoLeaf, applyLeaf = MemoTable.create hsize
+      and memoNode, applyNode = MemoTable.create hsize in
       let rec calcrec (edge, gnode) = match gnode with
-        | Utils.Leaf leaf -> apply0 fun0 (edge, leaf)
-        | Utils.Node node -> apply1 fun1 node edge
-      and fun0 (edge, leaf) = D0.do_leaf extra edge leaf
-      and fun1 node edge = match D0.do_node extra edge with
+        | Utils.Leaf leaf -> applyLeaf funLeaf (edge, leaf)
+        | Utils.Node node -> applyNode funNode (edge, node)
+      and funLeaf (edge, leaf) = MV.do_leaf extra edge leaf
+      and funNode (edge, node) = match MV.do_node extra edge with
         | Utils.MEdge xedge -> xedge
         | Utils.MNode merger ->
         (
@@ -210,15 +187,15 @@ struct
         man  = man;
         extra = extra;
         calc = calcrec;
-        memo0 = memo0;
-        memo1 = memo1;
+        memoLeaf = memoLeaf;
+        memoNode = memoNode;
       }, calcrec)
 
     let newman man extra = makeman man extra 10000
     let calc man = man.calc
     let dump_stat man = Tree.Node [
-      Tree.Node [Tree.Leaf "man edge leaf:"; MEL.dump_stat man.memo0];
-      Tree.Node [Tree.Leaf "man edge node:"; MEN.dump_stat man.memo1];
+      Tree.Node [Tree.Leaf "man edge leaf:"; MemoTable.dump_stat man.memoLeaf];
+      Tree.Node [Tree.Leaf "man edge node:"; MemoTable.dump_stat man.memoNode];
     ]
 
   end
