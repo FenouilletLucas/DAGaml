@@ -16,7 +16,7 @@ struct
     }
 
     let newman hsize = {
-        memotable = MemoTable.create hsize;
+        memotable = MemoTable.make hsize;
     }
 
     let push dst_udag =

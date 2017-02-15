@@ -13,7 +13,7 @@ module type MODELE = sig
   val pull : 't e -> ('t e, 't n) unmerge
 
   val pull_node : 't n -> 't e * 't e
-  val compose : edge -> 't e -> 't e  
+  val compose : edge -> 't e -> 't e
 
   val dump_leaf : (leaf -> StrTree.tree) option
   val load_leaf : (StrTree.tree -> 't e) option
@@ -32,27 +32,27 @@ end
 
 module MODULE(M0:MODELE)
 (*:MODULE_SUBDAG with
-    type M.node = M0.node
+      type M.node = M0.node
   and type M.edge = M0.edge
   and type M.leaf = M0.leaf *)
 =
 (* M = Modele *)
 struct
-  module M = M0
+  module M : MODELE = M0
   module MODELE =
   struct
-    type leaf = M0.leaf
-    type edge = M0.edge
-    type node = M0.node
+    type leaf = M.leaf
+    type edge = M.edge
+    type node = M.node
 
     type 't gn = (leaf, 't) Utils.gnode
     type 't n = node * 't gn * 't gn
     type 't e = edge * 't gn
 
-    let push = M0.push
-    let pull = M0.pull
-    let pull_node = M0.pull_node
-    let compose = M0.compose
+    let push = M.push
+    let pull = M.pull
+    let pull_node = M.pull_node
+    let compose = M.compose
 
     let dump_leaf = None
     let load_leaf = None
@@ -77,19 +77,19 @@ struct
   let makeman = G.makeman
 
   let push_leaf (e:M.edge) (l:M.leaf) = ((e, ((Utils.Leaf l):G.tree)):edge)
-  let pull_node man (n:G.pnode) = M.pull_node G.get_ident (G.pull man n)
+  let pull_node man (n:G.pnode) = M.pull_node (G.pull man n)
 
-  let push man x y = match M.push G.get_ident x y with
+  let push man x y = match M.push x y with
     | MEdge e -> e
     | MNode (e, (n:G.node)) -> (e, Utils.Node (G.push man (n:G.node)))
 
-  let pull man ((_, n)as e) = match M.pull G.get_ident e with
+  let pull man ((_, n)as e) = match M.pull e with
     | MEdge (x, y) -> (x, y)
     | MNode f -> match n with
       | Utils.Leaf _ -> assert false
       | Utils.Node p -> f(G.pull man p)
 
-  let compose = M.compose G.get_ident
+  let compose = M.compose 
 
   module type MODELE_NODE_VISITOR =
   sig
@@ -107,26 +107,26 @@ struct
   struct
     type memo = {
       man  : manager;
-      extra : D0.extra;
-      calc : edge -> D0.xedge;
+      extra : MV.extra;
+      calc : edge -> MV.xedge;
       memoLeaf: ( M.leaf, MV.xnode) MemoTable.t;
       memoEdge: (   edge, MV.xedge) MemoTable.t;
       memoNode: (G.pnode, MV.xnode) MemoTable.t;
     }
 
     let makeman man extra hsize =
-      let memoLeaf, applyLeaf = MemoTable.create hsize
-      and memoEdge, applyEdge = MemoTable.create hsize
-      and memoNode, applyNode = MemoTable.create hsize in
+      let memoLeaf, applyLeaf = MemoTable.make hsize
+      and memoEdge, applyEdge = MemoTable.make hsize
+      and memoNode, applyNode = MemoTable.make hsize in
       (*HERE*)
       let rec calcrec = function
         | Utils.Leaf leaf -> calcleaf leaf
         | Utils.Node node -> calcnode node
-      and    calcedge edge = applyEdge (fun (edge, gnode) -> D0.do_edge extra edge (calcrec gnode)) edge
-      and    calcleaf leaf = applyLeaf (D0.do_leaf extra) leaf
+      and    calcedge edge = applyEdge (fun (edge, gnode) -> MV.do_edge extra edge (calcrec gnode)) edge
+      and    calcleaf leaf = applyLeaf (MV.do_leaf extra) leaf
       and    calcnode node = applyNode (fun node ->
         let (node:M.node), (nx:G.tree), (ny:G.tree) = G.pull man node in
-        match D0.do_node extra node with
+        match MV.do_node extra node with
         | Utils.MEdge xnode -> xnode
         | Utils.MNode merger -> merger (calcrec nx) (calcrec ny)) node
       in
@@ -162,15 +162,15 @@ struct
 
     type memo = {
       man     : manager;
-      extra   : D0.extra;
+      extra   : MV.extra;
       calc    : edge -> MV.xedge;
       memoLeaf: (M.edge * M.leaf,  MV.xedge) MemoTable.t;
       memoNode: (M.edge * G.pnode, MV.xedge) MemoTable.t;
     }
 
     let makeman man extra hsize=
-      let memoLeaf, applyLeaf = MemoTable.create hsize
-      and memoNode, applyNode = MemoTable.create hsize in
+      let memoLeaf, applyLeaf = MemoTable.make hsize
+      and memoNode, applyNode = MemoTable.make hsize in
       let rec calcrec (edge, gnode) = match gnode with
         | Utils.Leaf leaf -> applyLeaf funLeaf (edge, leaf)
         | Utils.Node node -> applyNode funNode (edge, node)
@@ -203,8 +203,7 @@ struct
   module type MODELE_EUOP =
   (* External Unary OPerator *)
   sig
-    include Map.OrderedType
-    (* t = compact *)
+    type t
     type transform
     type extern
     type t1
@@ -216,65 +215,44 @@ struct
     val  merger : extra -> t1 -> extern -> extern -> extern
   end
 
-  module EUOP(D0:MODELE_EUOP) =
+  module EUOP(MV:MODELE_EUOP) =
   (* External Unary OPerator *)
   struct
-    type ld = M.leaf * D0.t
-    module BLD : Map.OrderedType with
-      type t = ld
-    =
-    struct
-      type t = ld
-      let compare (x, t) (x', t') = match Pervasives.compare x x' with 0 -> (D0.compare t t') | x -> x
-    end
-    module MEMO0 = Ubdag.M0T(BLD)
 
-    module MEMO1 = G.M1T(D0)
     type memo = {
-      man  : manager;
-      extra : D0.extra;
-      calc : D0.t2 -> edge -> D0.extern;
-      memo0  : D0.extern MEMO0.manager;
-      memo1  : D0.extern MEMO1.manager;
+      man   : manager;
+      extra : MV.extra;
+      calc  : MV.t2 -> edge -> MV.extern;
+      memo  : (MV.t * G.tree, MV.extern) MemoTable.t;
     }
 
     let makeman man extra hsize=
-      let memo0  = MEMO0.makeman hsize in
-      let apply0 : (ld -> D0.extern) -> ld -> D0.extern = MEMO0.apply memo0 in
-      let memo1  = MEMO1.makeman hsize in
-      let apply1 = MEMO1.apply memo1
+      let memo, apply = MemoTable.make hsize
       and pull = pull man in
-      let rec calcrec t2 x = match D0.solver extra t2 x with
-      | Utils.MEdge f -> f
-      | Utils.MNode (t, (c, n)) -> D0.compose extra t (match n with
-        | Leaf (l:M.leaf) -> (((apply0:(ld->D0.extern)->ld->D0.extern) (fun0:ld->D0.extern) ((l, c):ld)):D0.extern)
-        | Node (n:G.pnode) -> (apply1 fun1 (n:G.pnode) c))
-      and fun0 ((l, c):ld) = calc c (Leaf l)
-      and fun1 n c = calc c (Node n)
-      and calc compact node =
-        let (t1:D0.t1), (t2:D0.t2), (edge:edge) = D0.decomp extra node compact in
-        let f0, f1 = pull edge in
-        ((D0.merger extra t1 (calcrec t2 f0) (calcrec t2 f1)):D0.extern)
+      let rec calcrec t2 x = match MV.solver extra t2 x with
+        | Utils.MEdge f -> f
+        | Utils.MNode (t, (c, n)) -> MV.compose extra t (apply (fun (compact, node) ->
+            let t1, t2, edge = MV.decomp extra node compact in
+            let f0, f1 = pull edge in
+            (MV.merger extra t1 (calcrec t2 f0) (calcrec t2 f1))) (c, n))
       in
       ({
         man  = man;
         extra = extra;
         calc = calcrec;
-        memo0 = memo0;
-        memo1 = memo1;
+        memo = memo;
       }, calcrec)
 
     let newman man extra = makeman man extra 10000
     let calc man = man.calc
     let dump_stat man = Tree.Node [
-      Tree.Node [Tree.Leaf "memo0:"; MEMO0.dump_stat man.memo0];
-      Tree.Node [Tree.Leaf "memo1:"; MEMO1.dump_stat man.memo1];
+      Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
     ]
 
   end
 
   module MODELE_DUMP_EDGE : MODELE_EDGE_VISITOR with
-      type xedge = Udag.StrTree.edge_t
+        type xedge = Udag.StrTree.edge_t
     and type extra = Udag.StrTree.manager
   =
   struct
@@ -385,104 +363,70 @@ struct
   end
 
 
-  module IUOP(D0:MODELE_IUOP) =
+  module IUOP(MV:MODELE_IUOP) =
   (* Internal Unary OPerator *)
   struct
     module MY_MODELE_EUOP : MODELE_EUOP with
-        type t = D0.t
-      and type transform = D0.transform
+        type t = MV.t
+      and type transform = MV.transform
       and type extern = edge
-      and type t1 = D0.t1
-      and type t2 = D0.t2
+      and type t1 = MV.t1
+      and type t2 = MV.t2
       and type extra = unit
     =
     struct
-      type t = D0.t
-      let compare = D0.compare
-      type transform = D0.transform
+      type t = MV.t
+      let compare = MV.compare
+      type transform = MV.transform
       type extern = edge
-      type t1 = D0.t1
-      type t2 = D0.t2
+      type t1 = MV.t1
+      type t2 = MV.t2
       type extra = unit
-      let compose () = D0.compose
-      let  decomp () = D0.decomp
-      let  solver () = D0.solver
-      let  merger () = D0.merger
+      let compose () = MV.compose
+      let  decomp () = MV.decomp
+      let  solver () = MV.solver
+      let  merger () = MV.merger
     end
 
     module MY_EUOP = EUOP(MY_MODELE_EUOP)
 
     type memo = MY_EUOP.memo
 
-    let makeman  man = MY_EUOP.makeman man (():MY_MODELE_EUOP.extra)
-    let newman man  = MY_EUOP.newman man ()
-    let dump_stat  = MY_EUOP.dump_stat
-    let calc    = MY_EUOP.calc
+    let makeman  man  = MY_EUOP.makeman man (():MY_MODELE_EUOP.extra)
+    let newman man    = MY_EUOP.newman man ()
+    let dump_stat     = MY_EUOP.dump_stat
+    let calc          = MY_EUOP.calc
   end
 
   module type MODELE_IBOP =
   (* Internal Binary OPerator *)
   sig
-    include Map.OrderedType
-    (* t = compact *)
+    type compact
+    type cblock = compact * G.tree * G.tree
     type transform
     val compose : transform -> edge -> edge
-    val  decomp : G.tree -> G.tree -> t -> edge * edge
-    val  solver : (G.pnode -> G.ident) -> edge * edge -> (edge, (transform * (t*G.tree*G.tree))) Utils.merge
+    val  decomp : cblock -> edge * edge
+    val  solver : edge * edge -> (edge, transform * cblock) Utils.merge
   end
 
-  module IBOP(D0:MODELE_IBOP) =
+  module IBOP(MV:MODELE_IBOP) =
   (* Internal Binary OPerator *)
   struct
-    type lld = (M.leaf * M.leaf) * D0.t
-    module LLD : Map.OrderedType with type t = lld =
-    struct
-      type t = lld
-      let compare (x, t) (x', t') = match Pervasives.compare x x' with 0 -> (D0.compare t t') | x -> x
-    end
-    module MEMO0 = Ubdag.M0T(LLD)
-
-    type bld = (bool * M.leaf) * D0.t
-    (* true = Node * Leaf, false = Leaf * Node *)
-    module BLD : Map.OrderedType with type t = bld =
-    struct
-      type t = bld
-      let compare (x, t) (x', t') = match Pervasives.compare x x' with 0 -> (D0.compare t t') | x -> x
-    end
-    module MEMO1 = G.M1T(BLD)
-
-    module MEMO2 = G.M2T(D0)
     type memo = {
       man  : manager;
       calc : edge -> edge -> edge;
-      memo0  : edge MEMO0.manager;
-      memo1  : edge MEMO1.manager;
-      memo2  : edge MEMO2.manager;
+      memo : (edge * edge, edge) MemoTable.t;
     }
 
     let makeman man hsize=
-      let memo0  = MEMO0.makeman hsize in
-      let apply0 = MEMO0.apply memo0 in
-      let memo1  = MEMO1.makeman hsize in
-      let apply1 = MEMO1.apply memo1 in
-      let memo2  = MEMO2.makeman hsize in
-      let apply2 = MEMO2.apply memo2 in
+      let memo, apply = MemoTable.make hsize in
       let push = push man
       and pull = pull man in
-        let rec calcrec (x:edge) (y:edge) = match D0.solver G.get_ident (x, y) with
-        | Utils.MEdge f -> f
-        | Utils.MNode (t, (c, n1, n2)) -> D0.compose t (match n1, n2 with
-          | Leaf l1, Leaf l2 ->   apply0 fun0 ((l1, l2), c)
-          | Leaf (l:M.leaf ) , Node (n:G.pnode)  ->   apply1 fun1 n ((false, l), (c:D0.t))
-          | Node (n:G.pnode) , Leaf (l:M.leaf )  ->   apply1 fun1 n ((true,  l), c)
-          | Node n1, Node n2 ->   apply2 fun2 n1 n2 c)
-        and fun0 ((l1, l2), c) = calc c (Leaf l1) (Leaf l2)
-        and fun1 n ((b, l), c) = if b
-          then calc c (Node n) (Leaf l)
-          else calc c (Leaf l) (Node n)
-        and fun2 n n' c = calc c (Node n) (Node n')
-        and calc compact nx ny =
-          let fx, fy = D0.decomp nx ny compact in
+        let rec calcrec (x:edge) (y:edge) = match MV.solver (x, y) with
+          | Utils.MEdge f -> f
+          | Utils.MNode (tra, blk) -> MV.compose tra (reccalc blk)
+        and     reccalc blk =
+          let fx, fy = MV.decomp blk in
           let fx0, fx1 = pull fx
           and fy0, fy1 = pull fy in
           let f0 = calcrec fx0 fy0
@@ -490,18 +434,14 @@ struct
           push f0 f1
       in
       {
-        man  = man;
-        calc = calcrec;
-        memo0 = memo0;
-        memo1 = memo1;
-        memo2 = memo2;
+        man   = man;
+        calc  = calcrec;
+        memo  = memo;
       }, calcrec
     let newman man = makeman man 10000
     let calc man = man.calc
     let dump_stat man = Tree.Node [
-      Tree.Node [Tree.Leaf "memo0:"; MEMO0.dump_stat man.memo0];
-      Tree.Node [Tree.Leaf "memo1:"; MEMO1.dump_stat man.memo1];
-      Tree.Node [Tree.Leaf "memo2:"; MEMO2.dump_stat man.memo2]
+      Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo]
     ]
   end
 end

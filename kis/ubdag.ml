@@ -27,7 +27,7 @@ end
 
 
 module UBDAG(H0:Udag.UDAG_HEADER) : MODULE_UBDAG with
-    type H.node = H0.node
+      type H.node = H0.node
   and type H.leaf = H0.leaf
 =
 struct
@@ -38,11 +38,11 @@ struct
   and  node  = (H.node * tree * tree)
   and  pnode = ident
 
-  let get_ident pnode = pnode.ident
+  let get_ident pnode = pnode
   
   let equal_tree x y = match x, y with
-    | Utils.(Leaf x, Leaf y) -> x = y
-    | Utils.(Node x, Node y) -> x = y
+    | Utils.Leaf x, Utils.Leaf y -> x = y
+    | Utils.Node x, Utils.Node y -> x = y
     | _ -> false
 
   let cmp x y =
@@ -55,8 +55,8 @@ struct
     else Some ( x > y )
 
   let cmp_tree x y = match x, y with (* Leaf < Node *)
-    | Utils.(Leaf x, Leaf y) -> cmp x y
-    | Utils.(Node x, Node y) -> cmp x y
+    | Utils.Leaf x, Utils.Leaf y -> cmp x y
+    | Utils.Node x, Utils.Node y -> cmp x y
     | Utils.Node _, Utils.Leaf _ -> Some true
     | Utils.Leaf _, Utils.Node _ -> Some false
 
@@ -73,11 +73,11 @@ struct
   (* let dump man ed *)
 
   type manager = {
-    unique = (node, pnode) H2Table.t;
+    unique : node H2Table.t;
   }
 
   let makeman hsize = {
-    unique = H2Table.create hsize;
+    unique = H2Table.create hsize 0;
   }
 
   let default_newman_hsize = 10000

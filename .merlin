@@ -1,10 +1,12 @@
 S .
 S src
+S src-kis
 S test
 S tools
 
 B _build
 B _build/tools
 B _build/src
+B _build/src-kis
 B _build/test
 

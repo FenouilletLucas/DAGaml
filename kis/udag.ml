@@ -97,8 +97,7 @@ struct
 			let dump_edge_t = dump_edge_t parcours in
 			function ((node, edges) : node_t) -> (dump_node node)::(List.map dump_edge_t edges)
 		in fun udag edges ->
-			let memo = MemoTable.create (H2Table.length udag.unique) in
-			let apply : (ident -> unit) -> ident -> unit = MemoTable.apply memo in
+			let memo, apply = MemoTable.make (H2Table.length udag.unique) in
 			let liste = ref [] in
 			let push x =
 				liste:=(x::(!liste)) in
