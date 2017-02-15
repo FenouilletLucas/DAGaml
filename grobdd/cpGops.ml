@@ -92,14 +92,20 @@ let binload_ttag = function
 let bindump_tacx (t, l) = bindump_ttag (bindump_pair l) t |> Array.of_list |> Bitv.L.of_bool_array
 let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> binload_ttag >> (fun (t, l) -> (t, binload_pair l))
 
-let eq getid = function
-	| (Utils.Leaf (), Utils.Leaf ()) -> true
-	| (Utils.Node nx, Utils.Node ny) -> (getid nx) = (getid ny)
-	| _								 -> false
+let cmp x y =
+	if x = y
+	then None
+	else Some(x>y)
+
+let cmpid getid = function
+	| (Utils.Leaf (), Utils.Leaf ()) -> None
+	| (Utils.Node nx, Utils.Node ny) -> cmp (getid nx) (getid ny)
+	| (Utils.Leaf _ , Utils.Node _ ) -> Some false
+	| (Utils.Node _ , Utils.Leaf _ ) -> Some true
 
 let solve_cons getid ((bX, lX) as eX, iX) ((bY, lY) as eY, iY) =
 	assert(List.length lX = List.length lY);
-	if (eq getid (iX, iY)) && (eX = eY)
+	if (cmpid getid (iX, iY) = None) && (eX = eY)
 	then (Utils.MEdge ((bX, P::lX), iX))
 	else
 	(
@@ -231,10 +237,14 @@ let tacx_pull_node _ (c, ix, iy) =
 
 let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) : (op_tag, 't edge, 't cnode) Utils.unmerge_tagged = match lx with
 	| [] -> assert false
-	| h::lx' -> let e' = (bx, lx') in match h with
-		| P -> Utils.MEdge ((Cons, (e', i), (e', i)):op_tag * 't edge * 't edge)
+	| h::lx' ->  match h with
+		| P -> let e' = (bx, lx') in Utils.MEdge ((Cons, (e', i), (e', i)):op_tag * 't edge * 't edge)
 		| S -> Utils.MNode (fun node ->
 			let t, x', y' = tacx_pull_node getid node in
+			let e' = match t with
+				| Cons	-> (bx, lx')
+				| _		-> (bx, lx )
+			in
 			((t, (compose e' x'), (compose e' y')): op_tag * 't edge * 't edge))
 
 

@@ -29,13 +29,19 @@ extra:
 		bitv/bitv.native \
 		grobdd/cpGops.native \
 		grobdd/bsev.native \
+		grobdd/bsevTest.native \
+		grobdd/bsevTest.d.byte \
 		grobdd/nniGops.native \
+		grobdd/nni.native \
 		grobdd/cp.native \
 		grobdd/oops.native \
 		grobdd/myUint.native \
 		test/test_bin_of_int.native \
 		tools/binDump.native \
-		tools/binLoad.native
+		tools/binLoad.native \
+		test/test_upgrade_tacx_cp_to_nni.native \
+		test/test_noreg_nni_cons.native
+
 
 
 clean:

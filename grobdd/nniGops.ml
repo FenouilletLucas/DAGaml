@@ -1,96 +1,21 @@
 open NniTypes
 open Extra
 
-let strdump_invar = Bitv.L.to_bool_list ||>> (fun x -> if x then "+" else " ") 
-
-let strdump_uniq_elem = function
-	| S b			-> ((if b then "F" else "S"), None)
-	| P (b, None)	-> ((if b then "A" else "P"), None)
-	| P (b, Some i)	-> ((if b then "N" else "I"), Some(strdump_invar i))
-
-let bindump_invar (b, opi) (stream:bool list) : bool list =
-	let stream = BinDump.option BinDump.bitv stream opi in
-	BinDump.bool stream b
-
-let binload_invar i stream =
-	let b, stream = BinLoad.bool stream in
-	let opi, stream = BinLoad.option (BinLoad.bitv i) stream in
-	(b, opi), stream
-
-let bindump_uniq_elem carry = function
-	| S b			-> false::b::carry
-	| P (b, opi)	-> true::b::((match opi with None -> [false] | Some i -> true::(Bitv.L.to_bool_list i))@carry)
-
-let binload_uniq_elem i = BinLoad.choice
-	(fun stream -> let b, stream = BinLoad.bool stream in (S b, (i+1), stream))
-	(fun stream -> let invar, stream = binload_invar i stream in (P invar, i , stream))
-
-let bindump_uniq = (let rec fold stream = function
-	| [] -> false::stream
-	| head::tail -> fold (true::(bindump_uniq_elem stream head)) tail in fold []) >> Bitv.L.of_bool_list
-
-let binload_uniq = Bitv.L.to_bool_list >> (
-	let rec fold i carry = BinLoad.choice
-		(fun stream -> carry)
-		(fun stream ->
-			let e, i, stream = binload_uniq_elem i stream in
-			fold i (e::carry) stream)
-	in fold 0 [])
-
-
-let bindump_pair_elem carry = function
-	| SS b -> false::b::carry
-	| SP invar -> true::false::true::(bindump_invar invar carry)
-	| PS invar -> true::false::false::(bindump_invar invar carry)
-	| PP (invarX, invarY) -> true::true::(bindump_invar invarX (bindump_invar invarY carry))
-
-let bindump_pair = (let rec fold carry = function
-	| [] -> carry
-	| head::tail -> fold (bindump_pair_elem carry head) tail in fold []) >> Bitv.L.of_bool_list
-
-let binload_pair_elem i j = function
-	| false::b::stream				-> (* SS *)
-		(i+1, j+1, SS b, stream)
-	| true::false::true::stream		-> (* SP *)
-		let invar, stream = binload_invar j stream in
-		(i+1, j, SP invar, stream)
-	| true::false::false::stream	-> (* PS *)
-		let invar, stream = binload_invar i stream in
-		(i, j+1, PS invar, stream)
-	| true::true::stream			-> (* PP *)
-		let invarX, stream = binload_invar i stream in
-		let invarY, stream = binload_invar j stream in
-		(i, j, PP (invarX, invarY), stream)
-	| _								->  assert false
-
-let binload_pair = Bitv.L.to_bool_list >> (
-	let rec fold i j carry = function
-		| [] -> carry
-		| stream ->
-			let i, j, e, stream = binload_pair_elem i j stream in
-			fold i j (e::carry) stream
-	in fold 0 0 [])
-
-let expand_uniq : uniq -> uniq=
-	let aux0 =
-		let rec aux carry = function
-			| [], [] -> List.rev carry
-			| (S _)::x', y::y' -> aux (y::carry) (x', y')
-			| (P _)::x', y' -> aux (false::carry) (x', y')
-			| _ -> assert false
-		in
-		fun vect uniq -> Bitv.L.of_bool_list (aux [] (uniq, (Bitv.L.to_bool_list vect)))
-	in
-	let aux =
-		let rec aux carry = function
-			| [] -> List.rev carry
-			| head::tail -> match head with
-				| S _ | P (_, None) -> aux (head::carry) tail
-				| P (b, Some i) -> aux ((P (b, Some(aux0 i tail)))::carry) tail
-		in aux []
-	in aux
 
 type iinvar = bool * (bool list option)
+
+let count_s = MyList.count (function S _ -> true | P _ -> false)
+let count_p = MyList.count (function S _ -> false | P _ -> true)
+
+
+type iuniq_elem =
+	| IS of bool
+	| IP of iinvar
+
+let count_is = MyList.count (function IS _ -> true | IP _ -> false)
+let count_ip = MyList.count (function IS _ -> false | IP _ -> true)
+
+type iuniq = iuniq_elem list
 
 let iinvar_of_invar (b, opi) = (b, (match opi with
 	| None -> None
@@ -98,20 +23,13 @@ let iinvar_of_invar (b, opi) = (b, (match opi with
 
 let invar_of_iinvar (b, opi) = (b, (match opi with
 	| None -> None
-	| Some i -> Some(Bitv.M.of_bool_list i)))
+	| Some i -> Some(Bitv.L.of_bool_list i)))
 
-type iuniq_elem =
-	| IS of bool
-	| IP of iinvar
-
-type iuniq = iuniq_elem list
-
-
-let iuniq_of_uniq = List.map (function
+let xiuniq_of_xuniq = List.map (function
 	| S b -> IS b
 	| P i -> IP (iinvar_of_invar i))
 
-let uniq_of_iuniq = List.map (function
+let xuniq_of_xiuniq = List.map (function
 	| IS b -> S b
 	| IP i -> P (invar_of_iinvar i))
 
@@ -135,61 +53,263 @@ let pair_of_ipair = List.map (function
 	| ISP i -> SP (invar_of_iinvar i)
 	| IPP (ix, iy) -> PP (invar_of_iinvar ix, invar_of_iinvar iy))
 
-let add : bool list -> bool list -> bool list = List.map2 ( <> ) 
 
-let reduce_iuniq =
-	let aux0S b small =
-		let n = List.length small in fun big -> (* could be speed-up by bringing this computation to bitv level of abstraction *)
-		let m = List.length big in
-		assert(m > n);
-		let head, tail = MyList.hdtl_nth (m-(n+1)) big in
-		assert(List.length tail = (n+1));
-		match tail with
-		| [] -> assert false
-		| x::tail -> (b && x, head@(if x then (add small tail) else tail))
+let uniq_check =
+	let rec aux i = function
+		| [] -> true
+		| head::tail -> match head with
+			| S _ -> aux (i+1) tail
+			| P (b, opv) -> (match opv with
+				| None -> true
+				| Some v -> Bitv.length v = i)&&(aux i tail)
+	in List.rev >> (aux 0)
+
+let edge_check (b, u) = uniq_check u
+
+let riuniq_check =
+	let rec aux i = function
+		| [] -> true
+		| head::tail -> match head with
+			| IS _ -> aux (i+1) tail
+			| IP (b, opv) -> (match opv with
+				| None -> true
+				| Some v -> List.length v = i)&&(aux i tail)
+	in List.rev >> (aux 0)
+
+let iuniq_check =
+	let rec aux  = function
+		| [] -> true
+		| head::tail -> match head with
+			| IS _ -> aux tail
+			| IP (_, opv) -> (match opv with
+				| None -> true
+				| Some v -> List.length v = List.length tail)&&(aux tail)
+	in aux
+
+let strdump_riuniq b =
+	let iuniq_elem n =
+		let rec aux carry = function
+			| ([], []) -> (MyList.ntimes " " (n+1))@("+"::(List.rev carry))
+			| ((IS _)::x', y::y') -> aux ((if y then "+" else " ")::carry) (x', y')
+			| ((IP _)::x', y') -> aux (" "::carry) (x', y')
+			| _ -> assert false
+		in fun vec tail -> aux [] (tail, vec)
 	in
-	let aux0N b n big =
-		let m = List.length big in
-		assert(m > n);
-		let head, tail = MyList.hdtl_nth (m-(n+1)) big in
-		assert(List.length tail = (n+1));
-		match tail with
-		| [] -> assert false
-		| x::tail -> (b && x, head@tail)
+	let rec aux n floor matrix = function
+		| [] -> String.concat "\n" ((List.map (String.concat "") ((List.rev matrix)@[(if b then "-" else "+")::(List.rev floor)])))
+		| head::tail -> match head with
+			| IS b				-> aux (n+1) ((if b then "F" else "S")::floor) matrix tail
+			| IP (b, None)		-> aux (n+1) ((if b then "A" else "P")::floor) matrix tail
+			| IP (b, Some v)	-> aux (n+1) ((if b then "N" else "I")::floor) ((iuniq_elem n v tail)::matrix) tail
 	in
-	let aux0map f = List.map (function
-		| IS b -> IS b
-		| IP (b, None) -> IP (b, None)
-		| IP (b, Some i) ->
-			let b', i = f i in
-			IP (b<>b', Some i)
+	aux 0 [] []
+
+let strdump_edge (b, u) = strdump_riuniq b (xiuniq_of_xuniq u)
+
+let bindump_invar (b, opi) (stream:bool list) : bool list =
+	let stream = BinDump.option BinDump.bitv stream opi in
+	BinDump.bool stream b
+
+let binload_invar i stream =
+	let b, stream = BinLoad.bool stream in
+	let opi, stream = BinLoad.option (BinLoad.bitv i) stream in
+	(b, opi), stream
+
+let bindump_uniq_elem stream = function
+	| S b	-> false::b::stream
+	| P i	-> true::(bindump_invar i stream)
+
+let binload_uniq_elem i = BinLoad.choice
+(* S *)	(fun stream ->
+	let b, stream = BinLoad.bool stream in
+	(S b, (i+1), stream)
 		)
-	in
-	let aux1 : iuniq -> iuniq =
-		let head_reduce = function
-			| IS b -> IS b
-			| IP (b, opi) -> IP (b, (match opi with
-				| None -> None
-				| Some i ->
-					if List.exists (fun x -> x) i
-						then Some i
-						else None))
+(* P *) (fun stream ->
+	let invar, stream = binload_invar i stream in
+	(P invar, i , stream)
+		)
+
+let bindump_uniq = (let rec fold stream = function
+	| [] -> stream
+	| head::tail -> fold (true::(bindump_uniq_elem stream head)) tail in fold (false::[]))
+
+let binload_uniq = (
+	let rec fold i carry = BinLoad.choice
+		(fun stream -> carry)
+		(fun stream ->
+			let e, i, stream = binload_uniq_elem i stream in
+			fold i (e::carry) stream)
+	in fold 0 [])
+
+
+let bindump_pair_elem carry = function
+	| SS b					-> false::b::carry
+	| SP invar				-> true::false::true::(bindump_invar invar carry)
+	| PS invar				-> true::false::false::(bindump_invar invar carry)
+	| PP (invarX, invarY)	-> true::true ::false::(bindump_invar invarX (bindump_invar invarY carry))
+
+let bindump_pair = (let rec fold carry = function
+	| [] -> carry
+	| head::tail -> fold (bindump_pair_elem carry head) tail in fold (true::true::true::[]))
+
+let binload_pair_elem i j = function
+	| false::b::stream				-> (* SS *)
+		(i+1, j+1, SS b, stream)
+	| true::false::true::stream		-> (* SP *)
+		let invar, stream = binload_invar j stream in
+		(i+1, j, SP invar, stream)
+	| true::false::false::stream	-> (* PS *)
+		let invar, stream = binload_invar i stream in
+		(i, j+1, PS invar, stream)
+	| true::true ::false::stream	-> (* PP *)
+		let invarX, stream = binload_invar i stream in
+		let invarY, stream = binload_invar j stream in
+		(i, j, PP (invarX, invarY), stream)
+	| _								->  assert false
+
+let binload_pair = (
+	let rec fold i j carry = function
+		| [] -> carry
+		| true::true ::true :: _ -> carry
+		| stream ->
+			let i, j, e, stream = binload_pair_elem i j stream in
+			fold i j (e::carry) stream
+	in fold 0 0 [])
+
+
+let bindump_edge (b, l) = b::(bindump_uniq l) |> Array.of_list |> Bitv.L.of_bool_array 
+let binload_edge = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_uniq l) | _ -> assert false)
+
+let bindump_node (b, l) = b::(bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
+let binload_node = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_pair l) | _ -> assert false)
+
+let bindump_node_and ((bx, by), l) = bx::by::(bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
+let binload_node_and = Bitv.L.to_bool_array >> Array.to_list >> (function bx::by::l -> ((bx, by), binload_pair l) | _ -> assert false)
+
+let bindump_node_xor l = bindump_pair l |> Array.of_list |> Bitv.L.of_bool_array
+let binload_node_xor = Bitv.L.to_bool_array >> Array.to_list >> binload_pair
+
+let bindump_tacx (t, l) = CpGops.bindump_ttag (bindump_pair l) t |> Array.of_list |> Bitv.L.of_bool_array
+let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> CpGops.binload_ttag >> (fun (t, l) -> (t, binload_pair l))
+
+let expand_uniq : uniq -> uniq=
+	let aux0 =
+		let rec aux carry = function
+			| [], [] -> List.rev carry
+			| (S _)::x', y::y' -> aux (y::carry) (x', y')
+			| (P _)::x', y' -> aux (false::carry) (x', y')
+			| _ -> assert false
 		in
-		let rec aux carry : iuniq -> iuniq = function
-			| [] -> List.rev carry
-			| head::tail ->
-				let head = head_reduce head in
-				aux (head::carry) (match head with
-					| IS _				-> tail
-					| IP (b, None)		-> aux0map (aux0N b (List.length tail)) tail
-					| IP (b, Some i)	-> aux0map (aux0S b i) tail)
-		in aux []
+		fun vect uniq -> Bitv.L.of_bool_list (aux [] (uniq, (Bitv.L.to_bool_list vect)))
 	in
-	aux1
+	let aux =
+		let rec aux carry = function
+			| [] -> List.rev carry
+			| head::tail -> match head with
+				| S _ | P (_, None) -> aux (head::carry) tail
+				| P (b, Some i) -> aux ((P (b, Some(aux0 i tail)))::carry) tail
+		in aux []
+	in aux
 
-let reduce_uniq = iuniq_of_uniq >> reduce_iuniq >> uniq_of_iuniq
+let iuniq_of_riuniq : iuniq -> iuniq=
+	let aux0 =
+		let rec aux carry = function
+			| [], [] -> List.rev carry
+			| (IS _)::x', y::y' -> aux (y::carry) (x', y')
+			| (IP _)::x', y' -> aux (false::carry) (x', y')
+			| _ -> assert false
+		in
+		fun vect uniq -> aux [] (uniq, vect)
+	in
+	let aux =
+		let rec aux carry = function
+			| [] -> List.rev carry
+			| head::tail -> match head with
+				| IS _ | IP (_, None) -> aux (head::carry) tail
+				| IP (b, Some i) -> aux ((IP (b, Some(aux0 i tail)))::carry) tail
+		in aux []
+	in aux
 
-let compose =
+let add : bool list -> bool list -> bool list = List.map2 ( <> ) 
+let cadd = function
+	| true -> add
+	| false -> fun x _ -> x
+
+
+let xsev_vec_of_xiuniq b =
+	let aux =
+		let rec aux carry = function
+			| [] -> List.rev ((None, b)::carry)
+			| head::tail -> let head = match head with
+				| IS b -> None, b
+				| IP (b, opv) -> Some((match opv with None -> MyList.ntimes false (List.length tail) | Some v -> v)@[b]), false
+				in aux (head::carry) tail
+		in aux []
+	in aux >> List.split
+
+let xsev_rvec_of_xiuniq b =
+	let aux =
+		let rec aux carry = function
+			| [] -> List.rev ((None, Some b)::carry)
+			| head::tail -> let head = match head with
+				| IS b -> None, Some b
+				| IP (b, opv) -> Some((match opv with None -> MyList.ntimes false (List.length tail) | Some v -> v)@[b]), None
+				in aux (head::carry) tail
+		in aux []
+	in aux >> List.split >> (fun (sev, opvec) -> (sev, MyList.list_of_oplist opvec))
+
+let xsev_rvec_of_xuniq (b, uniq) =
+	uniq |> xiuniq_of_xuniq |> iuniq_of_riuniq |> (xsev_rvec_of_xiuniq b)
+
+let xiuniq_of_xsev_rvec sev vec =
+	(* bsev + vect -> iuniq *)
+	let sev, last = MyList.last sev in
+	assert(last = None);
+	let vec, b = MyList.last vec in
+	let aux0 =	
+		let rec aux some carry = function
+			| []			-> assert false
+			| [x]			-> x, (if some then Some(List.rev carry) else None)
+			| head::tail	-> aux (head||some) (head::carry) tail
+		in function
+			| [] -> assert false
+			| liste -> aux false [] liste
+	in
+	let aux1 =
+		let rec aux carry = function
+			| ([], []) -> List.rev carry
+			| ([], _) -> assert false
+			| (None::x', y::y') -> aux ((IS y)::carry) (x', y')
+			| (None::_ , []) -> assert false
+			| ((Some v)::x', y') -> aux ((IP(aux0 v))::carry) (x', y')
+		in fun sev vec -> aux [] (sev, vec)
+	in
+	(b, aux1 sev vec)
+
+let uniq_of_rsev_rvec sev vec = 
+	let b, sev = xiuniq_of_xsev_rvec sev vec in
+	(b, xuniq_of_xiuniq sev)
+
+let riuniq_of_iuniq u =
+	assert(iuniq_check u);
+	let sev, vec = xsev_rvec_of_xiuniq false u in
+	assert(List.length vec = Bsev.sev_count_none sev);
+	assert(Bsev.check sev);
+	let sev = Bsev.sev_reduce sev in
+	assert(Bsev.check_reduce sev);
+	assert(List.length vec = Bsev.sev_count_none sev);
+	let b, u = xiuniq_of_xsev_rvec sev vec in
+	assert(b = false);
+	assert(riuniq_check u);
+	u
+
+let uniq_compose =
+(*	let copadd = function
+		| false -> fun _ x -> x
+		| true	-> function
+			| None		-> fun y -> y
+			| Some x	-> (add x)
+	in *)
 	let aux0 =
 		let rec aux carry = function
 			| ([], [])				-> List.rev carry
@@ -211,251 +331,321 @@ let compose =
 				| None -> aux ((IP(by, None))::carry) (x', y', (bp, p'))
 				| Some iy -> 
 					let iy = aux0 iy x' in
-					let bp, p' = if bx
-						then (by<>bp, add p' iy)
-						else (bp, p')
-					in aux ((IP(by, Some iy))::carry) (x', y', (bp, p'))
+					assert(List.length p' = List.length iy);
+					let p' = cadd bx p' iy in
+					aux ((IP(by, Some iy))::carry) (x', y', (bp, p'))
 			
+		)
+		| ((IP (bx, opx))::x', y', (bp, p::p')) ->
+		(
+			let bp = bp <> (p && bx) in
+			let p' = match opx with
+				| None -> p'
+				| Some v -> cadd p p' v in
+			aux ((IP(bx, opx))::carry) (x', y', (bp, p'))
 		)
 		| _ -> assert false
 	in
 	fun uniqC uniq ->
-		let uniqC = iuniq_of_uniq (expand_uniq uniqC)
-		and uniq  = iuniq_of_uniq (expand_uniq uniq) in
+		let uniqC = uniqC |> xiuniq_of_xuniq |> iuniq_of_riuniq in
+		let uniq  = uniq  |> xiuniq_of_xuniq |> iuniq_of_riuniq in
+		assert(List.length uniq = count_is uniqC);
 		let b, uniqX = aux [] (uniqC, uniq, (false, MyList.ntimes false (List.length uniqC))) in
-		(b, uniqX |> reduce_iuniq |> uniq_of_iuniq)
+		(b, uniqX |> riuniq_of_iuniq |> xuniq_of_xiuniq)
 
-let ipair_remove_nth =
-	let aux0 n vect =
-		let head, tail = MyList.hdtl_nth (List.length vect - (n+1)) vect in
-		match tail with
-			| x::tail	-> assert(x=false); (head, tail)
-			| _			-> assert false;
-	in
-	let aux1 n (b, opi) = (b, match opi with
-		| None -> None
-		| Some i -> Some(aux0 n i))
-	in
-	let aux2 n = List.map (function
-		| ISS b -> ISS b
-		| ISP x -> ISP (aux1 n x)
-		| IPS x -> IPS (aux1 n x)
-		| IPP (x, y) -> IPP(aux1 n x, aux1 n y))
-	in aux2
+let compose (bC, uC) ((b, u), i) =
+	let b', u = uniq_compose uC u in
+	(bC<>b<>b', u), i
 
-let cons_1 uniqX uniqY =
-	let uniqX = iuniq_of_uniq (expand_uniq uniqX)
-	and uniqY = iuniq_of_uniq (expand_uniq uniqY) in
+
+let pair_recompose sev uniqX uniqY vec =
+	let sev, last = MyList.last sev in
+	assert(last = None);
+	let n = List.length sev in
+	assert(n = List.length uniqX);
+	assert(n = List.length uniqY);
+	let mix = List.combine sev (List.combine uniqX uniqY) in
+	let f = fun (s, (x, y)) -> match s with
+		| None -> Some (match x, y with
+			| S _, S _ -> SS false
+			| P x, S _ -> PS x
+			| S _, P y -> SP y
+			| P x, P y -> PP (x, y))
+		| Some _ -> None
+	in
+	let sev = MyList.opmap f mix in
+	List.map2 (fun s v -> match s with
+		| SS _	-> SS v
+		| x		-> x) sev vec
+
+let uniq_recompose sev vec =
+	(* bsev + vect -> iuniq *)
+	let sev, last = MyList.last sev in
+	assert(last = None);
+	(*MAYBE: let vec, b = MyList.last vec in*)
+	let aux0 =	
+		let rec aux some carry = function
+			| []			-> assert false
+			| [x]			-> x, (if some then Some(List.rev carry) else None)
+			| head::tail	-> aux (head||some) (head::carry) tail
+		in function
+			| [] -> assert false
+			| liste -> aux false [] liste
+	in
+	let rec aux carry = function
+		| ([], []) -> List.rev carry
+		| (None::x', y::y') -> aux ((IS y)::carry) (x', y')
+		| ((Some v)::x', y') -> aux ((IP(aux0 v))::carry) (x', y')
+		| _ -> assert false
+	in
+	let iuniq = aux [] (sev, vec) in
+	(* iuniq -> uniq *)
+	xuniq_of_xiuniq iuniq
+		
+
+let sev_vec_of_uniq (b, u) = xsev_vec_of_xiuniq b (u |> xiuniq_of_xuniq |> iuniq_of_riuniq)
+
+
+let solve_cons_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
+	let (sx, vx) as dx = sev_vec_of_uniq x
+	and (sy, vy) as dy = sev_vec_of_uniq y in
+	assert(Bsev.check sx);
+	assert(Bsev.check sy);
+	let f, sev, ((bY, vY), (bXY, vXY)) = Bsev.sev_inter_cons dx dy in
+	assert(List.length sev = List.length uniqX + 1);
+	assert(List.length sev = List.length uniqY + 1);
+	let xy  = pair_recompose sev uniqX uniqY vY in
+	let vXY = uniq_recompose sev vXY in
+	(f, (bY, xy), (bXY, vXY))
+
+let solve_and_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
+	let (sx, vx) as dx = sev_vec_of_uniq x
+	and (sy, vy) as dy = sev_vec_of_uniq y in
+	assert(Bsev.check sx);
+	assert(Bsev.check sy);
+	let f, sev, (bX, (bY, vY), (bXY, vXY)) = Bsev.sev_inter_and dx dy in
+	let xy  = pair_recompose sev uniqX uniqY vY in
+	let vXY = uniq_recompose sev vXY in
+	(f, (bX, bY, xy), (bXY, vXY))
+
+let solve_xor_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
+	let (sx, vx) as dx = sev_vec_of_uniq x
+	and (sy, vy) as dy = sev_vec_of_uniq y in
+	assert(Bsev.check sx);
+	assert(Bsev.check sy);
+	let f, sev, (vY, (bXY, vXY)) = Bsev.sev_inter_xor dx dy in
+	let xy  = pair_recompose sev uniqX uniqY vY in
+	let vXY = uniq_recompose sev vXY in
+	(f, xy, (bXY, vXY))
+
+let solve_cons_0 (bX, uniqX) (bY, uniqY) =
 	let aux =
-		let aux0 p (b, p') (ib, iopi) = if not p then (b, p') else
-			(b<>ib, match iopi with
-			| None -> p'
-			| Some i -> add p' i)
-		in
-		let rec aux carryXY carryZ = function
-			| ((bx, []), (by, []), [], []) -> (bx<>by, List.rev carryXY), (bx, List.rev carryZ)
-			| ((bpx, px::px'), (bpy, py::py'), x::x', y::y') ->
-			(
-				assert(List.length x' = List.length y');
-				match x, y with
-				| IS bx, IS by ->
-					let bx = bx <> px
-					and by = by <> py in
-					aux ((ISS (by<>bx))::carryXY) ((IS bx)::carryZ) ((bpx, px'), (bpy, py'), x', y')
-				| IP ix, IP iy ->
-					let bpx, px' = aux0 px (bpx, px') ix
-					and bpy, py' = aux0 py (bpy, py') iy in
-					if ix = iy
-					then
-					(
-						let carryXY = ipair_remove_nth (List.length x') carryXY in
-						aux carryXY ((IP ix)::carryZ) ((bpx, px'), (bpy, py'), x', y')
-					)
-					else aux ((IPP (ix, iy))::carryXY) ((IS false)::carryZ) ((bpx, px'), (bpy, py'), x', y')
-				| IS bx, IP iy ->
-					let bx = bx <> px in
-					let bpy, py' = aux0 (py <> bx) (bpy, py') iy in
-					aux ((ISP iy)::carryXY) ((IS bx)::carryZ) ((bpx, px'), (bpy, py'), x', y')
-				| IP ix, IS by ->
-					let by = by <> py in
-					let bpx, px' = aux0 (px <> by) (bpx, px') ix in
-					aux ((IPS ix)::carryXY) ((IS by)::carryZ) ((bpx, px'), (bpy, py'), x', y')
-			)
-			| _ -> assert false
-		in fun uniqX uniqY ->
-			let n = List.length uniqX in
-			assert(List.length uniqY = n);
-			let p = (false, MyList.ntimes false n) in
-			aux [] [] (p, p, uniqX, uniqY)
+		let rec aux carryY carryXY = function
+			| [] -> Some(List.rev carryY, List.rev carryXY)
+			| head::tail -> match head with
+				| P x, P y -> if x = y
+					then aux carryY ((P x)::carryXY) tail
+					else None
+				| S x, S y -> aux ((x<>y)::carryY) ((S x)::carryXY) tail
+				| _ -> None
+		in aux [] []
 	in
-	let (bp, pair), (bu, uniq) = aux uniqX uniqY in
-	((bp, pair_of_ipair pair), (bu, uniq_of_iuniq uniq))
+	if uniqX = uniqY
+	then Some(bX, (P(bX<>bY, None))::uniqX)
+	else match aux (List.combine uniqX uniqY) with
+	| None -> None
+	| Some(diff, uniqXY) -> Some (bX, (P (invar_of_iinvar (bX<>bY, Some diff))::uniqX))
 
+let size (b, u) = List.length u
 
-let cons_2 pair =
-	let bi_bi_add (bx, ix) (by, iy) = (bx<>by, add ix iy) in
-	let bopi_bi_add (bx, opix) (by, iy) = (bx<>by, match opix with None -> iy | Some ix -> add ix iy) in
-	let bopi_bopi_add (bx, opix) (by, opiy) = (bx<>by, match opix, opiy with
-		| None, None -> None
-		| Some v, None | None, Some v -> Some v
-		| Some vx, Some vy -> Some (add vx vy)
+let solve_cons getid (eX, iX) (eY, iY) =
+	assert(size eX = size eY);
+	match (if(CpGops.cmpid getid (iX, iY) = None)
+		then solve_cons_0 eX eY
+		else None) with
+	| Some e	-> Utils.MEdge (e, iX)
+	| None		->
+		let f, (eX, iX), (eY, iY) = if iX <= iY
+		then false, (eX, iX), (eY, iY)
+		else true,  (eY, iY), (eX, iX) in
+		let f', (bY, xy), (bXY, vXY) = solve_cons_1 eX eY in
+		let iX, iY = if f' then iY, iX else iX, iY in
+		Utils.MNode ((bXY, (S(f<>f'))::vXY), ((bY, xy), iX, iY))
+
+let node_push_cons gid x y = match solve_cons gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, (bindump_node e', x, y))
+
+let tacx_push_cons gid x y = match solve_cons gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TCons b, l), x, y))
+
+let get_root_n b n = ((b, MyList.ntimes (P(false, None)) n), Utils.Leaf ())
+
+let get_root b ((_, l), _) = get_root_n b (List.length l)
+
+let uniq_is_root = List.for_all (function P(false, None) -> true | _ -> false)
+
+let deco_is_root (b, u) = if uniq_is_root u
+	then Some b
+	else None
+
+let edge_is_root (e, i) = match i with
+	| Utils.Leaf () -> deco_is_root e
+	| Utils.Node _  -> None
+
+let pair_is_root : pair -> bool * bool=
+	let isP = function
+		| (false, None) -> true
+		| _				-> false
 	in
-	let deal f = function
-		| (bx, x::x'), (by, y::y'), z -> f x y ((bx, x'), (by, y'), z)
+	let rec aux rX rY = function
+		| [] -> (rX, rY)
+		| head::tail -> match head with
+			| SS _ -> (false, false)
+			| PS x -> aux (rX&&(isP x)) rY tail
+			| SP y -> aux rX (rY&&(isP y)) tail
+			| PP (x, y) -> aux (rX&&(isP x)) (rY&&(isP y)) tail
+	in aux true true
+
+let uniqX_of_pair = List.map (function
+	| SS _
+	| SP _		-> S false
+	| PS x
+	| PP(x, _)	-> P x)
+
+let uniqY_of_pair = List.map (function
+	| SS b		-> S b
+	| PS _		-> S false
+	| SP y
+	| PP(_, y)	-> P y)
+
+let pair_split pair = List.map (function
+	| SS s		-> S false, S s
+	| PS x		-> P x, S false
+	| SP y		-> S false, P y
+	| PP(x, y)	-> P x, P y) pair |> List.split
+
+let node_split (b, p) =
+	let uX, uY = pair_split p in
+	(false, uX), (b, uY)
+
+let node_pull_node _ (c, ix, iy) =
+	let ex, ey = node_split (binload_node c) in
+	(ex, ix), (ey, iy)
+
+let apply_reduced_phase =
+	let rec aux carry = function
+		| ([], []) -> List.rev carry
+		| ((S x)::x', y::y') -> aux ((S(x<>y))::carry) (x', y')
+		| ((P x)::x', y') -> aux ((P x)::carry) (x', y')
 		| _ -> assert false
-	in
-	let div_ss (v, w, t) = List.map
-		(deal (fun x y (x', y', z') ->
-			let z' = y::z' in
-			if x
-			then (bi_bi_add_v v x', bi_bi_add w y', add t z')
-			else (x', y', z')
-		))
-	in
-	let aux_ss =
-		let rec aux carry = function
-		| [] -> List.rev carry
-		| head::tail -> deal (fun x y (x', y', z') ->
-			let z = (x', y', y::z') in
-			if x
-			then (List.rev(carry))@(div_ss z)
-			(fun x -> aux (z::carry) tail)
-			head
-		in fun (nonelist, coinvarlist) -> (nonelist, aux [] coinvarlist)
-	in
-	let aux_ps v (nonelist, coinvarlist) = (nonelist, List.map
-	(
-		deal
-		(fun x y (x', y', z') ->
-			let z' = (x<>y)::z' in
-			if x
-			then (bopi_bi_add v x', bopi_bi_add v y', z')
-			else (x', y', z')
-		)
-	)
-	coinvarlist)
-	let aux_sp v (nonelist, coinvarlist) = (nonelist, List.map
-	(
-		deal
-		(fun x y (x', y', z') ->
-			(if x then bopi_bi_add v x' else x', y', y::z')
-		)
+	in fun p u -> aux [] (u, p)
 
-	)
-	coinvarlist)
-	let n = List.length pair in
-	let aux_pp i ((bv, vv) as v) w state =
-		let (nonelist, coinvarlist) = aux_sp w state in
-		match bopi_bopi_add v w with
-		| (b, None) -> ((b, (bv, (MyList.ntimes false (n-(i+1)))@(true::(MyList.ntimes false i))))::nonelist, coinvarlist)
-		| (bz, Some vz) ->
-		(
-			let x = (bz, vz) in
-			let y = (bv, match vv with None -> (MyList.ntimes false i) | Some v -> v) in
-			let z = true::(MyList.ntimes false (n-(i+1))) in
-			(nonelist, (x, y, z)::coinvarlist)
-		)
-	in
-	let aux_end (nonelist, coinvarlist) =
-		let nonelist = nonelist @ (List.map (function ((bx, []), (by, []), z) -> (bx, (by, List.rev z)) | _ -> assert false) coinvarlist) in
-		let aux0 v = List.map (function (bx, y) -> if bx then bi_bi_add v y else y)
-		let rec aux1 carry = function
-			| []			-> List.rev carry
-			| (bx, y)::tail	-> if bx then (List.rev carry)@(aux0 y tail) else aux1 (y::carry) tail
-		in
-		let aux2 v = List.map (function x::x' -> if x then add v x else x)
-		let rec aux3 carry = function
-			| [] -> List.rev carry, None
-			| (x::x')::tail -> if x then ((List.rev carry)@(aux2 x' tail)), Some x' else aux3 (x'::carry) tail
-		in
-		let rec aux4 state carry = function
-			| 0 -> List.rev carry
-			| n ->
-				let state, elem = aux3 [] state in
-				aux4 state (elem::carry) 0
+let node_pull getid ((bx, lx), i) = match lx with
+	| [] -> assert false
+	| h::lx' -> let e' = (bx, lx') in match h with
+		| S b -> Utils.MNode (fun node ->
+			let x', y' = node_pull_node getid node in
+			Tools.cswap b ((compose e' x'), (compose e' y')))
+		| P(b, opv) -> Utils.MEdge (match opv with
+			| None -> ((bx, lx'), i), ((bx<>b, lx'), i)
+			| Some v ->
+			(
+				let lx'' = apply_reduced_phase (Bitv.L.to_bool_list v) lx' in
+				((bx, lx'), i), ((bx<>b, lx''), i)
+			))
 
-		let rec aux carry = function
-		| [] -> List.rev carry
-		| head::tail -> deal (fun x y (x', y', z') ->
-			let z = (x', y', y::z') in
-			if x
-			then (List.rev(carry))@(div_ss z)
-			(fun x -> aux (z::carry) tail)
-			head
-		in fun (nonelist, coinvarlist) -> (nonelist, aux [] coinvarlist)
-	in
-	let rec aux coinvarlist = function
-		| [] -> aux_end coinvarlist
-		| x::x' -> match x with
-			| ISS _ -> aux (aux_ss coinvarlist) x'
-			| IPS v -> aux (aux_ps v coinvarlist) x'
-			| ISP v -> aux (aux_sp v coinvarlist) x'
-			| IPP (v, w) -> aux (aux_pp (List.length x') v w coinvarlist) x'
-	in aux ([], [])
+let tacx_split (t, lxy) =
+	let lx, ly = pair_split lxy in
+	match t with
+	| CpTypes.TAnd (bx, by) -> (CpTypes.And,  (bx, lx), (by, ly))
+	| CpTypes.TCons by		-> (CpTypes.Cons, (false, lx), (by, ly))
+	| CpTypes.TXor			-> (CpTypes.Xor,  (false, lx), (false, ly))
 
-	let rec aux0 carry = function
-(*		| (vref, vdiff, carry) *)
-		| ((bx, []), (by, []), []) -> if by then None else Some (bx, Some(List.rev carry))
-		| ((bx, x::x'), (by, y::y'), z::z') -> if y then
-		(
-			match z with
-			| ISS b		-> None
-			| IPS v		-> aux ((not x)::carry) (bopi_bi_add v (bx, x'), bopi_bi_add v (by, y'), z')
-			| ISP v		-> aux (x::carry) ((bx, x'), bopi_bi_add v (by, y'), z')
-			| IPP ((b1, opi1), (b2, opi2)) ->
-			(
-			)
-		)
-		else
-		(
-		)
-		match z with
-			| ISS b -> if y then None else aux0 (bp, x::carry) (x', y', z')
-			| IPS (b, opi) ->
-			( match opi with
-				| None		-> aux0 (bp<>(b&&y), (x<>y)::carry) (x', y', z')
-				| Some i	-> if y
-				then (
-					
-				) else (
-				)
-			(
-			) else
-			(
-			)match opi with
-	let rec aux carryXY carryZ = function
-		| []		-> carryXY, carryZ
-		| x::tail	-> match x with
-			| ISS _ | ISP _ | IPS _ -> aux (x::carryXY) ((IS false)::carryZ) tail
-			| IPP (vx, vy) -> match aux0 (false, []) (vx, (add0 vx vy), carryXY) with
-				| None		-> aux (x::carryXY) ((IS false)::carryZ) tail
-				| Some v	-> aux carryXY ((IP v)::carryZ) (ipair_remove_nth (List.length carryXY) tail)
-	in fun ipair -> aux [] [] (List.rev ipair)
-	
-	
+let tacx_pull_node _ (c, ix, iy) =
+	let t, ex, ey = tacx_split (binload_tacx c) in
+	(t, (ex, ix), (ey, iy))
 
-(*
-let cons_primaire uniqX uniqY =
-	assert(List.length uniqX = List.length uniqY);
-	let n = List.length uniqX in
-	let phase = MyList.ntimes False n in
-	let
-	let aux0 =
-		let rec aux carry = function
-			| [], [] -> List.rev carry
-			| (S b)::x, y::y' as yy ->
+let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) : (op_tag, 't edge, 't cnode) Utils.unmerge_tagged = match lx with
+	| [] -> assert false
+	| h::lx' -> match h with
+		| S b -> Utils.MNode (fun node ->
+			let t, x', y' = tacx_pull_node getid node in
+			let e' = match t with
+				| CpTypes.Cons	-> (bx, lx')
+				| _		-> (bx, lx )
+			in
+			let a, b = Tools.cswap b ((compose e' x'), (compose e' y')) in
+			(t, a, b))
+		| P(b, opv) -> Utils.MEdge (match opv with
+			| None -> CpTypes.Cons, ((bx, lx'), i), ((bx<>b, lx'), i)
+			| Some v ->
 			(
-				match x, y with
-			)
-	let rec aux carryXY carryZ= function
-		| ([], [], []) -> List.rev carryXY, List.rev carryZ
-		| (p::p', x::x', y::y') ->
-		(
-			match x, y with
-			| S bx, S by -> aux ((SS (by<>bx))::carryXY) ((S (p<>bx))::carryZ) (p', x', y')
-			| P ix, P iy -> if ix = iy
-				then aux carryXY ((P ix)::carryZ) (p', x', y') (* ERROR: project ix back into absolute space *)
-				else aux ((PP (ix, iy))::carryXY) ((S false)::carry (* ERROR: true if ix and iy are int the absolute space *)
-		)
-		| _ -> assert false
-*)
+				let lx'' = apply_reduced_phase (Bitv.L.to_bool_list v) lx' in
+				CpTypes.Cons, ((bx, lx'), i), ((bx<>b, lx''), i)
+			))
+
+let uniqY_of_pair = List.map (function
+	| SS b		-> S b
+	| PS _		-> S false
+	| SP y
+	| PP(_, y)	-> P y)
+
+let solve_and gid (eX, iX) (eY, iY) =
+	let f, (eX, iX), (eY, iY) = if (match CpGops.cmpid gid (iX , iY) with Some true -> false | _ -> true)
+		then (false, (eX, iX), (eY, iY))
+		else (true,  (eY, iY), (eX, iX)) in
+	let f', (bX, bY, xy), (bXY, vXY) = solve_and_1 eX eY in
+	let iX, iY = if f' then iY, iX else iX, iY in
+	let n = List.length xy in
+	match (match pair_is_root xy with
+		| true, true	-> Some (get_root_n (bX&&bY) n)
+		| true, false	-> Some (if bX
+			then ((bY, uniqY_of_pair xy), iY)
+			else (get_root_n false n))
+		| false, true	-> Some (if bY
+			then ((bX, uniqX_of_pair xy), iX)
+			else (get_root_n false n))
+		| false, false	-> None) with
+	| Some e -> Utils.MEdge (compose (bXY, vXY) e)
+	| None -> Utils.MNode ((bXY, vXY), (((bX, bY), xy), iX, iY))
+
+let tacx_push_and gid x y = match solve_and gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TAnd (bx, by), lxy), x, y))
+
+let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (Bitv.t * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode)) Utils.merge =
+	fun gid (x, y) -> match solve_and gid x y with
+		| Utils.MEdge e -> Utils.MEdge e
+		| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, (bindump_node_and e', x, y))
+
+
+
+let solve_xor gid (eX, iX) (eY, iY) =
+	let f, (eX, iX), (eY, iY) = if (match CpGops.cmpid gid (iX , iY) with Some true -> false | _ -> true)
+		then (false, (eX, iX), (eY, iY))
+		else (true,  (eY, iY), (eX, iX)) in
+	let f', xy, (bXY, vXY) = solve_xor_1 eX eY in
+	let iX, iY = if f' then iY, iX else iX, iY in
+	let n = List.length xy in
+	match (match pair_is_root xy with
+		| true, true	-> Some (get_root_n false n)
+		| true, false	-> Some ((false, uniqY_of_pair xy), iY)
+		| false, true	-> Some ((false, uniqX_of_pair xy), iX)
+		| false, false	-> None) with
+	| Some e -> Utils.MEdge (compose (bXY, vXY) e)
+	| None -> Utils.MNode ((bXY, vXY), (xy, iX, iY))
+
+let tacx_push_xor gid x y = match solve_xor gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TXor, l), x, y))
+
+let node_solve_xor gid (x, y) = match solve_xor gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_node_xor l, x, y))
+
+let tacx_push gid = function
+	| CpTypes.And  -> tacx_push_and  gid
+	| CpTypes.Cons -> tacx_push_cons gid
+	| CpTypes.Xor  -> tacx_push_xor  gid

@@ -3,6 +3,10 @@ type sev = vec option list
 
 let vec_add = List.map2 (fun x y -> x <> y)
 
+let vec_cadd = function
+	| true -> vec_add
+	| false -> fun x _ -> x
+
 let sev_count_some : sev -> int = MyList.count (function None -> false | Some _ -> true)
 let sev_count_none : sev -> int = MyList.count (function None -> true | Some _ -> false)
 
@@ -32,9 +36,7 @@ let vec_divide_asym small big =
 	head@(if x then vec_add small tail else tail)
 
 let vec_divide_sym vec = List.map (function
-	| x::head -> if x
-		then vec_add vec head
-		else head
+	| x::head -> vec_cadd x head vec
 	| [] -> assert false)
 
 let vec_set_divisor =
@@ -72,7 +74,7 @@ let sev_expand =
 			| Some vec	-> Some (vec_expand vec tail))::carry) tail
 	in aux []
 
-let sev_union =
+let sev_union = (* : expand -> expand -> expand *)
 	let rec aux carry state = function
 		| [] -> List.rev carry
 		| head::tail -> match head with
@@ -86,110 +88,35 @@ let sev_union =
 			| Some vec, Some vec' ->
 				let state = (vec_add vec vec')::(vec_divide_sym vec state) in
 				aux ((Some vec)::carry) state tail
-	in fun sevX sevY -> aux [] [] (List.combine sevX sevY)
-
-let sev_inter =
-	let postmain n =
-		let rec aux0 carry = function
-			| []		-> (List.rev carry)@(MyList.ntimes None (n-(List.length carry)))
-			| [[]::_]	-> List.rev carry
-			| state		->
-				let state, opdiv = vec_set_divisor state in
-				aux (opdiv::carry) state
-		in aux0 []
-	in
-	let state_add (xX, (yX, y'X)) (xY, (yY, y'Y)) =
-		(vec_add xX xY, (vec_add yX yY, vec_add y'X y'Y))
-	in
-	let state_pull = function
-		| (x::xX, (y::yX, y'X)) ->
-			x, (xX, (yX, y::y'X))
-		| _ -> assert false
-	in
-	let state_end = function
-		| ([], ([], vect)) -> List.rev vect
-		| _ -> assert false
-	in
-	let state_divide vec = List.map (function
-		| head::tail ->
-			let x, head = state_pull in if x
-			then state_add vec head
-			else head
-		| [] -> assert false) vec
-	in
-	let state_divisor =
-		let rec aux carry = function
-			| [] -> List.rev carry, None
-			| head::tail ->
-				let x, head = state_pull in if x
-				then ((List.rev carry)@(vec_divide_sym head tail)), Some head
-				else aux (head::carry) tail
-		in aux []
-	in
-	let main sevXY =
-		let n = List.length sevXY in
-		let state_of_vect_L vec =
-			let i = List.length vec in
-			(vec, (vec, true::(MyList.ntimes false (n-(i+1)))))
-		and state_of_vect_R vec =
-			let i = List.length vect in
-			(vec, (MyList.ntimes false i , MyList.ntimes false (n-i)))
-		and state_of_vect_LR vecL vecR =
-			let i = List.length vect in
-			(vec_add vecL vecR, (vecL, true::(MyList.ntimes false (n-(i+1)))))
-		in
-		let rec aux state = function
-			| [] -> (match state with
-				| []	-> MyList.ntimes None n
-				| state	-> postmain n (List.map state_end state))
-			| head::tail -> let state = (match head with
-				| None, None ->
-					let state, _ = state_divisor state in
-					state
-				| Some vec, None ->
-					state_divide (state_of_vect_L vec) state in
-				| None, Some vec ->
-					state_divide (state_of_vect_R vec) state in
-				| Some vecL, Some vecR ->
-					let vecR  = state_of_vect_L  vecR
-					and vecLR = state_of_vect_LR vecL vecR in
-					(vecLR::(state_divide vecR state))
-				)
-				in aux state tail
-		in aux [] (List.combine sevX sevY)
-	in
-	let premain =
-		let rec preaux i = function
-			| [] -> MyList.ntimes
-			| head::tail -> match head with
-				| Some x, Some y -> (MyList.ntimes None i)@(main (head::tail))
-				| _ -> aux (i+1) tail
-		in fun sevX sevY -> preaux 0 (List.combine sevX sevY)
-	in
-	premain
+	in fun sevX sevY ->
+		assert(check sevX);
+		assert(check sevY);
+		aux [] [] (List.combine sevX sevY)
 
 let sev_make_norm n m =
 	let x = MyList.ntimes false n in
+	assert(List.length x = n);
 	let y = x@(true::x)@[true] in
+	assert(List.length y = 2*(n+1));
 	MyList.init m (fun i ->
-		let z = y@(MyList.ntimes false (n-(i+1))) in
-		assert(List.length z + i + 1 = 3 * n);
+		let z = y@(MyList.ntimes false (n-i)) in
+		assert(List.length z + i + 1 = 3 * (n+1));
 		Some z)
 
 let sev_make_norm_cons n =
-	let z = sev_make_norm (n+1) (n+1) in
+	let z = sev_make_norm n (n+1) in
 	let z = z@(MyList.ntimes None (2*(n+1))) in
 	assert(List.length z = 3*(n+1));
 	z
 
 let sev_make_norm_and n =
-	let z = sev_make_norm (n+1) n in
+	let z = sev_make_norm n n in
 	let z = z@(MyList.ntimes None (2*(n+1)+1)) in
 	assert(List.length z = 3*(n+1));
 	z
 
 let sev_make_norm_xor n =
-	let z = sev_make_norm (n+1) n in
+	let z = sev_make_norm n n in
 	let nf = MyList.ntimes false n in
 	let nf1 = nf@[true] in
 	let nn = MyList.ntimes None n in
@@ -197,7 +124,7 @@ let sev_make_norm_xor n =
 	assert(List.length z = 3*(n+1));
 	z
 
-let sev_cat_special sevX sevY =
+let sev_cat_special n sevX sevY =
 	let x = MyList.ntimes false (2*(n+1)) in
 	let sevX = List.map (function
 		| None -> None
@@ -208,7 +135,9 @@ let sev_cat_special sevX sevY =
 		| None -> None
 		| Some vect -> Some (vect@y)) sevY
 	in
-	sevX@(None::@sevY)@(MyList.ntimes None (n+2)) in
+	let z = sevX@sevY@(MyList.ntimes None (n+1)) in
+	assert(List.length z = 3*(n+1));
+	z
 
 
 let vec_extract_cons n vect =
@@ -244,39 +173,89 @@ let sev_vec_divide =
 		| [] -> carry
 		| (opv, x)::tail -> aux (match opv with
 			| None		-> (x::carry)
-			| Some vect	-> (false::(vec_add vect carry))) tail
+			| Some vect	-> (false::(vec_cadd x carry vect))) tail
 	in fun sev vec -> aux [] (List.rev(List.combine sev vec))
 
-let sev_reduce_cons n (sevX, vecX) (sevY, vecY) =
-	let sevA = sev_cat_special sevX sevY in
-	let sevB = sev_make_norm_cons n in
-	let sev = sev_union sevA sevB in
-	let vec = vecX@vecY@(MyList.ntimes false (n+1) in
-	let vec = sev_vec_divide sev vec in
-	sev, vec_extract_cons vec
-
-let sev_reduce_and n (sevX, vecX) (sevY, vecY) =
-	let sevA = sev_cat_special sevX sevY in
-	let sevB = sev_make_norm_and n in
-	let sev = sev_union sevA sevB in
-	let vec = vecX@vecY@(MyList.ntimes false (n+1) in
-	let vec = sev_vec_divide sev vec in
-	sev, vec_extract_and vec
-
-let sev_reduce_xor n (sevX, vecX) (sevY, vecY) =
-	let sevA = sev_cat_special sevX sevY in
-	let sevB = sev_make_norm_xor n in
-	let sev = sev_union sevA sevB in
-	let vec = vecX@vecY@(MyList.ntimes false (n+1) in
-	let vec = sev_vec_divide sev vec in
-	sev, vec_extract_xor vec
-
-
+let sev_diff sev minus =
+	assert(check sev);
+	let sevm = MyList.opmap2 (fun s -> function
+		| None -> Some s
+		| Some _ -> match s with
+			| Some _ -> None
+			| None -> assert false) (sev_reduce sev) minus |> sev_expand in
+	assert(check sevm);
+	sevm
 
 let sev_vec_reduce =
 	let rec aux carry = function
 		| [] -> carry
 		| (opv, x)::tail -> aux (match opv with
 			| None		-> (x::carry)
-			| Some vect	-> (vec_add vect carry)) tail
+			| Some vect	-> vec_cadd x carry vect) tail
 	in fun sev vec -> aux [] (List.rev(List.combine sev vec))
+
+let sev_vec_shrink =
+	let rec aux carry = function
+		| [] -> carry
+		| (opv, x)::tail -> aux (match opv with
+			| None		-> (x::carry)
+			| Some _	-> assert(not x); carry) tail
+	in fun sev vec -> aux [] (List.rev(List.combine sev vec))
+
+let sev_union_meta sev_make_norm_meta n sevX sevY =
+	assert(check sevX);
+	assert(check sevY);
+	assert(List.length sevX = n+1);
+	assert(List.length sevY = n+1);
+	let sevA = sev_cat_special n sevX sevY in
+	assert(List.length sevA = 3*(n+1));
+	assert(check sevA);
+	let sevB = sev_make_norm_meta n in
+	assert(List.length sevB = 3*(n+1));
+	assert(check sevB);
+	sev_union sevA sevB
+
+let sev_vec_shrink sev (sevX, vecX) =
+	assert(List.length sevX = List.length vecX);
+	assert(List.length sev  = List.length vecX);
+	(sev_diff sevX sev, sev_vec_shrink sev vecX)
+
+let sev_inter_meta	sev_make_norm_meta vec_extract_meta (sevX, vecX) (sevY, vecY) =
+	assert(check sevX);
+	assert(check sevY);
+	let n = List.length sevX - 1 in
+	assert(n>=0);
+	assert(List.length vecX = n+1);
+	assert(List.length sevY = n+1);
+	assert(List.length vecY = n+1);
+	let sev = sev_union_meta sev_make_norm_meta n sevX sevY in
+	let _, inter = MyList.hdtl_nth (2*(n+1)) sev in
+	let sevX, vecX = sev_vec_shrink inter (sevX, vecX)
+	and sevY, vecY = sev_vec_shrink inter (sevY, vecY) in
+	assert(check sevX);
+	assert(check sevY);
+	let n = List.length sevX - 1 in
+	assert(n>=0);
+	assert(List.length sevY = n+1);
+	assert(List.length vecX = n+1);
+	assert(List.length vecY = n+1);
+	let f, (sevX, vecX), (sevY, vecY) = if sevX <= sevY
+		then false, (sevX, vecX), (sevY, vecY)
+		else true,  (sevY, vecY), (sevX, vecX) in
+	assert(check sevX);
+	assert(check sevY);
+	let sev = sev_union_meta sev_make_norm_meta n sevX sevY in
+	let vec = vecX@vecY@(MyList.ntimes false (n+1)) in
+	let vec = sev_vec_divide sev vec in
+	f, sev_reduce inter, vec_extract_meta n vec
+	
+
+let sev_inter_cons =
+	sev_inter_meta sev_make_norm_cons vec_extract_cons
+
+let sev_inter_and =
+	sev_inter_meta sev_make_norm_and vec_extract_and
+
+let sev_inter_xor =
+	sev_inter_meta sev_make_norm_xor vec_extract_xor
+
