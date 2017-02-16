@@ -353,9 +353,12 @@ let uniq_compose =
 		let b, uniqX = aux [] (uniqC, uniq, (false, MyList.ntimes false (List.length uniqC))) in
 		(b, uniqX |> riuniq_of_iuniq |> xuniq_of_xiuniq)
 
-let compose (bC, uC) ((b, u), i) =
+
+let compose_edge (bC, uC) (b, u) =
 	let b', u = uniq_compose uC u in
-	(bC<>b<>b', u), i
+	(bC<>b<>b', u)
+
+let compose eC (e, i) = (compose_edge eC e, i)
 
 
 let pair_recompose sev uniqX uniqY vec =
@@ -406,16 +409,36 @@ let uniq_recompose sev vec =
 let sev_vec_of_uniq (b, u) = xsev_vec_of_xiuniq b (u |> xiuniq_of_xuniq |> iuniq_of_riuniq)
 
 
-let solve_cons_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
+let pair_split pair = List.map (function
+	| SS s		-> S false, S s
+	| PS x		-> P x, S false
+	| SP y		-> S false, P y
+	| PP(x, y)	-> P x, P y) pair |> List.split
+
+let node_split (b, p) =
+	let uX, uY = pair_split p in
+	(false, uX), (b, uY)
+
+let solve_cons_1 ((_, uniqX) as x) ((_, uniqY) as y) =
 	let (sx, vx) as dx = sev_vec_of_uniq x
 	and (sy, vy) as dy = sev_vec_of_uniq y in
 	assert(Bsev.check sx);
 	assert(Bsev.check sy);
 	let f, sev, ((bY, vY), (bXY, vXY)) = Bsev.sev_inter_cons dx dy in
+	print_string "f0: "; StrUtil.print_bool f; print_newline(); flush stdout;
 	assert(List.length sev = List.length uniqX + 1);
 	assert(List.length sev = List.length uniqY + 1);
+	let uniqX, uniqY = Tools.cswap f (uniqX, uniqY) in
 	let xy  = pair_recompose sev uniqX uniqY vY in
 	let vXY = uniq_recompose sev vXY in
+	(* start checks *)
+	let eX, eY = node_split (bY, xy) in
+	let e = (bXY, vXY) in
+	let eX = compose_edge e eX
+	and eY = compose_edge e eY in
+	let eX, eY = Tools.cswap f (eX, eY) in
+	assert((eX = x)&&(eY = y));
+	(* end checks *)
 	(f, (bY, xy), (bXY, vXY))
 
 let solve_and_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
@@ -458,18 +481,20 @@ let solve_cons_0 (bX, uniqX) (bY, uniqY) =
 
 let size (b, u) = List.length u
 
-let solve_cons getid (eX, iX) (eY, iY) =
+let solve_cons getid ((eX, iX) as x) ((eY, iY) as y)=
 	assert(size eX = size eY);
-	match (if(CpGops.cmpid getid (iX, iY) = None)
+	let cmp = CpGops.cmpid getid (iX, iY) in
+	match (if(cmp = None)
 		then solve_cons_0 eX eY
 		else None) with
 	| Some e	-> Utils.MEdge (e, iX)
 	| None		->
-		let f, (eX, iX), (eY, iY) = if iX <= iY
-		then false, (eX, iX), (eY, iY)
-		else true,  (eY, iY), (eX, iX) in
+		let f = match cmp with Some true -> true | _ -> false in
+	print_string "f1: "; StrUtil.print_bool f; print_newline(); flush stdout;
+		let (eX, iX), (eY, iY) = Tools.cswap f (x, y) in
 		let f', (bY, xy), (bXY, vXY) = solve_cons_1 eX eY in
-		let iX, iY = if f' then iY, iX else iX, iY in
+	print_string "f2: "; StrUtil.print_bool f; print_newline(); flush stdout;
+		let iX, iY = Tools.cswap f' (iX, iY) in
 		Utils.MNode ((bXY, (S(f<>f'))::vXY), ((bY, xy), iX, iY))
 
 let node_push_cons gid x y = match solve_cons gid x y with
@@ -520,15 +545,6 @@ let uniqY_of_pair = List.map (function
 	| SP y
 	| PP(_, y)	-> P y)
 
-let pair_split pair = List.map (function
-	| SS s		-> S false, S s
-	| PS x		-> P x, S false
-	| SP y		-> S false, P y
-	| PP(x, y)	-> P x, P y) pair |> List.split
-
-let node_split (b, p) =
-	let uX, uY = pair_split p in
-	(false, uX), (b, uY)
 
 let node_pull_node _ (c, ix, iy) =
 	let ex, ey = node_split (binload_node c) in
@@ -547,7 +563,8 @@ let node_pull getid ((bx, lx), i) = match lx with
 	| h::lx' -> let e' = (bx, lx') in match h with
 		| S b -> Utils.MNode (fun node ->
 			let x', y' = node_pull_node getid node in
-			Tools.cswap b ((compose e' x'), (compose e' y')))
+			let x', y' = Tools.cswap b (x', y') in
+			(compose e' x'), (compose e' y'))
 		| P(b, opv) -> Utils.MEdge (match opv with
 			| None -> ((bx, lx'), i), ((bx<>b, lx'), i)
 			| Some v ->

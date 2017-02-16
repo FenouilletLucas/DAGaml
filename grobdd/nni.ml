@@ -59,6 +59,13 @@ end
 module GroBdd_NNI =
 struct
 	include Subdag.MODULE(GroBdd_NNI_M)
+
+	let push man edgeX edgeY =
+		let edgeXY = push man edgeX edgeY in
+		let edgeX', edgeY' = pull man edgeXY in
+		assert ((edgeX = edgeX')&&(edgeY = edgeY'));
+		edgeXY
+
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in

@@ -74,7 +74,7 @@ let gen_sev  size	= gen_sev' size Iter.stop
 ;;
 
 let gen_rinni' =
-	let last : _ -> _ =
+	let get_last : bool list -> bool * ((bool list) option) =
 		let rec aux some carry = function
 			| [] -> assert false
 			| [x] -> (x, if some then Some (List.rev carry) else None)
@@ -83,38 +83,38 @@ let gen_rinni' =
 	in
 	fun size ->	(gen_vec size) $@++	(fun vect ->
 		let vect = true::vect in
-		let m = MyList.count_true vect in
 		(gen_vec (entropy_sev vect)) $$+	(fun matx ->
 			let sev = binload_sev matx vect in
 			let sev, last = MyList.last sev in
 			assert(last = None);
-			let sev : (bool * ( (bool list) option ) ) option list = List.map (function None -> None | Some v -> Some (last v)) sev in
-			sev
+			List.map (function None -> None | Some v -> Some (get_last v)) sev
 											)
 									)
 
-let gen_uniq size = gen_uniq' size Iter.stop
+let gen_rinni size = gen_rinni' size Iter.stop
 
 let gen_ripair' =
 	let merge =
 		let rec aux carry = function
 			| ([], []) -> List.rev carry
+			| ([], _ ) -> assert false
 			| ((None, None)::x', y::y') -> aux ((NniGops.ISS y)::carry) (x', y')
 			| (x::x', y') -> let head = NniGops.(match x with
+				| (None, None)		-> assert false
 				| (None, Some v)	-> ISP v
 				| (Some v, None)	-> IPS v
 				| (Some v, Some v') -> IPP (v, v')) in aux (head::carry) (x', y')
 		in fun uXY v -> aux [] (uXY, v)
 	in 
 	fun size ->
-	let gu = gen_uniq size in
+	let gu = gen_rinni size in
 	gu $* gu $@++ (fun (uX, uY) ->
 		let uXY = List.combine uX uY in
 		let m = MyList.count (function (None, None) -> true | _ -> false) uXY in
 		let funmap = merge uXY in
-		gen_vect m $$+ funmap)
+		gen_vec m $$+ funmap)
 
-let gen_ripair size = gen_ripair size Iter.stop
+let gen_ripair size = gen_ripair' size Iter.stop
 
 let gen_riuniq' size : NniTypes.edge_state Iter.next =
 	(gen_vec size) $@++ (fun vect ->
@@ -343,3 +343,18 @@ Iter.iter NniGops.(fun (nniA, nniB, nniC) ->
 		assert(false);
 	);)
 		(n $< gen_riuniq_comp_comp);;
+
+
+print_string "TEST 6 : get_rinni [terminate]"; print_newline();;
+Iter.iter ignore (n $< gen_rinni);;
+
+let gp = n $< gen_ripair;;
+
+print_string "TEST 7 : get_ripair [terminate]"; print_newline();;
+Iter.iter ignore gp;;
+
+print_string "TEST 7.1 : ipair = ipair_of_pair(pair_of_ipair ipair)"; print_newline();;
+Iter.iter NniGops.(fun pair -> assert(pair = ipair_of_pair(pair_of_ipair pair));) (n $< gen_ripair);;
+
+print_string "TEST 7.2 : ipair = binload(bindump ipair)"; print_newline();;
+Iter.iter NniGops.(fun pair -> assert(pair = ipair_of_pair(binload_pair(bindump_pair(pair_of_ipair pair))));) gp;;

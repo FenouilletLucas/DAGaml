@@ -239,9 +239,9 @@ let sev_inter_meta	sev_make_norm_meta vec_extract_meta (sevX, vecX) (sevY, vecY)
 	assert(List.length sevY = n+1);
 	assert(List.length vecX = n+1);
 	assert(List.length vecY = n+1);
-	let f, (sevX, vecX), (sevY, vecY) = if sevX <= sevY
-		then false, (sevX, vecX), (sevY, vecY)
-		else true,  (sevY, vecY), (sevX, vecX) in
+	let f = sevX > sevY in
+	print_string "f3: "; StrUtil.print_bool f; print_newline(); flush stdout;
+	let (sevX, vecX), (sevY, vecY) = Tools.cswap f ((sevX, vecX), (sevY, vecY)) in
 	assert(check sevX);
 	assert(check sevY);
 	let sev = sev_union_meta sev_make_norm_meta n sevX sevY in
