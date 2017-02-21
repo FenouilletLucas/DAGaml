@@ -1,5 +1,7 @@
 type ('a, 'b) ab = A of 'a | B of 'b
 
+let mapreduce map reduce init liste = List.fold_left (fun x y -> reduce x (map y)) init liste
+
 let cmp a b =
 	if (a = b)
 		then 0

@@ -9,6 +9,11 @@ let list_init n f =
 
 let init = list_init
 
+let catlist (cat: 'a) : 'a list list -> 'a list = function
+	| [] -> []
+	| [x] -> x
+	| x::x' -> x@(List.flatten (List.map (fun (x:'a list) -> cat::x) x'))
+
 let option_cons = function
 	| None -> (fun l -> l)
 	| Some x -> (fun l -> (x::l))
