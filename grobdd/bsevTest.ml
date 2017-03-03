@@ -1,3 +1,6 @@
+let string_of_vec = StrUtil.catmap""(function true -> "1" | false -> "0")
+let print_vec vec = print_string (string_of_vec vec)
+
 let entropy_sev =
 	let rec aux i carry = function
 		| [] -> carry
@@ -252,6 +255,26 @@ Iter.iter	(fun ((sevA, sevB), sevC) ->
 	)
 			) g3;;
 
+print_string "TEST 2.3 : ((x in A) or (x in B)) => (x in (A U B))"; print_newline();;
+Iter.iter	(fun (sevA, sevB) ->
+	let n = List.length sevA in
+	assert(n = List.length sevB);
+	let sevA' = Bsev.sev_expand sevA
+	and sevB' = Bsev.sev_expand sevB in
+	let (+) = Bsev.sev_union in
+	let sevAB' = sevA' + sevB' in
+	assert(n = List.length sevAB');
+	let is_in = Bsev.sev_vec_in in
+	Iter.iter	(fun v ->
+		assert(n = List.length v);
+		let inAB = is_in sevAB' v
+		and inA  = is_in sevA'  v
+		and inB  = is_in sevB'  v in
+		assert(inA <= inAB);
+		assert(inB <= inAB);
+				) (gen_vec n);
+			) g2;;
+
 let gnni = n $< gen_riuniq;;
 let gnni2 = n $< (fun n -> let g = gen_riuniq n in (g$*g));;
 
@@ -358,3 +381,22 @@ Iter.iter NniGops.(fun pair -> assert(pair = ipair_of_pair(pair_of_ipair pair));
 
 print_string "TEST 7.2 : ipair = binload(bindump ipair)"; print_newline();;
 Iter.iter NniGops.(fun pair -> assert(pair = ipair_of_pair(binload_pair(bindump_pair(pair_of_ipair pair))));) gp;;
+
+print_string "TEST 7.3 : consistency between pair_split, uniqX_of_pair and uniqY_of_pair"; print_newline();;
+Iter.iter NniGops.(fun pair ->
+	let pair = pair_of_ipair pair in
+	let uX, uY = pair_split pair in
+	let uX' = uniqX_of_pair pair
+	and uY' = uniqY_of_pair pair in
+	assert((uX = uX') && (uY = uY'));
+					) gp;;
+
+print_string "TEST 7.4 : consistency between pair_split, uniq_is_root, pair_is_root"; print_newline();;
+Iter.iter NniGops.(fun pair ->
+	let pair = pair_of_ipair pair in
+	let uX, uY = pair_split pair in
+	let rX = uniq_is_root uX
+	and rY = uniq_is_root uY in
+	let rX', rY' = pair_is_root pair in
+	assert((rX = rX') && (rY = rY'));
+					) gp;;

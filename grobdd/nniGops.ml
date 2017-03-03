@@ -379,7 +379,7 @@ let pair_recompose sev uniqX uniqY vec =
 	let sev = MyList.opmap f mix in
 	List.map2 (fun s v -> match s with
 		| SS _	-> SS v
-		| x		-> x) sev vec
+		| x		-> assert(v = false); x) sev vec
 
 let uniq_recompose sev vec =
 	(* bsev + vect -> iuniq *)
@@ -425,7 +425,6 @@ let solve_cons_1 ((_, uniqX) as x) ((_, uniqY) as y) =
 	assert(Bsev.check sx);
 	assert(Bsev.check sy);
 	let f, sev, ((bY, vY), (bXY, vXY)) = Bsev.sev_inter_cons dx dy in
-	print_string "f0: "; StrUtil.print_bool f; print_newline(); flush stdout;
 	assert(List.length sev = List.length uniqX + 1);
 	assert(List.length sev = List.length uniqY + 1);
 	let uniqX, uniqY = Tools.cswap f (uniqX, uniqY) in
@@ -434,10 +433,10 @@ let solve_cons_1 ((_, uniqX) as x) ((_, uniqY) as y) =
 	(* start checks *)
 	let eX, eY = node_split (bY, xy) in
 	let e = (bXY, vXY) in
-	let eX = compose_edge e eX
-	and eY = compose_edge e eY in
-	let eX, eY = Tools.cswap f (eX, eY) in
-	assert((eX = x)&&(eY = y));
+	let eX' = compose_edge e eX
+	and eY' = compose_edge e eY in
+	let eX', eY' = Tools.cswap f (eX', eY') in
+	assert((eX' = x)&&(eY' = y));
 	(* end checks *)
 	(f, (bY, xy), (bXY, vXY))
 
@@ -447,8 +446,19 @@ let solve_and_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
 	assert(Bsev.check sx);
 	assert(Bsev.check sy);
 	let f, sev, (bX, (bY, vY), (bXY, vXY)) = Bsev.sev_inter_and dx dy in
+	let uniqX, uniqY = Tools.cswap f (uniqX, uniqY) in
 	let xy  = pair_recompose sev uniqX uniqY vY in
 	let vXY = uniq_recompose sev vXY in
+	(* start checks *)
+	let uX, uY = pair_split xy in
+	let eX = (bX, uX)
+	and eY = (bY, uY) in
+	let e = (bXY, vXY) in
+	let eX' = compose_edge e eX
+	and eY' = compose_edge e eY in
+	let eX', eY' = Tools.cswap f (eX', eY') in
+	assert((eX' = x)&&(eY' = y));
+	(* end checks *)
 	(f, (bX, bY, xy), (bXY, vXY))
 
 let solve_xor_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
@@ -457,6 +467,7 @@ let solve_xor_1 ((bX, uniqX) as x) ((bY, uniqY) as y) =
 	assert(Bsev.check sx);
 	assert(Bsev.check sy);
 	let f, sev, (vY, (bXY, vXY)) = Bsev.sev_inter_xor dx dy in
+	let uniqX, uniqY = Tools.cswap f (uniqX, uniqY) in
 	let xy  = pair_recompose sev uniqX uniqY vY in
 	let vXY = uniq_recompose sev vXY in
 	(f, xy, (bXY, vXY))
@@ -490,10 +501,8 @@ let solve_cons getid ((eX, iX) as x) ((eY, iY) as y)=
 	| Some e	-> Utils.MEdge (e, iX)
 	| None		->
 		let f = match cmp with Some true -> true | _ -> false in
-	print_string "f1: "; StrUtil.print_bool f; print_newline(); flush stdout;
 		let (eX, iX), (eY, iY) = Tools.cswap f (x, y) in
 		let f', (bY, xy), (bXY, vXY) = solve_cons_1 eX eY in
-	print_string "f2: "; StrUtil.print_bool f; print_newline(); flush stdout;
 		let iX, iY = Tools.cswap f' (iX, iY) in
 		Utils.MNode ((bXY, (S(f<>f'))::vXY), ((bY, xy), iX, iY))
 
@@ -528,8 +537,8 @@ let pair_is_root : pair -> bool * bool=
 		| [] -> (rX, rY)
 		| head::tail -> match head with
 			| SS _ -> (false, false)
-			| PS x -> aux (rX&&(isP x)) rY tail
-			| SP y -> aux rX (rY&&(isP y)) tail
+			| PS x -> aux (rX&&(isP x)) false tail
+			| SP y -> aux false (rY&&(isP y)) tail
 			| PP (x, y) -> aux (rX&&(isP x)) (rY&&(isP y)) tail
 	in aux true true
 
@@ -610,11 +619,10 @@ let uniqY_of_pair = List.map (function
 	| PP(_, y)	-> P y)
 
 let solve_and gid (eX, iX) (eY, iY) =
-	let f, (eX, iX), (eY, iY) = if (match CpGops.cmpid gid (iX , iY) with Some true -> false | _ -> true)
-		then (false, (eX, iX), (eY, iY))
-		else (true,  (eY, iY), (eX, iX)) in
+	let f = match CpGops.cmpid gid (iX, iY) with Some true -> true | _ -> true in
+	let (eX, iX), (eY, iY) = Tools.cswap f ((eX, iX), (eY, iY)) in
 	let f', (bX, bY, xy), (bXY, vXY) = solve_and_1 eX eY in
-	let iX, iY = if f' then iY, iX else iX, iY in
+	let iX, iY = Tools.cswap f' (iX, iY) in
 	let n = List.length xy in
 	match (match pair_is_root xy with
 		| true, true	-> Some (get_root_n (bX&&bY) n)

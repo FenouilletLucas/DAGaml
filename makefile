@@ -22,6 +22,8 @@ tests:
 		test/test_rtcqueens_cp.native \
 		test/test_tacx_cp.native \
 		test/test_eval_tacx_to_pure_cp.d.byte \
+		test/test_eval_tacx_to_pure_cp.native \
+		test/test_eval_tacx_to_pure_nni.native \
 		test/test_eval_pure_to_dot.native
 
 extra:

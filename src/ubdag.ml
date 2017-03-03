@@ -55,11 +55,13 @@ module type MODULE_UBDAG =
 sig
 	module H:Udag.UDAG_HEADER
 
-	type ident
+	type ident = int
+(*	type ident *)
 
 	type tree  = (H.leaf, pnode) Utils.gnode
 	and  node  = H.node * tree * tree
-	and	 pnode
+	and  pnode = {ident : ident; node : node}
+(*	and	 pnode *)
 
 	val get_ident : pnode -> ident
 	
