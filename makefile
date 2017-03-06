@@ -1,7 +1,7 @@
 #NUMS=/usr/lib/ocaml/nums
 #LIBS=-lib /usr/lib64/ocaml/nums
 #LIBS=-lib /usr/lib/ocaml/nums
-SRCS=-Is tools,kis
+SRCS=-Is tools,src
 NPROC=$(shell nproc)
 OB=ocamlbuild -j $(NPROC) -r $(LIBS) $(SRCS)
 

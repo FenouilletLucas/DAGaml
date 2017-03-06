@@ -15,9 +15,10 @@ struct
         memotable : (Src.ident, Dst.edge_t) MemoTable.t;
     }
 
-    let newman hsize = {
-        memotable = MemoTable.make hsize;
-    }
+    let newman hsize =
+		let memo, _ = MemoTable.make hsize in {
+			memotable = memo;
+		}
 
     let push dst_udag =
         let rec pnext = function

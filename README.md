@@ -1,7 +1,7 @@
 # DAGaml
 Abstract manipulations of Directed Acyclic Graph (DAG) using OCaml.
 
-https://en.wikipedia.org/wiki/Directed_acyclic_graph
+https://en.wikipedia.org/wiki/Directed\_acyclic\_graph
 
 https://ocaml.org/
 
