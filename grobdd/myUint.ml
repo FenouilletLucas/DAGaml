@@ -25,7 +25,7 @@ let fulladd man =
 	let ( && ) = Cp.( &! ) man
 	and ( ^ ) = Cp.( ^! ) man in
 	let ( || ) = Oops.(|!) ( && ) in fun a b c ->
-	let carry =  (a || b) && (b || c) && (a || c) in
+	let carry =  (a || (b && c)) && (b || c) in
 	let somme = a ^ b ^ c in
 	(somme, carry)
 
