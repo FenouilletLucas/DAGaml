@@ -1,3 +1,4 @@
+(*
 module UnitH : Subdag.MODELE with
 		type node = unit
 	and	type edge = unit
@@ -19,6 +20,44 @@ struct
 		| Utils.Node n	-> Utils.MNode (fun (((), nx, ny):'t n) -> (((), nx):'t e), (((), ny): 't e))
 	let pull_node _ (((), nx, ny):'t n) = ((((), nx):'t e), (((), ny):'t e))
 	let compose _ (():edge) (x:'t e)  = x
+
+
+	let dump_node = Some (fun () -> Tree.Node [])
+	let load_node = Some (function Tree.Node [] -> (), () | _ -> assert false)
+	let dot_of_node = None
+
+	let dump_edge = Some StrTree.of_unit
+	let load_edge = Some StrTree.to_unit
+	let dot_of_edge = None
+
+	let dump_leaf = Some (fun () -> Tree.Node [])
+	let load_leaf = Some (function Tree.Node [] -> ((), Utils.Leaf ()) | _ -> assert false)
+	let dot_of_leaf = None
+
+end;;
+*)
+
+module UnitH : Subdag.MODELE with
+		type node = unit
+	and	type edge = unit
+	and type leaf = unit
+=
+struct
+	
+	type node = unit
+	type edge = unit
+	type leaf = unit
+
+	type 't gn = (leaf, 't) Utils.gnode
+	type 't n = node * 't gn * 't gn	
+	type 't e = edge * 't gn
+
+	let push (((), nx):'t e) (((), ny): 't e) = Utils.MNode ((():edge), (((), nx, ny):'t n))
+	let pull (((), nx):'t e) = match nx with
+		| Utils.Leaf ()	-> assert false
+		| Utils.Node n	-> Utils.MNode (fun (((), nx, ny):'t n) -> (((), nx):'t e), (((), ny): 't e))
+	let pull_node (((), nx, ny):'t n) = ((((), nx):'t e), (((), ny):'t e))
+	let compose (():edge) (x:'t e)  = x
 
 
 	let dump_node = Some (fun () -> Tree.Node [])
