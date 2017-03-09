@@ -1,7 +1,7 @@
 #NUMS=/usr/lib/ocaml/nums
 #LIBS=-lib /usr/lib64/ocaml/nums
 LIBS=-lib /usr/lib/ocaml/nums
-SRCS=-Is tools,kis,bitv,grobdd
+SRCS=-Is tools,src,bitv,grobdd
 NPROC=$(shell nproc)
 OB=ocamlbuild -j $(NPROC) -r $(LIBS) $(SRCS)
 
@@ -44,6 +44,9 @@ extra:
 		test/test_upgrade_tacx_cp_to_nni.native \
 		test/test_noreg_nni_cons.native \
 		test/test_noreg_nni_cons.d.byte \
+
+extrakis:
+		$(OB) \
 		kis/udag.native \
 		kis/ubdag.native \
 		kis/subdag.native

@@ -1,4 +1,4 @@
-(*
+
 module UnitH : Subdag.MODELE with
 		type node = unit
 	and	type edge = unit
@@ -35,8 +35,8 @@ struct
 	let dot_of_leaf = None
 
 end;;
-*)
 
+(*
 module UnitH : Subdag.MODELE with
 		type node = unit
 	and	type edge = unit
@@ -73,12 +73,12 @@ struct
 	let dot_of_leaf = None
 
 end;;
-
+*)
 module T = Subdag.MODULE(UnitH);;
 
 let man = T.newman();;
 
-let x = T.push_leaf (():UnitH.edge) (():UnitH.leaf);;
+let x = T.push_leaf (():UnitH.edge) (():UnitH.edge);;
 let y = T.push man x x;;
 let z = T.push man x y;;
 let z' = T.push man y x;;

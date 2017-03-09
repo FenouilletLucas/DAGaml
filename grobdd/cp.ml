@@ -36,12 +36,11 @@ struct
 	type 't n = node * 't gn * 't gn	
 	type 't e = edge * 't gn
 
-	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge =
-		CpGops.node_push_cons
-	let pull = CpGops.node_pull
+	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge = CpGops.node_push_cons
+	let pull	= CpGops.node_pull
 	let compose _ = CpGops.compose
 	
-	let pull_node = CpGops.node_pull_node
+	let pull_node	= CpGops.node_pull_node
 	
 	let dump_node   = Some strdump_node
 	let load_node   = Some strload_node
