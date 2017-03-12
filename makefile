@@ -21,9 +21,10 @@ tests:
 		test/test_tcqueens_cp.native \
 		test/test_rtcqueens_cp.native \
 		test/test_tacx_cp.native \
-		test/test_eval_tacx_to_pure_cp.d.byte \
 		test/test_eval_tacx_to_pure_cp.native \
 		test/test_eval_tacx_to_pure_nni.native \
+		test/test_upgrade_tacx_cp_to_nni.native \
+		test/test_noreg_nni_cons.native \
 		test/test_eval_pure_to_dot.native
 
 extra:
@@ -41,9 +42,6 @@ extra:
 		test/test_bin_of_int.native \
 		tools/binDump.native \
 		tools/binLoad.native \
-		test/test_upgrade_tacx_cp_to_nni.native \
-		test/test_noreg_nni_cons.native \
-		test/test_noreg_nni_cons.d.byte \
 
 extrakis:
 		$(OB) \
