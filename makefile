@@ -39,6 +39,7 @@ extra:
 		grobdd/cp.native \
 		grobdd/oops.native \
 		grobdd/myUint.native \
+		grobdd/cp1pLang.native \
 		test/test_bin_of_int.native \
 		tools/binDump.native \
 		tools/binLoad.native \
