@@ -1,6 +1,6 @@
 type t = {
 	arity : int;
-	array : Cp.TACX_CP.edge array; (* uint = sum(b_i 2^i) *)
+	array : Cp.TACX.edge array; (* uint = sum(b_i 2^i) *)
 }
 
 let get_arity t = t.arity
@@ -68,7 +68,7 @@ let eq man =
 	then Oops.make_const true ari
 	else (Oops.vect_et (&) (Array.init len (fun i -> (x i) == (y i))))
 
-let lX default man : t -> t -> Cp.TACX_CP.edge =
+let lX default man : t -> t -> Cp.TACX.edge =
 	let ( =! ) = Oops.(=!) (Cp.(^!) man)
 	and ( && ) = Cp.(&!) man in
 	let ( || ) = Oops.(|!) ( && ) in

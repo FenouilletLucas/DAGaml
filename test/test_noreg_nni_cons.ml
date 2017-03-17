@@ -4,7 +4,7 @@ let n = (int_of_string Sys.argv.(1));;
 
 let file = Sys.argv.(2);;
 
-module T = Nni.GroBdd_NNI;;
+module T = Nni.GroBdd;;
 
 let man = T.newman ();;
 
@@ -34,7 +34,7 @@ let gn2 = gn $* gn;;
 let gn22 = gn2 $* gn2;;
 
 print_string "TEST 1.0 : cons is reversible"; print_newline();;
-Nni.GroBdd_NNI.dumpfile man (gn |> Iter.enumerate 0 $$ (count "T:1.0 : " 10000 (fun x -> x)) |> Iter.to_list) file;;
+Nni.GroBdd.dumpfile man (gn |> Iter.enumerate 0 $$ (count "T:1.0 : " 10000 (fun x -> x)) |> Iter.to_list) file;;
 print_newline();;
 
 

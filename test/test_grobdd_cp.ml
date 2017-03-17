@@ -6,7 +6,7 @@ let make_ident = Cp.make_ident man;;
 
 let push_pass = Cp.push_pass;;
 
-let ( *? ) = Cp.GroBdd_CP.push man;;
+let ( *? ) = Cp.GroBdd.push man;;
 
 let ( =?? ) = Cp.( =?? );;
 
@@ -53,9 +53,9 @@ let strman = Udag.String.newman ();;
 
 let edges0 = [nx01; nx10; nx01 ^? nx10; x01; x10; x01 ^? x10];;
 
-Cp.GroBdd_CP.dumpfile man edges0 "test.cp.pure";;
+Cp.GroBdd.dumpfile man edges0 "test.cp.pure";;
 
-let man1, edges1 = Cp.GroBdd_CP.loadfile "test.cp.pure";;
+let man1, edges1 = Cp.GroBdd.loadfile "test.cp.pure";;
 
 
 

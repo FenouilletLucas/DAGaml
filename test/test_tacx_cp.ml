@@ -1,4 +1,4 @@
-module T = Cp.TACX_CP;;
+module T = Cp.TACX;;
 
 let man = T.newman();;
 
@@ -6,7 +6,7 @@ let ( *! ) = Cp.( *! ) man
 and ( &! ) = Cp.( &! ) man
 and ( ^! ) = Cp.( ^! ) man;;
 
-let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes CpTypes.P n) ();;
+let make_const  b n = Cp.TACX.push_leaf (b, MyList.ntimes CpTypes.P n) ();;
 
 let make_ident b n = (make_const b n) *! (make_const (not b) n);;
 
@@ -46,7 +46,7 @@ let edges = [nx01; nx10; nx01 ^! nx10; x01; x10; x01 ^! x10];;
 
 
 let strman = Udag.String.newman ();;
-let stredges = Cp.TACX_CP.to_dot man strman edges;;
+let stredges = Cp.TACX.to_dot man strman edges;;
 
 let stredges = Udag.String.to_dot_file strman stredges "test.dot";;
 
@@ -59,11 +59,11 @@ StrTree.dumpfile [dump_edges] "test.cp.tacx";;
 
 let groman = Cp.newman ();;
 
-let evaman, mapcalc = Cp.EVAL.newman man groman;;
+let evaman, mapcalc = Cp.PURE_OF_TACX.newman man groman;;
 
 let eval_edges = mapcalc edges;;
 
-let dump_edges = Cp.GroBdd_CP.dump groman dump_man eval_edges;;
+let dump_edges = Cp.GroBdd.dump groman dump_man eval_edges;;
 let dump_edges = Udag.StrTree.dump dump_man dump_edges;;
 
 StrTree.tree_print print_string [dump_edges];;

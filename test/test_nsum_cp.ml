@@ -5,7 +5,7 @@ let n = (int_of_string Sys.argv.(1));;
 print_string "------ begin computation ------";;
 print_newline();;
 
-module T = Cp.TACX_CP;;
+module T = Cp.TACX;;
 
 let man = T.newman ();;
 

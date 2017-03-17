@@ -17,6 +17,24 @@ type block2 = {
 	subXY	: (elem * elem) list;
 }
 
+let node_split block =
+	let subX, subY = List.split block.subXY in
+	{
+		neg = false;
+		shift = block.shiftX;
+		sub = subX
+	},
+	{
+		neg = block.negY;
+		shift = block.shiftY;
+		sub = subY;
+	}
+
+let node_pull_node _ (b2, i0, i1) =
+	let b0, b1 = node_split b2 in
+	(b0, i0), (b1, i1)
+	
+
 (* return true if x is odd, false otherwise *)
 let mod2 x = (x mod 2) = 1
 
@@ -26,6 +44,8 @@ let size block = List.length block.sub
 (* TODO
 	- check for trailing 0s
 	- check that shift is set to 0 if their is no X elem
+	- check for a single trailing 1
+	- check for sub-normal case +/- I (if false then true else false)
 *)
 let check block =
 	let n = size block in
@@ -83,44 +103,47 @@ let push_X iB rN tB (* if, rank, then *) block =
 		assert(block.shift = false);
 		if hasS
 		then
-		(
-			{
-				neg = block.neg;
-				shift = tB <> block.neg;
-				sub = (X(iB, 0))::block.sub;
-			}
-		)
+		{
+			neg		= block.neg;
+			shift	= tB <> block.neg;
+			sub		= (X(iB, 0))::block.sub;
+		}
+		else if (tB <> block.neg) = false
+		then
+		(* trailing 0 *)
+		{
+			neg		= block.neg;
+			shift	= false;
+			sub		= P::block.sub;
+		}
 		else
-		(
-			if (tB <> block.neg) = false
-			then
-			(* trailing 0 *)
-			{
-				neg = block.neg;
-				shift = false;
-				sub = P::block.sub;
-			}
-			else
-			{
-				neg = block.neg;
-				shift = true;
-				sub = (X(iB, 0))::block.sub;
-			}
-		)
+		(* trailing 1 *)
+		{
+			neg = block.neg <> iB;
+			shift = true;
+			sub = (X(false, 0))::block.sub;
+		}
 	)
 	| Some maxX ->
 	(
+		assert(maxX >= 0);
 		assert(rN <= maxX + 1);
-		if (tB <> block.neg <> block.shift <> (mod2 rN)) = false
+		if(not hasS && rN = maxX + 1)
 		then
-		(
-			(* correct alignment *)
-			{
-				neg = block.neg;
-				shift = block.shift;
-				sub = (X(iB, rN))::block.sub;
-			}
-		)
+		(* trailing 1 *)
+		{
+			neg		= not block.neg;
+			shift	= not block.shift;
+			sub		= (X(not iB, maxX))::block.sub;
+		}
+		else if (tB <> block.neg <> block.shift <> (mod2 rN)) = false
+		then
+		(* correct alignment *)
+		{
+			neg		= block.neg;
+			shift	= block.shift;
+			sub		= (X(iB, rN))::block.sub;
+		}
 		else
 		(
 			(* incorrect alignment *)
@@ -132,17 +155,17 @@ let push_X iB rN tB (* if, rank, then *) block =
 					| P -> P
 					| X(b, i) -> X(b, i+1))) block.sub in
 				{
-					neg = block.neg;
-					shift = not block.shift;
-					sub = sub';
+					neg		= block.neg;
+					shift	= not block.shift;
+					sub		= sub';
 				}
 			)
 			else
 			(
 				{
-					neg = block.neg;
-					shift = block.shift;
-					sub = (X(iB, rN-1))::block.sub;
+					neg		= block.neg;
+					shift	= block.shift;
+					sub		= (X(iB, rN-1))::block.sub;
 				}
 			)
 		)
@@ -333,4 +356,95 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	)
 	(* X-less merging *)
 	else (Utils.MNode (solve_cons_0 f0 f1))
+
+let pull_S i block =
+	let f = block.shift <> (mod2 i) in
+	let ethen = {
+		neg = block.neg <> f;
+		shift = block.neg <> f;
+		sub = List.map (function
+			| ((X(b, j)) as x)  when j < i -> x
+			| _ -> P) block.sub;
+	} in
+	let cnt = MyList.count (function X(_, j) when i = j -> true | _ -> false) block.sub in
+	let eelse = {
+		neg = block.neg;
+		shift = block.shift;
+		sub = if cnt = 0
+		then
+		(
+			List.map
+				( function
+					| S -> S
+					| P -> P
+					| X(b, j) -> assert(i<>j); if j < i
+						then X(b, j)
+						else X(b, j-2)
+				) block.sub
+		)
+		else block.sub ;
+	} in
+	ethen, eelse
+
+let compose_block blockC blockc =
+	let hasS, maxX = classify blockC in
+	match maxX with
+	| None ->
+	(
+		let sub = (let rec aux carry = function
+			| ([], []) -> List.rev carry
+			| ([], _) -> assert false
+			| (S::x', y::y') -> aux (y::carry) (x', y')
+			| (S::_, []) -> assert false
+			| ((X _)::x' , _) -> assert false
+			| (P::x', y') -> aux (P::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
+		assert(blockC.shift = false);
+		{
+			neg		= blockC.neg <> blockc.neg;
+			shift	= blockc.shift;
+			sub		= sub;
+		}
+	)
+	| Some maxX ->
+	(
+		let blockC_neg = blockC.neg <> blockc.neg
+		and blockC_shift = blockC.shift <> blockc.neg in
+		let blockc_dec = maxX + (if ((mod2 maxX) <> blockC_shift) =  blockc.shift then 0 else 1) in
+		let sub = (let rec aux carry = function
+			| ([], []) -> List.rev carry
+			| ([], _ ) -> assert false
+			| (S::x', y::y') -> aux ((match y with X(b, i) -> X(b, i+blockc_dec) | _ -> y)::carry) (x', y')
+			| (S::_, []) -> assert false
+			| (x::x', y') -> aux (x::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
+		{
+			neg		= blockC_neg;
+			shift	= blockC_shift;
+			sub		= sub;
+		}
+	)
+
+let compose bC (bc, ic) = (compose_block bC bc, ic)
+
+let node_pull getid (b, i) = match b.sub with
+	| [] -> assert false
+	| head::tail -> 
+		let b' = {
+			neg = b.neg;
+			shift = b.shift;
+			sub = tail;
+		} in match head with
+		| S -> Utils.MNode (fun node ->
+			let x', y' = node_pull_node getid node in
+			(compose b' x', compose b' y'))
+		| P ->
+		(
+			Utils.MEdge ((b', i), (b', i))
+		)
+		| X(b, j) ->
+		(
+			let ethen, eelse = pull_S j b' in
+			let ethen = (ethen, Utils.Leaf ())
+			and eelse = (eelse, i) in
+			Utils.MEdge (Tools.cswap b (ethen, eelse))
+		)
 

@@ -2,7 +2,7 @@ let start = Sys.time() ;;
 
 let n = (int_of_string Sys.argv.(1));;
 
-module T = Cp.TACX_CP;;
+module T = Cp.TACX;;
 
 let man = T.newman ();;
 

@@ -21,7 +21,7 @@ let default_leaf = ((false, []), Utils.Leaf ())
 let strdump_leaf = (fun () -> Tree.Node [])
 let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
-module GroBdd_CP_M : Subdag.MODELE with
+module GroBdd_M : Subdag.MODELE with
 		type node = CpTypes.node_cstate
 	and	type edge = CpTypes.edge_state
 	and type leaf = unit
@@ -55,9 +55,9 @@ struct
 	let dot_of_leaf = Some (function () -> "[label = \"0\"];")
 end
 
-module GroBdd_CP =
+module GroBdd =
 struct
-	include Subdag.MODULE(GroBdd_CP_M)
+	include Subdag.MODULE(GroBdd_M)
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in
@@ -70,11 +70,11 @@ struct
 		man, edges
 end
 
-let newman = GroBdd_CP.newman
+let newman = GroBdd.newman
 
-let make_const b n = GroBdd_CP.push_leaf (b, MyList.ntimes CpTypes.P n) ();;
+let make_const b n = GroBdd.push_leaf (b, MyList.ntimes CpTypes.P n) ();;
 
-let make_ident man b n = GroBdd_CP.push man (make_const b n) (make_const (not b) n);;
+let make_ident man b n = GroBdd.push man (make_const b n) (make_const (not b) n);;
 
 let arity ((_, l), _) = List.length l
 
@@ -93,7 +93,7 @@ let (=??) (ex, ix) (ey, iy) = match ix, iy with
 	| Utils.Node nx, Utils.Node ny -> (nx == ny) && (ex = ey)
 	| _ -> false
 
-module AND_M : GroBdd_CP.MODELE_IBOP =
+module AND_M : GroBdd.MODELE_IBOP =
 struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
@@ -106,7 +106,7 @@ struct
 	let solver = CpGops.node_solve_and
 end;;
 
-module XOR_M : GroBdd_CP.MODELE_IBOP =
+module XOR_M : GroBdd.MODELE_IBOP =
 struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
@@ -119,11 +119,11 @@ struct
 	let solver = CpGops.node_solve_xor
 end;;
 
-module AND = GroBdd_CP.IBOP(AND_M);;
-module XOR = GroBdd_CP.IBOP(XOR_M);;
+module AND = GroBdd.IBOP(AND_M);;
+module XOR = GroBdd.IBOP(XOR_M);;
 
 
-module TACX_CP_M : TaggedSubdag.MODELE with
+module TACX_M : TaggedSubdag.MODELE with
 		type node = CpTypes.tacx_cstate
 	and	type edge = CpTypes.edge_state
 	and type leaf = unit
@@ -161,9 +161,9 @@ struct
 	let dot_of_tag = Some Extra.(CpTypes.(function And -> "A" | Cons -> "C" | Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
 end
 
-module TACX_CP =
+module TACX =
 struct
-	include TaggedSubdag.MODULE(TACX_CP_M)
+	include TaggedSubdag.MODULE(TACX_M)
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in
@@ -176,16 +176,16 @@ struct
 		man, edges
 end
 
-let ( *! ) man x y = TACX_CP.push man CpTypes.Cons x y
-let ( &! ) man x y = TACX_CP.push man CpTypes.And x y
-and ( ^! ) man x y = TACX_CP.push man CpTypes.Xor x y
+let ( *! ) man x y = TACX.push man CpTypes.Cons x y
+let ( &! ) man x y = TACX.push man CpTypes.And x y
+and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
 
-module EVAL =
+module PURE_OF_TACX =
 struct
-	module EVAL_VISITOR =
+	module VISITOR =
 	struct
-		type xnode = GroBdd_CP.edge
-		type xedge = GroBdd_CP.edge
+		type xnode = GroBdd.edge
+		type xedge = GroBdd.edge
 		type cons = xedge -> xedge -> xedge
 		type extra = cons * cons * cons (* (a, c, x) *)
 
@@ -196,18 +196,18 @@ struct
 		let do_edge _ = CpGops.compose
 	end
 
-	module EVAL = TACX_CP.NODE_VISITOR(EVAL_VISITOR)
+	module EVAL = TACX.NODE_VISITOR(VISITOR)
 
 	type manager = {
-		grobdd : GroBdd_CP.manager;
+		grobdd : GroBdd.manager;
 		andman : AND.manager;
 		xorman : XOR.manager;
 		theman : EVAL.manager;
-		calc   : TACX_CP.edge -> GroBdd_CP.edge
+		calc   : TACX.edge -> GroBdd.edge
 	}
 
 	let newman tacx man =
-		let c = GroBdd_CP.push man in
+		let c = GroBdd.push man in
 		let aman, a = AND.newman man
 		and xman, x = XOR.newman man in
 		let theman, calc = EVAL.newman tacx (a, c, x) in
@@ -220,7 +220,7 @@ struct
 		}, List.map calc
 	
 	let dump_stat man = Tree.Node [
-(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd_CP.dump_stat man.grobdd]; *)
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
 		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
 		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
 		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
@@ -229,7 +229,7 @@ struct
 
 end
 
-module GroBdd_CP_CntSat =
+module CntSat =
 struct
 	module CntSat_VISITOR =
 	struct
@@ -254,7 +254,7 @@ struct
 
 	end
 
-	module CntSat = GroBdd_CP.NODE_VISITOR(CntSat_VISITOR)
+	module CntSat = GroBdd.NODE_VISITOR(CntSat_VISITOR)
 
 	let newman man =
 		CntSat.newman man ()
@@ -263,7 +263,7 @@ struct
 	
 end
 
-module GroBdd_CP_AllSat =
+module AllSat =
 struct
 	module AllSat_VISITOR =
 	struct
@@ -286,19 +286,48 @@ struct
 		let shift deco (x, y) = (List.map (compose (Some false) deco) x, List.map (compose (Some true) deco) y)
 		let add (x, y) (x', y') = (x@x', y@y')
 
-		let do_leaf (():extra) (():GroBdd_CP.M.leaf) = (([], [[]]):xnode)
+		let do_leaf (():extra) (():GroBdd.M.leaf) = (([], [[]]):xnode)
 		let do_node ()    = Extra.(CpGops.binload_node >> CpGops.node_split >> (fun ((bX, lX), (bY, lY)) ->
 			Utils.MNode (fun x y -> add (shift lX (cswap bX x)) (shift lY (cswap bY y)))))
-		let do_edge (():extra) ((b, l):GroBdd_CP.M.edge) ((x, y):xnode) =
+		let do_edge (():extra) ((b, l):GroBdd.M.edge) ((x, y):xnode) =
 			let x = if b then y else x in
 			List.map (compose None l) x
 	end
 
-	module AllSat = GroBdd_CP.NODE_VISITOR(AllSat_VISITOR)
+	module AllSat = GroBdd.NODE_VISITOR(AllSat_VISITOR)
 
 	let newman man =
 		AllSat.newman man ()
 	
 	let dump_stat = AllSat.dump_stat
 	
+end
+
+module Eval =
+struct
+	module Eval_VISITOR =
+	struct
+		type pars = bool option list
+		type back = GroBdd.M.edge
+
+		let pars gid pars ((be, le), ie) =
+			let lb, lpe = List.split(List.map2(fun p e -> match p, e with
+				| None, CpTypes.P -> Some CpTypes.P, None
+				| None, CpTypes.S -> Some CpTypes.S, Some(None, CpTypes.S)
+				| Some _, CpTypes.P -> None, None
+				| Some b, CpTypes.S -> Some CpTypes.S, Some(Some b, CpTypes.S)) pars le) in
+			let lb = MyList.list_of_oplist lb
+			and pars, le = List.split(MyList.list_of_oplist lpe) in
+			if List.for_all (function None -> true | Some _ -> false) pars
+			then Utils.MStop (CpGops.compose (false, lb) ((be, le), ie))
+			else match pars with
+				| [] -> assert false
+				| h::t -> match h with
+					| None       -> Utils.MPull ((false, lb), t, t)
+					| Some false -> Utils.Go0 ((false, lb), t)
+					| Some true	 -> Utils.Go1 ((false, lb), t)
+
+		let back = CpGops.compose
+	end
+
 end

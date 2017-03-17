@@ -1,4 +1,4 @@
-let make_const  b n = Cp.TACX_CP.push_leaf (b, MyList.ntimes CpTypes.P n) ()
+let make_const  b n = Cp.TACX.push_leaf (b, MyList.ntimes CpTypes.P n) ()
 
 let make_ident man b n = Cp.( *! ) man (make_const (not b) n) (make_const b n)
 
@@ -16,8 +16,8 @@ let f1 man = make_ident man true 0  (* function x -> -x *)
 let (|!) (&!) x y = no ((no x) &! (no y))
 let (=!) (^!) x y = no (x ^! y)
 
-let (-->) x y : Cp.TACX_CP.edge = CpGops.compose x y
-let (->>) uniq y : Cp.TACX_CP.edge = CpGops.compose ((false, uniq):CpTypes.edge_state) y
+let (-->) x y : Cp.TACX.edge = CpGops.compose x y
+let (->>) uniq y : Cp.TACX.edge = CpGops.compose ((false, uniq):CpTypes.edge_state) y
 
 
 let array_make_n_var man n =
@@ -99,7 +99,7 @@ let print_ALLsat pshi psi =
 	List.iter (fun sol -> print_string (OutP10.to_string sol); print_newline()) allsat
 *)
 
-let copy_fun copy (func : Cp.TACX_CP.edge) =
+let copy_fun copy (func : Cp.TACX.edge) =
 	let size = Cp.arity func in
 (* f -> [f..., .f.., ..f., ...f] *)
 	let tn = MyList.ntimes (CpTypes.S) size
@@ -116,12 +116,12 @@ let copy_fun_t copy func =
 let transpose n m mat =
 	Array.init m (fun x -> Array.init n (fun y -> mat.(y).(x)))
 
-let copy_funvect ncopy arity (funvect : Cp.TACX_CP.edge array) =
+let copy_funvect ncopy arity (funvect : Cp.TACX.edge array) =
 	let nfunc = Array.length funvect in
 	let mat = Array.map (copy_fun ncopy) funvect in
 	transpose nfunc ncopy mat
 
-let copy_funvect_t ncopy arity (funvect : Cp.TACX_CP.edge array) =
+let copy_funvect_t ncopy arity (funvect : Cp.TACX.edge array) =
 	let nfunc = Array.length funvect in
 	let mat = Array.map (copy_fun_t ncopy) funvect in
 	transpose nfunc ncopy mat

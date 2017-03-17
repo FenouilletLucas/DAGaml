@@ -21,7 +21,7 @@ let default_leaf = ((false, []), Utils.Leaf ())
 let strdump_leaf = (fun () -> Tree.Node [])
 let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
-module GroBdd_NNI_M : Subdag.MODELE with
+module GroBdd_M : Subdag.MODELE with
 		type node = NniTypes.node_cstate
 	and	type edge = NniTypes.edge_state
 	and type leaf = unit
@@ -56,9 +56,9 @@ struct
 	let dot_of_leaf = Some (function () -> "[label = \"0\"];")
 end
 
-module GroBdd_NNI =
+module GroBdd =
 struct
-	include Subdag.MODULE(GroBdd_NNI_M)
+	include Subdag.MODULE(GroBdd_M)
 
 	let push man edgeX edgeY =
 		let edgeXY = push man edgeX edgeY in
@@ -78,11 +78,11 @@ struct
 		man, edges
 end
 
-let newman = GroBdd_NNI.newman
+let newman = GroBdd.newman
 
-let make_const b n = GroBdd_NNI.push_leaf (b, MyList.ntimes NniTypes.(P(false, None)) n) ();;
+let make_const b n = GroBdd.push_leaf (b, MyList.ntimes NniTypes.(P(false, None)) n) ();;
 
-let make_ident man b n = GroBdd_NNI.push man (make_const b n) (make_const (not b) n);;
+let make_ident man b n = GroBdd.push man (make_const b n) (make_const (not b) n);;
 
 let arity ((_, l), _) = List.length l
 
@@ -101,7 +101,7 @@ let (=??) (ex, ix) (ey, iy) = match ix, iy with
 	| Utils.Node nx, Utils.Node ny -> (nx == ny) && (ex = ey)
 	| _ -> false
 
-module AND_M : GroBdd_NNI.MODELE_IBOP =
+module AND_M : GroBdd.MODELE_IBOP =
 struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
@@ -114,7 +114,7 @@ struct
 	let solver = NniGops.node_solve_and
 end;;
 
-module XOR_M : GroBdd_NNI.MODELE_IBOP =
+module XOR_M : GroBdd.MODELE_IBOP =
 struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
@@ -127,11 +127,11 @@ struct
 	let solver = NniGops.node_solve_xor
 end;;
 
-module AND = GroBdd_NNI.IBOP(AND_M);;
-module XOR = GroBdd_NNI.IBOP(XOR_M);;
+module AND = GroBdd.IBOP(AND_M);;
+module XOR = GroBdd.IBOP(XOR_M);;
 
 
-module TACX_NNI_M : TaggedSubdag.MODELE with
+module TACX_M : TaggedSubdag.MODELE with
 		type node = NniTypes.tacx_cstate
 	and	type edge = NniTypes.edge_state
 	and type leaf = unit
@@ -169,9 +169,9 @@ struct
 	let dot_of_tag = Some Extra.(NniTypes.(function CpTypes.And -> "A" | CpTypes.Cons -> "C" | CpTypes.Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
 end
 
-module TACX_NNI =
+module TACX =
 struct
-	include TaggedSubdag.MODULE(TACX_NNI_M)
+	include TaggedSubdag.MODULE(TACX_M)
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in
@@ -184,16 +184,16 @@ struct
 		man, edges
 end
 
-let ( *! ) man x y = TACX_NNI.push man CpTypes.Cons x y
-let ( &! ) man x y = TACX_NNI.push man CpTypes.And x y
-and ( ^! ) man x y = TACX_NNI.push man CpTypes.Xor x y
+let ( *! ) man x y = TACX.push man CpTypes.Cons x y
+let ( &! ) man x y = TACX.push man CpTypes.And x y
+and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
 
 module EVAL =
 struct
 	module EVAL_VISITOR =
 	struct
-		type xnode = GroBdd_NNI.edge
-		type xedge = GroBdd_NNI.edge
+		type xnode = GroBdd.edge
+		type xedge = GroBdd.edge
 		type cons = xedge -> xedge -> xedge
 		type extra = cons * cons * cons (* (a, c, x) *)
 
@@ -204,18 +204,18 @@ struct
 		let do_edge _ = NniGops.compose
 	end
 
-	module EVAL = TACX_NNI.NODE_VISITOR(EVAL_VISITOR)
+	module EVAL = TACX.NODE_VISITOR(EVAL_VISITOR)
 
 	type manager = {
-		grobdd : GroBdd_NNI.manager;
+		grobdd : GroBdd.manager;
 		andman : AND.manager;
 		xorman : XOR.manager;
 		theman : EVAL.manager;
-		calc   : TACX_NNI.edge -> GroBdd_NNI.edge
+		calc   : TACX.edge -> GroBdd.edge
 	}
 
 	let newman tacx man =
-		let c = GroBdd_NNI.push man in
+		let c = GroBdd.push man in
 		let aman, a = AND.newman man
 		and xman, x = XOR.newman man in
 		let theman, calc = EVAL.newman tacx (a, c, x) in
@@ -228,7 +228,7 @@ struct
 		}, List.map calc
 	
 	let dump_stat man = Tree.Node [
-(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd_NNI.dump_stat man.grobdd]; *)
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
 		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
 		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
 		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
@@ -237,14 +237,14 @@ struct
 
 end
 
-module TACX_NNI_OF_CP =
+module TACX_OF_CP =
 struct
 	module EVAL_VISITOR =
 	struct
-		type xnode = TACX_NNI.edge
-		type xedge = TACX_NNI.edge
+		type xnode = TACX.edge
+		type xedge = TACX.edge
 		type cons = xedge -> xedge -> xedge
-		type extra = TACX_NNI.manager
+		type extra = TACX.manager
 
 		let do_leaf _ () = default_leaf
 		let mu_nni_of_cp = function
@@ -255,19 +255,19 @@ struct
 			let edgeX = nni_of_cp edgeX
 			and edgeY = nni_of_cp edgeY in
 			let result = Utils.MNode NniGops.(fun nodeX nodeY ->
-				TACX_NNI.push extra tag (compose edgeX nodeX) (compose edgeY nodeY)) in
+				TACX.push extra tag (compose edgeX nodeX) (compose edgeY nodeY)) in
 			(result : (xnode, xnode -> xnode -> xnode) Utils.merge)))
 
 		let do_edge _ e = NniGops.compose (nni_of_cp e)
 	end
 
-	module EVAL = Cp.TACX_CP.NODE_VISITOR(EVAL_VISITOR)
+	module EVAL = Cp.TACX.NODE_VISITOR(EVAL_VISITOR)
 
 	type manager = {
-		man_cp : Cp.TACX_CP.manager;
-		mannni : TACX_NNI.manager;
+		man_cp : Cp.TACX.manager;
+		mannni : TACX.manager;
 		theman : EVAL.manager;
-		calc   : Cp.TACX_CP.edge -> TACX_NNI.edge
+		calc   : Cp.TACX.edge -> TACX.edge
 	}
 
 	let newman tacx_cp tacx_nni =
@@ -280,16 +280,16 @@ struct
 		}, List.map calc
 	
 	let dump_stat man = Tree.Node [
-(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd_NNI.dump_stat man.grobdd]; *)
-(*		Tree.Node [Tree.Leaf "man_cp:"; Cp.TACX_CP.dump_stat man.man_cp]; *)
-(*		Tree.Node [Tree.Leaf "mannni:"; TACX_NNI.dump_stat man.mannni]; *)
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
+(*		Tree.Node [Tree.Leaf "man_cp:"; Cp.TACX.dump_stat man.man_cp]; *)
+(*		Tree.Node [Tree.Leaf "mannni:"; TACX.dump_stat man.mannni]; *)
 		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
 	]
 
 
 end
 
-module GroBdd_NNI_CntSat =
+module CntSat =
 struct
 	module CntSat_VISITOR =
 	struct
@@ -326,7 +326,7 @@ struct
 
 	end
 
-	module CntSat = GroBdd_NNI.NODE_VISITOR(CntSat_VISITOR)
+	module CntSat = GroBdd.NODE_VISITOR(CntSat_VISITOR)
 
 	let newman man =
 		CntSat.newman man ()
@@ -336,7 +336,7 @@ struct
 end
 
 (*
-module GroBdd_NNI_AllSat =
+module GroBdd_AllSat =
 struct
 	module AllSat_VISITOR =
 	struct
@@ -359,15 +359,15 @@ struct
 		let shift deco (x, y) = (List.map (compose (Some false) deco) x, List.map (compose (Some true) deco) y)
 		let add (x, y) (x', y') = (x@x', y@y')
 
-		let do_leaf (():extra) (():GroBdd_NNI.M.leaf) = (([], [[]]):xnode)
+		let do_leaf (():extra) (():GroBdd.M.leaf) = (([], [[]]):xnode)
 		let do_node ()    = Extra.(NniGops.binload_node >> NniGops.node_split >> (fun ((bX, lX), (bY, lY)) ->
 			Utils.MNode (fun x y -> add (shift lX (cswap bX x)) (shift lY (cswap bY y)))))
-		let do_edge (():extra) ((b, l):GroBdd_NNI.M.edge) ((x, y):xnode) =
+		let do_edge (():extra) ((b, l):GroBdd.M.edge) ((x, y):xnode) =
 			let x = if b then y else x in
 			List.map (compose None l) x
 	end
 
-	module AllSat = GroBdd_NNI.NODE_VISITOR(AllSat_VISITOR)
+	module AllSat = GroBdd.NODE_VISITOR(AllSat_VISITOR)
 
 	let newman man =
 		AllSat.newman man ()

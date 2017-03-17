@@ -27,28 +27,29 @@ tests:
 		test/test_noreg_nni_cons.native \
 		test/test_eval_pure_to_dot.native
 
-extra:
+full:
 	$(OB) \
 		bitv/bitv.native \
 		grobdd/cpGops.native \
+		grobdd/cp.native \
 		grobdd/bsev.native \
 		grobdd/bsevTest.native \
-		grobdd/bsevTest.d.byte \
 		grobdd/nniGops.native \
 		grobdd/nni.native \
-		grobdd/cp.native \
+
+
+extra:
+	$(OB) \
 		grobdd/oops.native \
 		grobdd/myUint.native \
 		grobdd/cpxV0Gops.native \
 		test/test_bin_of_int.native \
-		tools/binDump.native \
-		tools/binLoad.native \
 
-extrakis:
+extraephe:
 		$(OB) \
-		kis/udag.native \
-		kis/ubdag.native \
-		kis/subdag.native
+		ephe/udag.native \
+		ephe/ubdag.native \
+		ephe/subdag.native
 
 
 clean:
