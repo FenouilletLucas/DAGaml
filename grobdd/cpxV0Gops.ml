@@ -9,6 +9,14 @@ type block = {
 	sub		: elem list;
 }
 
+let block_dummydump block =
+	(if block.neg then "-" else "+")^
+	(if block.shift then "-" else "+")^"["^
+	(StrUtil.catmap ", " (function
+		| S -> "S"
+		| P -> "P"
+		| X(b, i) -> "X("^(if b then "1" else "0")^", "^(string_of_int i)^")") block.sub)^" ]"
+
 type block2 = {
 	negY	: bool;
 (* TODO the shiftX component could be factorised, think about it in next version *)
@@ -47,7 +55,7 @@ let size block = List.length block.sub
 	- check for a single trailing 1
 	- check for sub-normal case +/- I (if false then true else false)
 *)
-let check block =
+let check_0 block = (* check for contiguity *)
 	let n = size block in
 	let cnt = Array.make n 0 in
 	let clk x = cnt.(x) <- cnt.(x) + 1 in
@@ -81,9 +89,9 @@ let push_S block = {
 }
 
 let push_P block = {
-	neg = block.neg;
-	shift = block.shift;
-	sub = P::block.sub;
+	neg		= block.neg;
+	shift	= block.shift;
+	sub		= P::block.sub;
 }
 
 let classify block = List.fold_left (fun (hasS, maxX) -> function
@@ -91,6 +99,103 @@ let classify block = List.fold_left (fun (hasS, maxX) -> function
 		| P			-> (hasS, maxX					)
 		| X(b, i)	-> (hasS, Tools.opmax i maxX	)
 	) (false, None) block.sub
+
+let check block =
+	(check_0 block)&&(
+	let hasS, maxX = classify block in
+	match maxX with
+	| None -> block.shift = false
+	| Some maxX ->
+	(
+		hasS || 
+		(
+			(block.shift <> (mod2 maxX))&&(
+				let n = MyList.count (function X(_, i) when i = maxX -> true | _ -> false) block.sub in
+				assert(n>=1);
+				n > 1
+			)
+		)
+	))
+
+let reduce block =
+	let minX = List.fold_left (fun x -> function S | P -> x | X(_, i) -> Tools.opmin i x) None block.sub in
+	match minX with
+	| None ->
+	{
+		neg		= block.neg;
+		shift	= false;
+		sub		= block.sub;
+	}
+	| Some minX ->
+		assert(minX>=0);
+		let block = {
+			neg		= block.neg;
+			shift	= block.shift <> (mod2 minX);
+			sub		= if minX = 0
+			then block.sub
+			else List.map (function
+				| S -> S
+				| P -> P
+				| X(b, i) -> X(b, i-minX)) block.sub
+		} in
+		let hasS, maxX = classify block in
+		let maxX = match maxX with None -> assert false | Some maxX -> maxX in
+		if hasS = false
+		then
+		(
+			let  block = if block.shift <> (mod2 maxX)
+				then block
+				else
+				{
+					neg		= block.neg;
+					shift	= block.shift;
+					sub		= List.map (function X(_, i) when i = maxX -> P | x -> x) block.sub;
+				}
+			in
+			let hasS, maxX = classify block in
+			assert(hasS = false);
+			match maxX with
+			| None ->
+			{
+				neg		= block.neg;
+				shift	= false;
+				sub		= block.sub;
+			}
+			| Some maxX ->
+			(
+				let n = MyList.count (function X(_, i) -> i = maxX | _ -> false) block.sub in
+				assert(n>=1);
+				if n = 1
+				then ( if maxX = 0
+				then
+				(
+					(* single significant variable *)
+					let iB = match (List.fold_left   ( function
+						| Some x -> (fun _ -> Some x)
+						| None   -> function
+							| S | P -> None
+							| X(b, 0) -> Some b
+							| _       -> assert false ) None block.sub) with
+					| None -> assert false
+					| Some iB -> iB
+					in
+					{
+						neg		= block.neg <> iB;
+						shift	= true;
+						sub		= List.map (function X _ -> X(false, 0) | x -> x) block.sub;
+
+					}
+				)
+				else
+				{
+					neg		= not block.neg;
+					shift	= not block.shift;
+					sub		= List.map (function X(b, i) when i = maxX -> X(b, i-1) | x -> x) block.sub;
+				} )
+				else block
+			)
+		)
+		else block
 
 
 let push_X iB rN tB (* if, rank, then *) block =
@@ -213,9 +318,9 @@ let solve_cons_2 (e0, i0) (e1, i1) =
 		| _, X _ -> assert false
 		| _ -> (S, Some(x, y))) e0.sub e1.sub) in
 	{
-		neg = e0.neg;
-		shift = e0.shift;
-		sub = sub;
+		neg		= e0.neg;
+		shift	= e0.shift;
+		sub		= sub;
 	},
 	(
 		{
@@ -261,10 +366,10 @@ let solve_cons_1 rank (e0, i0) (e1, i1) =
 	},
 	(
 		{
-			negY = e1.neg <> e0.neg;
-			shiftX = decshift e0.shift min0;
-			shiftY = decshift e1.shift min1;
-			subXY = List.combine sub0 sub1;
+			negY	= e1.neg <> e0.neg;
+			shiftX	= decshift e0.shift min0;
+			shiftY	= decshift e1.shift min1;
+			subXY	= List.combine sub0 sub1;
 		},
 		i0,
 		i1
@@ -281,16 +386,16 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 	let subXY = MyList.list_of_oplist subXY in
 	(
 		{
-			neg = e0.neg;
-			shift = false;
-			sub = S::sub;
+			neg		= e0.neg;
+			shift	= false;
+			sub		= S::sub;
 		},
 		(
 			{
-				negY = e1.neg <> e0.neg;
-				shiftX = e0.shift;
-				shiftY = e1.shift;
-				subXY = subXY;
+				negY	= e1.neg <> e0.neg;
+				shiftX	= e0.shift;
+				shiftY	= e1.shift;
+				subXY	= subXY;
 			},
 			i0,
 			i1
@@ -429,17 +534,14 @@ let node_pull getid (b, i) = match b.sub with
 	| [] -> assert false
 	| head::tail -> 
 		let b' = {
-			neg = b.neg;
-			shift = b.shift;
-			sub = tail;
+			neg		= b.neg;
+			shift	= b.shift;
+			sub		= tail;
 		} in match head with
-		| S -> Utils.MNode (fun node ->
+		| S ->	Utils.MNode (fun node ->
 			let x', y' = node_pull_node getid node in
 			(compose b' x', compose b' y'))
-		| P ->
-		(
-			Utils.MEdge ((b', i), (b', i))
-		)
+		| P ->	Utils.MEdge ((b', i), (b', i))
 		| X(b, j) ->
 		(
 			let ethen, eelse = pull_S j b' in
