@@ -27,8 +27,7 @@
 - add tree iterator
 
 #GroBdd
-- implement the polarity-phase invariant version of GroBdd
-- TO THINK: 1-prediction version
+- implement the CPX (non-significant variables + 1-predictions) version of GroBdd
 	-- TO THINK: 1-preduction + polarity-phase invariant version
 - TO THINK: last variables packing
 	-- profile: hit count vs arity in AND/XOR.manager

@@ -43,6 +43,8 @@ extra:
 		grobdd/oops.native \
 		grobdd/myUint.native \
 		grobdd/cpxV0Gops.native \
+		grobdd/cpxV0GopsTest.native \
+		grobdd/cpxV0GopsTest.d.byte \
 		test/test_bin_of_int.native \
 
 extraephe:

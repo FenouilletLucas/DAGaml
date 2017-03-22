@@ -3,11 +3,74 @@ type elem =
 	| P (* useless variable *)
 	| X of (bool * int) (* if x then (i [2] XOR shift XOR neg) else ... *)
 
+let bindump_elem elem stream = match elem with
+	| Some x ->
+	( match x with
+		| S -> true::stream
+		| P -> false::true::stream
+		| X(b, i) -> false::false::true::b::(BinDump.int i stream)
+	)
+	| None -> false::false::false::stream
+
+let bindump_elem2 elem2 stream = match elem2 with
+	| Some x ->
+	( match x with
+		| S, S					-> true ::stream
+		| S, P					-> false::true::false ::stream
+		| P, S					-> false::true::true  ::stream
+		| P, P					-> assert false
+		| S, X(b, i)			-> false::false::true ::false::b::(BinDump.int i stream)
+		| X(b, i), S			-> false::false::true ::true ::b::(BinDump.int i stream)
+		| P, X(b, i)			-> false::false::false::true ::false::b::(BinDump.int i stream)
+		| X(b, i), P			-> false::false::false::true ::true ::b::(BinDump.int i stream)
+		| X(b, i), X(b', i')	-> false::false::false::false::true ::b::b'::(BinDump.int i (BinDump.int i' stream))
+	)
+	| None						-> false::false::false::false::false::stream
+
+let binload_elem = function
+	| true::stream -> Some S, stream
+	| false::true::stream -> Some P, stream
+	| false::false::true::b::stream -> let i, stream = BinLoad.int stream in Some(X(b, i)), stream
+	| false::false::false::stream -> None, stream
+	| _ -> assert false
+
+let binload_elem2 = function
+	| true::stream -> Some(S, S), stream
+	| false::true::false::stream -> Some(S, P), stream
+	| false::true::true ::stream -> Some(P, S), stream
+	| false::false::true::false::b::stream ->
+		let i, stream = BinLoad.int stream in
+		Some(S, X(b, i)), stream
+	| false::false::true::true ::b::stream ->
+		let i, stream = BinLoad.int stream in
+		Some(X(b, i), S), stream
+	| false::false::false::true::false::b::stream ->
+		let i, stream = BinLoad.int stream in
+		Some(P, X(b, i)), stream
+	| false::false::false::true::true ::b::stream ->
+		let i, stream = BinLoad.int stream in
+		Some(X(b, i), P), stream
+	| false::false::false::false::true::b::b'::stream ->
+		let i, stream = BinLoad.int stream in
+		let i', stream = BinLoad.int stream in
+		Some(X(b, i), X(b', i')), stream
+	| false::false::false::false::false::stream -> None, stream
+	| _ -> assert false
+
 type block = {
 	neg		: bool;
 	shift	: bool;
 	sub		: elem list;
 }
+
+let bindump_block block stream =
+	block.neg::block.shift::(BinDump.none_list bindump_elem block.sub stream)
+
+let binload_block = function
+	| neg::shift::stream ->
+		let sub, stream = BinLoad.none_list binload_elem stream in
+		{ neg; shift; sub }, stream
+	| _ -> assert false
 
 let block_dummydump block =
 	(if block.neg then "-" else "+")^
@@ -18,6 +81,7 @@ let block_dummydump block =
 		| X(b, i) -> "X("^(if b then "1" else "0")^", "^(string_of_int i)^")") block.sub)^" ]"
 
 type block2 = {
+	negX	: bool;
 	negY	: bool;
 (* TODO the shiftX component could be factorised, think about it in next version *)
 	shiftX	: bool;
@@ -25,10 +89,19 @@ type block2 = {
 	subXY	: (elem * elem) list;
 }
 
+let bindump_block2 block stream =
+	block.negX::block.negY::block.shiftX::block.shiftY::(BinDump.none_list bindump_elem2 block.subXY stream)
+
+let binload_block2 = function
+	| negX::negY::shiftX::shiftY::stream ->
+		let subXY, stream = BinLoad.none_list binload_elem2 stream in
+		{negX; negY; shiftX; shiftY; subXY}, stream
+	| _ -> assert false
+
 let node_split block =
 	let subX, subY = List.split block.subXY in
 	{
-		neg = false;
+		neg = block.negX;
 		shift = block.shiftX;
 		sub = subX
 	},
@@ -62,20 +135,17 @@ let check_0 block = (* check for contiguity *)
 	List.iter (function
 		| S | P -> ()
 		| X (_, x) -> clk x) block.sub;
-	let res = Array.fold_left ( function
-		| None -> (fun _ -> None)
-		| Some true ->  ( function
-			| 0 -> Some true
-			| _ -> None
-						)
-		| Some false -> ( function
-			| 0 -> Some true
-			| _ -> Some false
-						)
-	) (Some false) cnt in
-	match res with
-	| None		-> false
-	| Some _	-> true
+	let rec aux0 = function
+		| [] -> true
+		| 0::tail -> aux0 tail
+		| _::tail -> false
+	in
+	let rec aux1 = function
+		| [] -> true
+		| 0::tail -> aux0 tail
+		| _::tail -> aux1 tail
+	in
+	aux1 (Array.to_list cnt)
 
 let is_const block =
 	if List.for_all (function P -> true | _ -> false) block.sub
@@ -100,6 +170,22 @@ let classify block = List.fold_left (fun (hasS, maxX) -> function
 		| X(b, i)	-> (hasS, Tools.opmax i maxX	)
 	) (false, None) block.sub
 
+let block_to_pretty block =
+	let _, maxX = classify block in
+	let pretty_x iB tB = match iB, tB with
+		| false, false -> "1"
+		| true , false -> "0"
+		| false, true  -> "I"
+		| true , true  -> "O"
+	in
+	let floor = (if block.neg then "-" else "+")^(StrUtil.catmap "" (function S -> "S" | P -> "P" | X(b, 0) -> pretty_x b block.shift | X _ -> ".") block.sub) in
+	match maxX with
+	| None
+	| Some 0 -> floor
+	| Some n ->
+		let uppers = MyList.init n (fun i -> let i = i+1 in " "^(StrUtil.catmap "" (function X(b, j) -> if i < j then "." else if j = i then (pretty_x b (block.shift <> (mod2 i))) else " " | _ -> " ") block.sub)) in
+		String.concat "\n" (List.rev (floor::uppers))
+
 let check block =
 	(check_0 block)&&(
 	let hasS, maxX = classify block in
@@ -107,12 +193,15 @@ let check block =
 	| None -> block.shift = false
 	| Some maxX ->
 	(
-		hasS || 
-		(
-			(block.shift <> (mod2 maxX))&&(
-				let n = MyList.count (function X(_, i) when i = maxX -> true | _ -> false) block.sub in
-				assert(n>=1);
-				n > 1
+		if hasS
+		then true
+		else (
+			(block.shift <> (mod2 maxX)) && (
+			let n = MyList.count (function X(_, i) when i = maxX -> true | _ -> false) block.sub in
+			assert(n>=1);
+			if (maxX = 0) && (n = 1)
+			then (List.for_all (function X(true, _) -> false | _ -> true) block.sub)
+			else (n > 1)
 			)
 		)
 	))
@@ -190,7 +279,7 @@ let reduce block =
 				{
 					neg		= not block.neg;
 					shift	= not block.shift;
-					sub		= List.map (function X(b, i) when i = maxX -> X(b, i-1) | x -> x) block.sub;
+					sub		= List.map (function X(b, i) when i = maxX -> X(not b, i-1) | x -> x) block.sub;
 				} )
 				else block
 			)
@@ -294,6 +383,7 @@ let compare_subs = List.fold_left2 (fun (x_sub_y, y_sub_x, max_xy, equal) x y ->
 
 let count_nS = MyList.count (function S -> true | _ -> false) 
 let  make_nSS n = {
+	negX   = false;
 	negY   = false;
 	shiftX = false;
 	shiftY = false;
@@ -320,10 +410,11 @@ let solve_cons_2 (e0, i0) (e1, i1) =
 	{
 		neg		= e0.neg;
 		shift	= e0.shift;
-		sub		= sub;
+		sub		= S::sub;
 	},
 	(
 		{
+			negX = false;
 			negY = e1.neg <> e0.neg;
 			shiftX = e0.shift;
 			shiftY = e1.shift;
@@ -333,7 +424,43 @@ let solve_cons_2 (e0, i0) (e1, i1) =
 		i1
 	)
 	
+let compose_block blockC blockc =
+	let hasS, maxX = classify blockC in
+	match maxX with
+	| None ->
+	(
+		let sub = (let rec aux carry = function
+			| ([], []) -> List.rev carry
+			| ([], _) -> ignore(blockC); ignore(blockc); assert false
+			| (S::x', y::y') -> aux (y::carry) (x', y')
+			| (S::_, []) -> assert false
+			| ((X _)::x' , _) -> assert false
+			| (P::x', y') -> aux (P::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
+		reduce {
+			neg		= blockC.neg <> blockc.neg;
+			shift	= blockc.shift;
+			sub		= sub;
+		}
+	)
+	| Some maxX ->
+	(
+		let blockC_neg = blockC.neg <> blockc.neg
+		and blockC_shift = blockC.shift <> blockc.neg in
+		let blockc_dec = maxX + (if ((mod2 maxX) <> blockC_shift) =  blockc.shift then 0 else 1) in
+		let sub = (let rec aux carry = function
+			| ([], []) -> List.rev carry
+			| ([], _ ) -> assert false
+			| (S::x', y::y') -> aux ((match y with X(b, i) -> X(b, i+blockc_dec) | _ -> y)::carry) (x', y')
+			| (S::_, []) -> assert false
+			| (x::x', y') -> aux (x::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
+		reduce {
+			neg		= blockC_neg;
+			shift	= blockC_shift;
+			sub		= sub;
+		}
+	)
 
+let compose bC (bc, ic) = (compose_block bC bc, ic)
 
 let solve_cons_1 rank (e0, i0) (e1, i1) =
 	let sub, subsub = List.split(List.map2 (fun x y -> match x, y with
@@ -341,38 +468,48 @@ let solve_cons_1 rank (e0, i0) (e1, i1) =
 		| X(b, i), X(b', i') when (b = b') && (i = i') && (i <= rank) -> (X(b, i), None)
 		| _ -> (S, Some(x, y))) e0.sub e1.sub) in
 	let sub0, sub1 = List.split (MyList.list_of_oplist subsub) in
-	let get_min = List.fold_left (fun minX -> function
-		| S | P -> minX
-		| X(b, i) -> Tools.opmin i minX) None in
-	let min0 = get_min sub0
-	and min1 = get_min sub1 in
-	let dec j = List.map (function
-		| S -> S
-		| P -> P
-		| X(b, i) -> assert(i-j >= 0); X(b, i-j)) in
-	let opdec = function
-		| None -> (fun sub -> sub)
-		| Some j -> dec j in
-	let sub0 = opdec min0 sub0
-	and sub1 = opdec min1 sub1 in
-	let decshift shift = function
-		| None -> false
-		| Some i -> shift <> (mod2 i)
-	in
-	{
-		neg = e0.neg;
-		shift = e0.shift;
-		sub = sub;
-	},
-	(
-		{
-			negY	= e1.neg <> e0.neg;
-			shiftX	= decshift e0.shift min0;
-			shiftY	= decshift e1.shift min1;
-			subXY	= List.combine sub0 sub1;
+	let blockC = {
+		neg		= e0.neg;
+		shift	= e0.shift;
+		sub		= sub;
+	}
+	and block0 = reduce {
+		neg		= false;
+		shift	= e0.shift;
+		sub		= sub0;
+	}
+	and block1 = reduce {
+		neg		= e1.neg <> e0.neg;
+		shift	= e1.shift;
+		sub		= sub1;
+	} in
+	let blockC0 = compose_block blockC block0 in assert(blockC0 = e0);
+	let blockC1 = compose_block blockC block1 in assert(blockC1 = e1);
+	let blockC = push_S blockC in
+	if		List.for_all (function P -> true | _ -> false) block0.sub
+	(* block0 is const equal to block0.neg *)
+	then Utils.MEdge (compose blockC (push_X false 0 block0.neg block1, i1))
+	else if List.for_all (function P -> true | _ -> false) block1.sub
+	(* block1 is const equal to block1.sub *)
+	then Utils.MEdge (compose blockC (push_X true  0 block1.neg block0, i0))
+	else
+	Utils.MNode (
+		reduce {
+			neg = blockC.neg <> block0.neg;
+			shift = blockC.shift <> block0.neg;
+			sub = blockC.sub;
 		},
-		i0,
-		i1
+		(
+			{
+				negX	= false;
+				negY	= block1.neg <> block0.neg;
+				shiftX	= block0.shift;
+				shiftY	= block1.shift;
+				subXY	= List.combine block0.sub block1.sub;
+			},
+			i0,
+			i1
+		)
 	)
 
 
@@ -381,7 +518,7 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 	let subsubXY = List.map	( function
 		| (P, P) -> (P, None)
 		| (x, y) -> (S, Some(x, y))
-	) (List.combine e0.sub e0.sub) in
+	) (List.combine e0.sub e1.sub) in
 	let sub, subXY = List.split subsubXY in
 	let subXY = MyList.list_of_oplist subXY in
 	(
@@ -392,6 +529,7 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 		},
 		(
 			{
+				negX	= false;
 				negY	= e1.neg <> e0.neg;
 				shiftX	= e0.shift;
 				shiftY	= e1.shift;
@@ -431,30 +569,16 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 		| Some maxX0, Some maxX1 ->
 		(
 			let x_sub_y, y_sub_x, max_xy, equal = compare_subs e0.sub e1.sub in
-			assert(equal = false);
-			assert(not(x_sub_y && y_sub_x)); (* they can't be both a subset of each other without being equal *)
-			match max_xy with
-			| Some max_xy ->
+			if equal
+			then Utils.MNode (solve_cons_2 f0 f1)
+			else
 			(
-				if		x_sub_y && (not hasS0)
-				then
-				(
-					(* mergeable *)
-					assert(maxX0 = max_xy);
-					Utils.MEdge ((push_X false (maxX0 + 1) e0.neg (* ? *) e0), i0)
-				)
-				else if y_sub_x && (not hasS1)
-				then
-				(
-					(* mergeable *)
-					assert(maxX1 = max_xy);
-					Utils.MEdge ((push_X true  (maxX1 + 1) e1.neg (* ? *) e1), i1)
-				)
-				(* at this point all merging and consensus have been eliminated *)
-				else (Utils.MNode (solve_cons_1 max_xy f0 f1))
+				assert(not(x_sub_y && y_sub_x)); (* they can't be both a subset of each other without being equal *)
+				match max_xy with
+				| Some max_xy -> (solve_cons_1 max_xy f0 f1)
+				(* no X-related conflict has been detected, thus we focus only on P-related problems *)
+				| None -> Utils.MNode (solve_cons_2 f0 f1)
 			)
-			(* no X-related conflict has been detected, thus we focus only on P-related problems *)
-			| None -> Utils.MNode (solve_cons_2 f0 f1)
 		)
 		(* X-less merging *)
 		| _ -> Utils.MNode (solve_cons_0 f0 f1)
@@ -463,72 +587,35 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	else (Utils.MNode (solve_cons_0 f0 f1))
 
 let pull_S i block =
+	(*print_string"block: "; print_string(block_dummydump block); print_newline();*)
 	let f = block.shift <> (mod2 i) in
 	let ethen = {
 		neg = block.neg <> f;
-		shift = block.neg <> f;
+		shift = block.shift <> f;
 		sub = List.map (function
-			| ((X(b, j)) as x)  when j < i -> x
+			| ((X(_, j)) as x)  when j < i -> x
 			| _ -> P) block.sub;
 	} in
 	let cnt = MyList.count (function X(_, j) when i = j -> true | _ -> false) block.sub in
-	let eelse = {
-		neg = block.neg;
-		shift = block.shift;
-		sub = if cnt = 0
-		then
-		(
-			List.map
-				( function
-					| S -> S
-					| P -> P
-					| X(b, j) -> assert(i<>j); if j < i
-						then X(b, j)
-						else X(b, j-2)
-				) block.sub
-		)
-		else block.sub ;
-	} in
-	ethen, eelse
+	let eelse = if cnt = 0
+	then (if i = 0
+	then
+	{
+		neg		= block.neg;
+		shift	= not block.shift;
+		sub		= List.map (function X(b, j) -> X(b, j-1) | x -> x) block.sub;
+	}
+	else
+	{
+		neg		= block.neg;
+		shift	= block.shift;
+		sub		= List.map (function X(b, j) when j > i -> X(b, j-2) | x -> x) block.sub;
+	})
+	else block
+	in
+	reduce ethen, reduce eelse
 
-let compose_block blockC blockc =
-	let hasS, maxX = classify blockC in
-	match maxX with
-	| None ->
-	(
-		let sub = (let rec aux carry = function
-			| ([], []) -> List.rev carry
-			| ([], _) -> assert false
-			| (S::x', y::y') -> aux (y::carry) (x', y')
-			| (S::_, []) -> assert false
-			| ((X _)::x' , _) -> assert false
-			| (P::x', y') -> aux (P::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
-		assert(blockC.shift = false);
-		{
-			neg		= blockC.neg <> blockc.neg;
-			shift	= blockc.shift;
-			sub		= sub;
-		}
-	)
-	| Some maxX ->
-	(
-		let blockC_neg = blockC.neg <> blockc.neg
-		and blockC_shift = blockC.shift <> blockc.neg in
-		let blockc_dec = maxX + (if ((mod2 maxX) <> blockC_shift) =  blockc.shift then 0 else 1) in
-		let sub = (let rec aux carry = function
-			| ([], []) -> List.rev carry
-			| ([], _ ) -> assert false
-			| (S::x', y::y') -> aux ((match y with X(b, i) -> X(b, i+blockc_dec) | _ -> y)::carry) (x', y')
-			| (S::_, []) -> assert false
-			| (x::x', y') -> aux (x::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
-		{
-			neg		= blockC_neg;
-			shift	= blockC_shift;
-			sub		= sub;
-		}
-	)
 
-let compose bC (bc, ic) = (compose_block bC bc, ic)
 
 let node_pull getid (b, i) = match b.sub with
 	| [] -> assert false
@@ -545,8 +632,64 @@ let node_pull getid (b, i) = match b.sub with
 		| X(b, j) ->
 		(
 			let ethen, eelse = pull_S j b' in
+			(*print_string"ethen: "; print_string(block_dummydump ethen); print_newline();
+			print_string"eelse: "; print_string(block_dummydump eelse); print_newline();*)
 			let ethen = (ethen, Utils.Leaf ())
 			and eelse = (eelse, i) in
+			(*print_string"b: "; print_string(if b then "true" else "false"); print_newline();*)
 			Utils.MEdge (Tools.cswap b (ethen, eelse))
 		)
+
+let get_root b (block, _) = ({neg = b; shift = false; sub = List.map (fun _ -> P) block.sub}, Utils.Leaf())
+
+let neg (block, i) = ({neg = not block.neg; shift = block.shift; sub= block.sub}, i)
+let cneg b (block, i) = ({neg = block.neg <> b; shift = block.shift; sub = block.sub}, i)
+
+let merge_P_and (ex, ix) (ey, iy) =
+	let a, bc = List.split(List.map (function (P, P) -> P, None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+	{
+		neg = false;
+		shift = false;
+		sub = a;
+	},
+	(
+		{
+			negX = ex.neg;
+			negY = ey.neg;
+			shiftX = ex.shift;
+			shiftY = ey.shift;
+			subXY = MyList.list_of_oplist bc;
+		},
+		ix,
+		iy
+	)
+
+let merge_P_xor (ex, ix) (ey, iy) =
+	let a, bc = List.split(List.map (function (P, P) -> P, None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+	{
+		neg = ex.neg <> ey.neg;
+		shift = false;
+		sub = a;
+	},
+	(
+		{
+			negX = false;
+			negY = false;
+			shiftX = ex.shift;
+			shiftY = ey.shift;
+			subXY = MyList.list_of_oplist bc;
+		},
+		ix,
+		iy
+	)
+
+let solve_and getid ((ex, ix) as x) ((ey, iy) as y) =
+	if		List.for_all (function P -> true | _ -> false) ex.sub
+	then Utils.MEdge ( if ex.neg then y else x )
+	else if	List.for_all (function P -> true | _ -> false) ey.sub
+	then Utils.MEdge ( if ey.neg then x else y )
+	else if (CpGops.cmpid getid (i0, i1) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
+	then Utils.MEdge (if ex.neg = ey.neg then x (* = y *) else get_root false x)
+	else Utils.MNode (merge_P x y)
+
 
