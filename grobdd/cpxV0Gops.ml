@@ -1,7 +1,5 @@
-type elem =
-	| S (* significant variable *)
-	| P (* useless variable *)
-	| X of (bool * int) (* if x then (i [2] XOR shift XOR neg) else ... *)
+open CpxV0Types
+
 
 let bindump_elem elem stream = match elem with
 	| Some x ->
@@ -57,11 +55,6 @@ let binload_elem2 = function
 	| false::false::false::false::false::stream -> None, stream
 	| _ -> assert false
 
-type block = {
-	neg		: bool;
-	shift	: bool;
-	sub		: elem list;
-}
 
 let bindump_block block stream =
 	block.neg::block.shift::(BinDump.none_list bindump_elem block.sub stream)
@@ -72,6 +65,12 @@ let binload_block = function
 		{ neg; shift; sub }, stream
 	| _ -> assert false
 
+let bindump_edge x = bindump_block x [] |> Bitv.L.of_bool_list
+let binload_edge stream =
+	let x, stream = binload_block (Bitv.L.to_bool_list stream) in
+	assert(stream = []);
+	x
+
 let block_dummydump block =
 	(if block.neg then "-" else "+")^
 	(if block.shift then "-" else "+")^"["^
@@ -80,23 +79,22 @@ let block_dummydump block =
 		| P -> "P"
 		| X(b, i) -> "X("^(if b then "1" else "0")^", "^(string_of_int i)^")") block.sub)^" ]"
 
-type block2 = {
-	negX	: bool;
-	negY	: bool;
-(* TODO the shiftX component could be factorised, think about it in next version *)
-	shiftX	: bool;
-	shiftY  : bool;
-	subXY	: (elem * elem) list;
-}
 
 let bindump_block2 block stream =
 	block.negX::block.negY::block.shiftX::block.shiftY::(BinDump.none_list bindump_elem2 block.subXY stream)
+
+let bindump_node x = bindump_block2 x [] |> Bitv.L.of_bool_list
 
 let binload_block2 = function
 	| negX::negY::shiftX::shiftY::stream ->
 		let subXY, stream = BinLoad.none_list binload_elem2 stream in
 		{negX; negY; shiftX; shiftY; subXY}, stream
 	| _ -> assert false
+
+let binload_node stream =
+	let x, stream = binload_block2 (Bitv.L.to_bool_list stream) in
+	assert(stream = []);
+	x
 
 let node_split block =
 	let subX, subY = List.split block.subXY in
@@ -151,6 +149,8 @@ let is_const block =
 	if List.for_all (function P -> true | _ -> false) block.sub
 	then Some block.neg
 	else None
+
+let is_root (block, i) = is_const block
 
 let push_S block = {
 	neg = block.neg;
@@ -348,7 +348,8 @@ let push_X iB rN tB (* if, rank, then *) block =
 					| S -> S
 					| P -> P
 					| X(b, i) -> X(b, i+1))) block.sub in
-				{
+(* TODO : fix this case {neg = true; shift = false; sub = [X (false, 0); X (false, 1)]} *)
+				reduce {
 					neg		= block.neg;
 					shift	= not block.shift;
 					sub		= sub';
@@ -684,12 +685,100 @@ let merge_P_xor (ex, ix) (ey, iy) =
 	)
 
 let solve_and getid ((ex, ix) as x) ((ey, iy) as y) =
-	if		List.for_all (function P -> true | _ -> false) ex.sub
-	then Utils.MEdge ( if ex.neg then y else x )
-	else if	List.for_all (function P -> true | _ -> false) ey.sub
-	then Utils.MEdge ( if ey.neg then x else y )
-	else if (CpGops.cmpid getid (i0, i1) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
+	match is_root x with
+	| Some b -> Utils.MEdge ( if b then y else x )
+	| None -> match is_root y with
+	| Some b -> Utils.MEdge ( if b then x else y)
+	| None ->
+	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
 	then Utils.MEdge (if ex.neg = ey.neg then x (* = y *) else get_root false x)
-	else Utils.MNode (merge_P x y)
+	else Utils.MNode (merge_P_and x y)
 
 
+let solve_xor getid ((ex, ix) as x) ((ey, iy) as y) =
+	match is_root x with
+	| Some b -> Utils.MEdge ( cneg b y )
+	| None -> match is_root y with
+	| Some b -> Utils.MEdge ( cneg b x )
+	| None ->
+	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
+	then Utils.MEdge (get_root (ex.neg <> ey.neg) x )
+	else Utils.MNode (merge_P_and x y)
+
+let bindump_tacx (ttag, block) stream =
+	let stream = bindump_block2 block stream in
+	match ttag with
+	| CpTypes.Cons -> false::false::stream
+	| CpTypes.And  -> false::true ::stream
+	| CpTypes.Xor  -> true ::false::stream
+
+let bindump_tacx x = bindump_tacx x [] |> Bitv.L.of_bool_list
+
+let binload_tacx = function
+	| b0::b1::stream ->
+	(
+		let block, stream = binload_block2 stream in
+		((match b0, b1 with
+		| false, false -> CpTypes.Cons
+		| false, true  -> CpTypes.And
+		| true , false -> CpTypes.Xor
+		| true , true  -> assert false), block), stream
+	)
+	| _ -> assert false
+
+let binload_tacx stream =
+	let x, stream = binload_tacx (Bitv.L.to_bool_list stream) in
+	assert(stream = []);
+	x
+
+let node_push_cons gid x y = match solve_cons gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_node block, x, y))
+
+let tacx_push_cons gid x y = match solve_cons gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.Cons, block), x, y))
+
+let node_push_and gid (x, y) = match solve_and gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_node block, x, y))
+
+let tacx_push_and gid x y = match solve_and gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.And, block), x, y))
+
+let node_push_xor gid (x, y) = match solve_xor gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_node block, x, y))
+
+let tacx_push_xor gid x y = match solve_xor gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.Xor, block), x, y))
+
+
+let tacx_split (ttag, block) =
+	let subX, subY = List.split block.subXY in
+	let ex = {
+		neg = block.negX;
+		shift = block.shiftX;
+		sub = subX;
+	}
+	and ey = {
+		neg = block.negY;
+		shift = block.shiftY;
+		sub = subY;
+	}
+	in
+	(ttag, ex, ey)
+
+let tacx_pull_node _ (c, ix, iy) =
+	let t, ex, ey = tacx_split (binload_tacx c) in
+	(t, (ex, ix), (ey, iy))
+
+let tacx_pull gid e = assert false
+
+let tacx_push gid = CpTypes.(function
+	| Cons -> tacx_push_cons gid
+	| And  -> tacx_push_and  gid
+	| Xor  -> tacx_push_xor  gid)
+	

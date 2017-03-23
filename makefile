@@ -45,6 +45,11 @@ extra:
 		grobdd/cpxV0Gops.native \
 		grobdd/cpxV0GopsTest.native \
 		grobdd/cpxV0GopsTest.d.byte \
+		grobdd/cpxV0.native \
+		test/test_noreg_cpx_cons.native \
+		test/test_noreg_cpx_cons.d.byte \
+		test/test_upgrade_tacx_cp_to_cpx.native \
+		test/test_eval_tacx_to_pure_cpx.native \
 		test/test_bin_of_int.native \
 
 extraephe:
