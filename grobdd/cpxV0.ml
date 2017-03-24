@@ -374,8 +374,6 @@ struct
 	
 end
 
-(*
-
 module AllSat =
 struct
 	module AllSat_VISITOR =
@@ -385,26 +383,64 @@ struct
 		type extra = unit
 
 		let cswap b (x, y) = if b then (y, x) else (x, y)
-		let p = function CpTypes.P -> true | _ -> false
-		let compose =
-			let rec aux carry = function
-			  | ([], []) -> List.rev carry
-			  | (CpTypes.S::x', y::y') -> aux (y::carry) (x', y')
-			  | (CpTypes.P::x', y') -> aux (None::carry) (x', y')
-			  | _ -> assert false
-			in function
-			  | None	-> fun deco elem -> aux [] (deco, elem)
-			  | Some b	-> fun deco elem -> aux [Some b] (deco, elem)
+		let x block =
+			let _, maxX = CpxV0Gops.classify block in
+			match maxX with
+			| None -> ([], [])
+			| Some maxX ->
+				let llist = MyList.init (maxX+1) CpxV0Types.(fun i ->
+					let rec aux0 chain = function
+						| [] -> List.rev chain
+						| head::tail -> match head with
+							| P -> aux0 (None::chain) tail
+							| S -> aux0 (None::chain) tail
+							| X(b, j) -> if j < i
+								then aux0 ((Some(not b))::chain) tail
+								else aux0 (None::chain) tail
+					in
+					let rec aux carry chain = function
+					| [] -> List.rev carry
+					| head::tail -> match head with
+						| P -> aux carry (None::chain) tail
+						| S -> aux carry (None::chain) tail
+						| X(b, j) ->
+							if i = j
+							then aux ((aux0 ((Some b)::chain) tail)::carry) ((Some(not b))::chain) tail
+							else if i < j
+							then aux carry (None::chain) tail
+							else aux carry ((Some(not b))::chain) tail
+					in aux [] [] block.sub) in
+				let rec aux (if0, if1) = function
+					| [] -> (if0, if1)
+					| [x] -> (if0@x, if1)
+					| x::y::tail -> aux (if0@x, if1@y) tail
+				in
+				let if01 = aux ([], []) llist in
+				Tools.cswap block.CpxV0Types.shift if01
 
-		let shift deco (x, y) = (List.map (compose (Some false) deco) x, List.map (compose (Some true) deco) y)
+		let compose =
+			let rec aux carry = CpxV0Types.(function
+			  | ([], [])			 -> List.rev carry
+			  | (S      ::x', y::y') -> aux (y            ::carry) (x', y')
+			  | (P      ::x', y'   ) -> aux (None		  ::carry) (x', y')
+			  | (X(b, _)::x', y'   ) -> aux ((Some(not b))::carry) (x', y')
+			  | _ -> assert false)
+			in fun block elem -> aux [] (block.CpxV0Types.sub, elem)
+
+		let map_compose block (liste0, liste1) = (List.map (compose block) liste0, List.map (compose block) liste1)
+
+		let map_push b (liste0, liste1) = (List.map (fun x -> (Some b)::x) liste0, List.map (fun x -> (Some b)::x) liste1)
+
 		let add (x, y) (x', y') = (x@x', y@y')
 
+		let shift block l01 = CpxV0Types.(cswap block.neg (add (x block) (map_compose block l01)))
+
 		let do_leaf (():extra) (():GroBdd.M.leaf) = (([], [[]]):xnode)
-		let do_node ()    = Extra.(CpxV0Gops.binload_node >> CpxV0Gops.node_split >> (fun ((bX, lX), (bY, lY)) ->
-			Utils.MNode (fun x y -> add (shift lX (cswap bX x)) (shift lY (cswap bY y)))))
-		let do_edge (():extra) ((b, l):GroBdd.M.edge) ((x, y):xnode) =
-			let x = if b then y else x in
-			List.map (compose None l) x
+		let do_node ()    = Extra.(CpxV0Gops.binload_node >> CpxV0Gops.node_split >> CpxV0Types.(fun (blockX, blockY) ->
+			Utils.MNode (fun lX lY -> add
+				(map_push false (shift blockX lX))
+				(map_push true  (shift blockY lY)))))
+		let do_edge (():extra) (block:GroBdd.M.edge) (l01:xnode) = shift block l01 |> snd
 	end
 
 	module AllSat = GroBdd.NODE_VISITOR(AllSat_VISITOR)
@@ -416,6 +452,8 @@ struct
 	
 end
 
+
+(*
 module Eval =
 struct
 	module Eval_VISITOR =

@@ -1,1 +1,1 @@
-GroBdd: Generalized Reductio of Ordered Binary Decision Diagramm
+GroBdd: Generalized Reduction of Ordered Binary Decision Diagramm

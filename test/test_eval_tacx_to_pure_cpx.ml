@@ -12,6 +12,12 @@ List.iter Extra.(cntsat >> (fun x -> BigInt.print x; print_string "; ")) edges;
 print_string "];";
 print_newline();
 
+let allman, allsat = CpxV0.AllSat.newman pure in 
+print_string "CntSat = ["; print_newline();
+List.iter Extra.(allsat ||>> (fun x -> print_string (StrUtil.catmap "" (function None -> "-" | Some b -> if b then"1"else"0") x); print_newline()) >> ignore)  edges;
+print_string "];";
+print_newline();
+
 let file = Sys.argv.(2) in
 CpxV0.GroBdd.dumpfile pure edges file;
 
