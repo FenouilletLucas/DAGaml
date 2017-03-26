@@ -170,6 +170,21 @@ let classify block = List.fold_left (fun (hasS, maxX) -> function
 		| X(b, i)	-> (hasS, Tools.opmax i maxX	)
 	) (false, None) block.sub
 
+let in_block block x =
+	let hasS, maxX = classify block in
+	match maxX with
+	| None -> if hasS then None else (Some block.neg)
+	| Some maxX ->
+	(
+		match List.fold_left (fun opmin -> function (X(b, i), b') when b = b' -> Tools.opmin i opmin | _ -> opmin) None (List.combine block.sub x) with
+		| None -> if hasS then None else (Some block.neg)
+		| Some i -> Some(block.neg <> block.shift <> (mod2 i))
+	)
+
+
+	
+
+
 let block_to_pretty block =
 	let _, maxX = classify block in
 	let pretty_x iB tB = match iB, tB with
@@ -544,8 +559,8 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
 	let xX, xXY, xY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b <> b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY in
 	let sX, sY = List.fold_left (fun (sX, sY) -> fun (x, y) -> (sX || (x = S), sY || (y = S))) (false, false) blockXY.subXY in
-	let uX = ( xX = 0 ) && ( not sX )
-	and uY = ( xY = 0 ) && ( not sY ) in
+	let uX = ( xX = 0 ) && ( not sX ) (* x is a singleton *)
+	and uY = ( xY = 0 ) && ( not sY ) (* y is a singleton *) in
 	if ( blockXY.negY <> blockXY.shiftX <> blockXY.shiftY ) && xXY = 1 && (uX || uY)
 	then
 	(
@@ -580,7 +595,7 @@ let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
 					shift = blockXY.shiftY;
 					sub = S::subC';
 				} in
-				compose blockC' (push_X false 0 true blockY, iY)
+				compose blockC' (push_X false 0 (not blockXY.negY) blockY, iY)
 			)
 			else (assert false)
 		))

@@ -27,9 +27,11 @@ let dummydump m = "["^(StrUtil.catmap ", " string_of_int m)^" ]";;
 let gen1 n = (Iter.range 0 n) $^ n |> (Iter.filter check_contig);;
 let gen_contig = gen1 ;;
 
+let gen_vec n = Iter.gen_bool $^ n;;
+
 let gen_sub' n = (Iter.range 0 3) $^ n $@++ (fun vect ->
 	let n2 = MyList.count(function 2 -> true | _ -> false) vect in
-	(gen_contig n2) $* (Iter.gen_bool $^ n2) $$+ (fun (a, b) ->
+	(gen_contig n2) $* (gen_vec n2) $$+ (fun (a, b) ->
 		let rec f carry = function
 			| ([], []) -> List.rev carry
 			| (0::x, y) -> f (S::carry) (x, y)
@@ -102,6 +104,48 @@ let reversible ((ex, ix) as x) ((ey, iy) as y) =
 			| Utils.MEdge _ -> assert false
 			| Utils.MNode f -> let x', y' = f (xy, ix', iy') in
 				assert(x = x' && y = y')
+	);
+	()
+;;
+
+Iter.iter (fun (ex, ey) ->
+	let ix = if List.exists (function S -> true | _ -> false) ex.sub
+		then Utils.Node 1
+		else Utils.Leaf ()
+	and iy, iy' = if List.exists (function S -> true | _ -> false) ey.sub
+		then Utils.Node 1 , Utils.Node 2
+		else Utils.Leaf (), Utils.Leaf ()
+	in
+	let x = (ex, ix)
+	and y = (ey, iy)
+	and y' = (ey, iy') in
+	reversible x y;
+	reversible x y')
+	((gen_block_checked n) $* (gen_block_checked n));
+
+print_string "TEST 3.2 : solve_cons using in_block"; print_newline();;
+
+let reversible ((ex, ix) as x) ((ey, iy) as y) =
+	match solve_cons (fun x -> x) x y with
+	| Utils.MEdge (exy, ixy) ->
+	(
+		Iter.iter (fun vec ->
+			assert(in_block exy (false::vec) = in_block ex vec);
+			assert(in_block exy (true ::vec) = in_block ey vec);
+			()
+		) (gen_vec n)
+	)
+	| Utils.MNode (e, (xy, ix', iy')) ->
+	(
+		let ok = function
+			| None -> fun _ -> true
+			| Some x -> function None -> false | Some y -> x = y
+		in
+		Iter.iter (fun vec ->
+			assert(ok (in_block e (false::vec)) (in_block ex vec));
+			assert(ok (in_block e (true ::vec)) (in_block ey vec));
+			()
+		) (gen_vec n)
 	);
 	()
 ;;
