@@ -41,7 +41,7 @@ print_newline();;
 print_string "TEST 2.0 : and primitives are consistent"; print_newline();;
 
 Iter.iter (fun (x, y) -> assert((make_bool x) &! (make_bool y) = (make_bool (x&&y)));) (Iter.gen_bool $* Iter.gen_bool);;
-
+(*
 print_string "TEST 2.1 : and is consistant"; print_newline();;
 gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	let x01 = x0 *! x1
@@ -53,9 +53,15 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	assert(calcX = calcY);
 	)) |> Iter.iter ignore;;
 print_newline();;
-
+*)
 print_string "TEST 3.0 : xor is consistant"; print_newline();;
 gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
-	assert(((x0 *! x1) ^! (y0 *! y1)) = ((x0 ^! y0) *! (x1 ^! y1)));
+	let x01 = x0 *! x1
+	and y01 = y0 *! y1
+	and xy0 = x0 ^! y0
+	and xy1 = x1 ^! y1 in
+	let calcX = x01 ^! y01
+	and calcY = xy0 *! xy1 in
+	assert(calcX = calcY);
 	)) |> Iter.iter ignore;;
 print_newline();;

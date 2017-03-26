@@ -541,8 +541,54 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 		)
 	)
 
+let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
+	let xX, xXY, xY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b <> b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY in
+	let sX, sY = List.fold_left (fun (sX, sY) -> fun (x, y) -> (sX || (x = S), sY || (y = S))) (false, false) blockXY.subXY in
+	let uX = ( xX = 0 ) && ( not sX )
+	and uY = ( xY = 0 ) && ( not sY ) in
+	if ( blockXY.negY <> blockXY.shiftX <> blockXY.shiftY ) && xXY = 1 && (uX || uY)
+	then
+	(
+		Utils.MEdge (compose blockC (
+			if		uY
+			then
+			(
+				let subC', subX = List.split(List.map (function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b <> b')); X(b, i), None | (x, _) -> S, (Some x)) blockXY.subXY) in
+				let blockX = reduce {
+					neg = false;
+					shift = blockXY.shiftX;
+					sub = MyList.list_of_oplist subX;
+				} in
+				let blockC' = reduce {
+					neg = false;
+					shift = blockXY.shiftX;
+					sub = S::subC';
+				} in
+				compose blockC' (push_X true 0 (not blockXY.negY) blockX, iX)
+			)
+			else if uX
+			then
+			(
+				let subC', subY = List.split(List.map(function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b <> b')); X(b', i'), None | (_, y) -> S, (Some y)) blockXY.subXY) in
+				let blockY = reduce {
+					neg = false;
+					shift = blockXY.shiftY;
+					sub = MyList.list_of_oplist subY;
+				} in
+				let blockC' = reduce {
+					neg = blockXY.negY;
+					shift = blockXY.shiftY;
+					sub = S::subC';
+				} in
+				compose blockC' (push_X false 0 true blockY, iY)
+			)
+			else (assert false)
+		))
+	)
+	else Utils.MNode (blockC, (blockXY, iX, iY))
 
-let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
+
+let solve_cons' getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	assert(check e0);
 	assert(check e1);
 	let cmp = CpGops.cmpid getid (i0, i1) in
@@ -586,6 +632,11 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	)
 	(* X-less merging *)
 	else (Utils.MNode (solve_cons_0 f0 f1))
+
+let solve_cons gid x y =
+	match solve_cons' gid x y with
+	| Utils.MEdge e -> Utils.MEdge e
+	| Utils.MNode (blockC, (blockXY, iX, iY)) -> solve_cons_3 (blockC, (blockXY, iX, iY))
 
 let pull_S i block =
 	(*print_string"block: "; print_string(block_dummydump block); print_newline();*)
@@ -665,23 +716,80 @@ let merge_P_and (ex, ix) (ey, iy) =
 		iy
 	)
 
-let merge_P_xor (ex, ix) (ey, iy) =
-	let a, bc = List.split(List.map (function (P, P) -> P, None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
-	{
-		neg = ex.neg <> ey.neg;
-		shift = false;
-		sub = a;
-	},
+let solve_xor_0 (ex, ix) (ey, iy) =
+	let _, _, max_xy, _ = compare_subs ex.sub ey.sub in
+	match max_xy with
+	| None ->
 	(
-		{
-			negX = false;
-			negY = false;
-			shiftX = ex.shift;
-			shiftY = ey.shift;
-			subXY = MyList.list_of_oplist bc;
+		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) -> assert(b=b' && i=i'); X(b, i), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+		let subX, subY = List.split(MyList.list_of_oplist subXY) in
+		let blockC = {
+			neg = ex.neg <> ex.shift;
+			shift = ex.shift <> ey.shift;
+			sub  = subC;
+		}
+		and blockX = reduce {
+			neg = false;
+			shift = ex.shift;
+			sub = subX;
+		}
+		and blockY = reduce {
+			neg = false;
+			shift = ey.shift;
+			sub = subY;
+		} in
+		reduce {
+			neg = blockC.neg <> blockX.neg <> blockY.neg;
+			shift = blockC.shift <> blockX.neg <> blockY.neg;
+			sub = blockC.sub;
 		},
-		ix,
-		iy
+		(
+			{
+				negX = false;
+				negY = false;
+				shiftX = blockX.shift;
+				shiftY = blockY.shift;
+				subXY = List.combine blockX.sub blockY.sub;
+			},
+			ix,
+			iy
+		)
+	)
+	| Some max_xy ->
+	(
+		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) when b = b' && i = i' && i <= max_xy -> X(b, i), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+		let subX, subY = List.split(MyList.list_of_oplist subXY) in
+		let blockC = {
+			neg = ex.neg <> ex.shift <> ey.neg <> ey.shift;
+			shift = false;
+			sub  = subC;
+		}
+		and blockX = reduce {
+			neg = ex.shift;
+			shift = ex.shift;
+			sub = subX;
+		}
+		and blockY = reduce {
+			neg = ey.shift;
+			shift = ey.shift;
+			sub = subY;
+		} in
+		reduce {
+			neg = blockC.neg <> blockX.neg <> blockY.neg;
+			shift = blockC.shift <> blockX.neg <> blockY.neg;
+			sub = blockC.sub;
+		},
+		(
+			{
+				negX = false;
+				negY = false;
+				shiftX = blockX.shift;
+				shiftY = blockY.shift;
+				subXY = List.combine blockX.sub blockY.sub;
+			},
+			ix,
+			iy
+		)
 	)
 
 let solve_and getid ((ex, ix) as x) ((ey, iy) as y) =
@@ -703,7 +811,7 @@ let solve_xor getid ((ex, ix) as x) ((ey, iy) as y) =
 	| None ->
 	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
 	then Utils.MEdge (get_root (ex.neg <> ey.neg) x )
-	else Utils.MNode (merge_P_and x y)
+	else Utils.MNode (solve_xor_0 x y)
 
 let bindump_tacx (ttag, block) stream =
 	let stream = bindump_block2 block stream in
