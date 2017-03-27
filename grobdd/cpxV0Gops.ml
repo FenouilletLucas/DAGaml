@@ -109,6 +109,15 @@ let node_split block =
 		sub = subY;
 	}
 
+let block_merge blockX blockY =
+	{
+		negX = blockX.neg;
+		shiftX = blockX.shift;
+		negY = blockY.neg;
+		shiftY = blockY.shift;
+		subXY = List.combine blockX.sub blockY.sub;
+	}
+
 let node_pull_node _ (b2, i0, i1) =
 	let b0, b1 = node_split b2 in
 	(b0, i0), (b1, i1)
@@ -557,11 +566,16 @@ let solve_cons_0 (e0, i0) (e1, i1) =
 	)
 
 let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
-	let xX, xXY, xY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b <> b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY in
+	assert(blockXY.negX = false);
+	let xX, xXY, xY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b <> b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY
+	and yX, yXY, yY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b = b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY in
 	let sX, sY = List.fold_left (fun (sX, sY) -> fun (x, y) -> (sX || (x = S), sY || (y = S))) (false, false) blockXY.subXY in
-	let uX = ( xX = 0 ) && ( not sX ) (* x is a singleton *)
-	and uY = ( xY = 0 ) && ( not sY ) (* y is a singleton *) in
-	if ( blockXY.negY <> blockXY.shiftX <> blockXY.shiftY ) && xXY = 1 && (uX || uY)
+	let uX = ( xX = 0 ) && ( not sX ) (* x is zero-ending subset of y *)
+	and uY = ( xY = 0 ) && ( not sY ) (* y is zero-ending subset of x *) in
+	let vX = ( yX = 0 ) && ( not sX )
+	and vY = ( yY = 0 ) && ( not sY ) in
+	let shifted = blockXY.shiftX <> blockXY.negY <> blockXY.shiftY in
+	if shifted && xXY = 1 && (uX || uY)
 	then
 	(
 		Utils.MEdge (compose blockC (
@@ -581,9 +595,9 @@ let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
 				} in
 				compose blockC' (push_X true 0 (not blockXY.negY) blockX, iX)
 			)
-			else if uX
-			then
+			else
 			(
+				assert(uX);
 				let subC', subY = List.split(List.map(function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b <> b')); X(b', i'), None | (_, y) -> S, (Some y)) blockXY.subXY) in
 				let blockY = reduce {
 					neg = false;
@@ -597,10 +611,88 @@ let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
 				} in
 				compose blockC' (push_X false 0 (not blockXY.negY) blockY, iY)
 			)
-			else (assert false)
 		))
 	)
-	else Utils.MNode (blockC, (blockXY, iX, iY))
+	else if (not shifted) && yXY = 1 && (vX || vY)
+	then
+	(
+		Utils.MEdge (compose blockC (
+			if		vY
+			then
+			(
+				let subC', subX = List.split(List.map (function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b = b')); X(b, i), None | (x, _) -> S, (Some x)) blockXY.subXY) in
+				let blockX = reduce {
+					neg = false;
+					shift = blockXY.shiftX;
+					sub = MyList.list_of_oplist subX;
+				}
+				and blockC' = reduce {
+					neg = false;
+					shift = blockXY.shiftX;
+					sub = S::subC';
+				} in
+				compose blockC' (push_X true 0 blockXY.negY blockX, iX)
+			)
+			else
+			(
+				assert(vX);
+				let subC', subY = List.split(List.map(function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b = b')); X(b', i'), None | (_, y) -> S, (Some y)) blockXY.subXY) in
+				let blockY = reduce {
+					neg = blockXY.negY;
+					shift = blockXY.shiftY;
+					sub = MyList.list_of_oplist subY;
+				} in
+				let blockC' = reduce {
+					neg = false;
+					shift = blockXY.shiftX;
+					sub = S::subC';
+				} in
+				compose blockC' (push_X false 0 false blockY, iY)
+			)
+		))
+	)
+	else if xXY = 0 && (uX || uY)
+	then
+	(
+		let blockX, blockY = node_split blockXY in
+		let blockX = reduce blockX
+		and blockY = reduce blockY in
+		Utils.MEdge (compose blockC (if uX
+		then
+		(
+			assert(List.for_all (function P -> true | _ -> false) blockX.sub);
+			(push_X false 0 blockX.neg blockY, iY)
+		)
+		else
+		(
+			assert(uY);
+			assert(List.for_all (function P -> true | _ -> false) blockY.sub);
+			(push_X true  0 blockY.neg blockX, iX)
+		)))
+	)
+	else
+	(
+		let blockX, blockY = node_split blockXY in
+		let blockX = reduce blockX
+		and blockY = reduce blockY in
+		let blockX = {
+			neg = false;
+			shift = blockX.shift;
+			sub = blockX.sub;
+		}
+		and blockY = {
+			neg = blockY.neg <> blockX.neg;
+			shift = blockY.shift;
+			sub = blockY.sub;
+		}
+		and blockC = reduce {
+			neg = blockC.neg <> blockX.neg;
+			shift = blockC.shift <> blockX.neg;
+			sub = blockC.sub;
+		}
+		in
+		Utils.MNode (blockC, (block_merge blockX blockY, iX, iY))
+	)
 
 
 let solve_cons' getid ((e0, i0) as f0) ((e1, i1) as f1) =
@@ -736,20 +828,20 @@ let solve_xor_0 (ex, ix) (ey, iy) =
 	match max_xy with
 	| None ->
 	(
-		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) -> assert(b=b' && i=i'); X(b, i), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) -> assert(b=b' && i=i'); X(b, 0), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
 		let subX, subY = List.split(MyList.list_of_oplist subXY) in
 		let blockC = {
-			neg = ex.neg <> ex.shift;
-			shift = ex.shift <> ey.shift;
+			neg = ex.neg <> ex.shift <> ey.neg <> ey.shift;
+			shift = false;
 			sub  = subC;
 		}
 		and blockX = reduce {
-			neg = false;
+			neg = ex.shift;
 			shift = ex.shift;
 			sub = subX;
 		}
 		and blockY = reduce {
-			neg = false;
+			neg = ey.shift;
 			shift = ey.shift;
 			sub = subY;
 		} in
@@ -772,7 +864,7 @@ let solve_xor_0 (ex, ix) (ey, iy) =
 	)
 	| Some max_xy ->
 	(
-		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) when b = b' && i = i' && i <= max_xy -> X(b, i), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) when b = b' && i = i' && i <= max_xy -> X(b, 0), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
 		let subX, subY = List.split(MyList.list_of_oplist subXY) in
 		let blockC = {
 			neg = ex.neg <> ex.shift <> ey.neg <> ey.shift;

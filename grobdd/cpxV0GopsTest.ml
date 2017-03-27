@@ -64,6 +64,15 @@ Iter.iter (fun x ->
 	let y = reduce x in
 	let z = reduce y in
 	assert(y = z)) (gen_block n);
+print_string "TEST 2.3 : reduce using in_block"; print_newline();;
+Iter.iter (fun x ->
+	let r = reduce x in
+	if x <> r then
+	(
+		Iter.iter (fun vec ->
+		assert(in_block x vec = in_block r vec);
+		()
+	)) (gen_vec n)) (gen_block n);
 print_string "TEST 3.0 : checked block"; print_newline();;
 (*Iter.iter (fun x -> print_string (block_to_pretty x); print_newline(); print_newline()) (gen_block_checked n);*)
 print_string "LENGTH = "; print_int (Iter.length (gen_block_checked n)); print_newline();;

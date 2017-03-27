@@ -3,6 +3,7 @@ open IterExtra
 let n = (int_of_string Sys.argv.(1));;
 
 let file = Sys.argv.(2);;
+let err_file = Sys.argv.(3);;
 
 module T = CpxV0.GroBdd;;
 
@@ -41,7 +42,6 @@ print_newline();;
 print_string "TEST 2.0 : and primitives are consistent"; print_newline();;
 
 Iter.iter (fun (x, y) -> assert((make_bool x) &! (make_bool y) = (make_bool (x&&y)));) (Iter.gen_bool $* Iter.gen_bool);;
-(*
 print_string "TEST 2.1 : and is consistant"; print_newline();;
 gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	let x01 = x0 *! x1
@@ -53,7 +53,6 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	assert(calcX = calcY);
 	)) |> Iter.iter ignore;;
 print_newline();;
-*)
 print_string "TEST 3.0 : xor is consistant"; print_newline();;
 gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	let x01 = x0 *! x1
@@ -62,6 +61,15 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	and xy1 = x1 ^! y1 in
 	let calcX = x01 ^! y01
 	and calcY = xy0 *! xy1 in
-	assert(calcX = calcY);
+	if (calcX <> calcY)
+	then
+	(
+		let edges = [x0; x1; y0; y1; x01; y01; xy0; xy1; calcX; calcY] in
+		(*let strman = Udag.String.newman () in
+		let stredges = CpxV0.GroBdd.to_dot man strman edges in
+		Udag.String.to_dot_file strman stredges err_file;*)
+		CpxV0.GroBdd.dumpfile man edges err_file;
+		assert false;
+	);
 	)) |> Iter.iter ignore;;
 print_newline();;
