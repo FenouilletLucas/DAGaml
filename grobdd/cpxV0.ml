@@ -1,19 +1,19 @@
 let strdump_node = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0Gops.binload_node >> CpxV0Gops.node_split)
+let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0DumpLoad.binload_node >> CpxV0Utils.block_split)
 
 let strdump_tacx = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_tacx = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0Gops.binload_tacx >> CpxV0Gops.tacx_split)
+let strload_tacx = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0DumpLoad.binload_tacx >> CpxV0Utils.tacx_split)
 
-let strdump_edge = Extra.(CpxV0Gops.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0Gops.binload_edge)
+let strdump_edge = Extra.(CpxV0DumpLoad.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.of_string)
+let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpxV0DumpLoad.binload_edge)
 
 let dot_of_edge_aux color block =
-	"[label = \""^(CpxV0Gops.block_to_pretty block)^"\"; color=\""^color^"\"];"
+	"[label = \""^(CpxV0DumpLoad.block_to_pretty block)^"\"; color=\""^color^"\"];"
 
 let dot_of_edge = dot_of_edge_aux "black"
 
 let dot_of_node node =
-	let e0, e1 = CpxV0Gops.binload_node node |> CpxV0Gops.node_split in
+	let e0, e1 = node |> CpxV0DumpLoad.binload_node |> CpxV0Utils.block_split in
 	"", (dot_of_edge_aux "red" e0), (dot_of_edge_aux "green" e1)
 
 let default_leaf = CpxV0Types.({neg = false; shift = false; sub = []}, Utils.Leaf ())
@@ -39,10 +39,10 @@ struct
 	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge = CpxV0Gops.node_push_cons
 	let pull : ('t -> 'i) -> 't e -> ('t e * 't e, 't n -> ('t e * 't e)) Utils.merge = fun gid edge -> match CpxV0Gops.node_pull gid edge with
 		| Utils.MEdge e -> Utils.MEdge e
-		| Utils.MNode f -> Utils.MNode (fun (node, i1, i2) -> f (CpxV0Gops.binload_node node, i1, i2))
-	let compose _ = CpxV0Gops.compose
+		| Utils.MNode f -> Utils.MNode (fun (node, i1, i2) -> f (CpxV0DumpLoad.binload_node node, i1, i2))
+	let compose _ = CpxV0Utils.compose
 	
-	let pull_node gid (n, i0, i1) = CpxV0Gops.node_pull_node gid (CpxV0Gops.binload_node n, i0, i1)
+	let pull_node _ (n, i0, i1) = CpxV0Utils.node_split (CpxV0DumpLoad.binload_node n, i0, i1)
 	
 	let dump_node   = Some strdump_node
 	let load_node   = Some strload_node
@@ -80,13 +80,13 @@ let make_ident man b n = GroBdd.push man (make_const b n) (make_const (not b) n)
 
 let arity block = CpxV0Types.(List.length block.sub)
 
-let push_pass = CpxV0Gops.push_P
+let push_pass = CpxV0Utils.push_P
 
-let no = CpxV0Gops.neg
+let no = CpxV0Utils.neg
 
-let is_root = CpxV0Gops.is_root
+let is_root = CpxV0Utils.node_is_const
 
-let get_root = CpxV0Gops.get_root
+let get_root = CpxV0Utils.get_root
 
 let (=??) (ex, ix) (ey, iy) = match ix, iy with
 	| Utils.Leaf (), Utils.Leaf () -> ex = ey
@@ -98,8 +98,8 @@ struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
 	type transform = CpxV0Types.edge_state
-	let compose = CpxV0Gops.compose
-	let decomp x y c = CpxV0Gops.((binload_node c, x, y) |> node_pull_node ())
+	let compose = CpxV0Utils.compose
+	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
 	let solver = CpxV0Gops.node_push_and
 end;;
 
@@ -108,8 +108,8 @@ struct
 	type t = Bitv.t
 	let compare = Pervasives.compare
 	type transform = CpxV0Types.edge_state
-	let compose = CpxV0Gops.compose
-	let decomp x y c = CpxV0Gops.((binload_node c, x, y) |> node_pull_node ())
+	let compose = CpxV0Utils.compose
+	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
 	let solver = CpxV0Gops.node_push_xor
 end;;
 
@@ -136,7 +136,7 @@ struct
 
 	let push = CpxV0Gops.tacx_push
 	let pull = CpxV0Gops.tacx_pull
-	let compose _ = CpxV0Gops.compose
+	let compose _ = CpxV0Utils.compose
 	
 	let pull_node = CpxV0Gops.tacx_pull_node
 	
@@ -184,10 +184,10 @@ struct
 		type extra = cons * cons * cons (* (a, c, x) *)
 
 		let do_leaf _ () = default_leaf
-		let do_node (a, c, x) = Extra.(CpxV0Gops.binload_tacx >> CpxV0Gops.tacx_split >> (fun (tag, edgeX, edgeY) ->
+		let do_node (a, c, x) = Extra.(CpxV0DumpLoad.binload_tacx >> CpxV0Utils.tacx_split >> (fun (tag, edgeX, edgeY) ->
 			let merge = NniTypes.(match tag with CpTypes.And -> a | CpTypes.Cons -> c | CpTypes.Xor -> x) in
-			Utils.MNode (fun nodeX nodeY -> merge (CpxV0Gops.compose edgeX nodeX) (CpxV0Gops.compose edgeY nodeY))))
-		let do_edge _ = CpxV0Gops.compose
+			Utils.MNode (fun nodeX nodeY -> merge (CpxV0Utils.compose edgeX nodeX) (CpxV0Utils.compose edgeY nodeY))))
+		let do_edge _ = CpxV0Utils.compose
 	end
 
 	module EVAL = TACX.NODE_VISITOR(EVAL_VISITOR)
@@ -233,10 +233,10 @@ struct
 		type extra = cons * cons * cons (* (a, c, x) *)
 
 		let do_leaf _ () = default_leaf
-		let do_node (a, c, x) = Extra.(CpxV0Gops.binload_tacx >> CpxV0Gops.tacx_split >> (fun (tag, edgeX, edgeY) ->
+		let do_node (a, c, x) = Extra.(CpxV0DumpLoad.binload_tacx >> CpxV0Utils.tacx_split >> (fun (tag, edgeX, edgeY) ->
 			let merge = CpTypes.(match tag with And -> a | Cons -> c | Xor -> x) in
-			Utils.MNode (fun nodeX nodeY -> merge (CpxV0Gops.compose edgeX nodeX) (CpxV0Gops.compose edgeY nodeY))))
-		let do_edge _ = CpxV0Gops.compose
+			Utils.MNode (fun nodeX nodeY -> merge (CpxV0Utils.compose edgeX nodeX) (CpxV0Utils.compose edgeY nodeY))))
+		let do_edge _ = CpxV0Utils.compose
 	end
 
 	module EVAL = TACX.NODE_VISITOR(VISITOR)
@@ -290,10 +290,10 @@ struct
 			let edgeX = cpx_of_cp edgeX
 			and edgeY = cpx_of_cp edgeY in
 			let result = Utils.MNode CpxV0Gops.(fun nodeX nodeY ->
-				TACX.push extra tag (compose edgeX nodeX) (compose edgeY nodeY)) in
+				TACX.push extra tag (CpxV0Utils.compose edgeX nodeX) (CpxV0Utils.compose edgeY nodeY)) in
 			(result : (xnode, xnode -> xnode -> xnode) Utils.merge)))
 
-		let do_edge _ e = CpxV0Gops.compose (cpx_of_cp e)
+		let do_edge _ e = CpxV0Utils.compose (cpx_of_cp e)
 	end
 
 	module EVAL = Cp.TACX.NODE_VISITOR(EVAL_VISITOR)
@@ -339,7 +339,7 @@ struct
 
 		let do_leaf () () = (BigInt.zero, BigInt.unit)
 		let x block =
-			match CpxV0Gops.classify block |> snd with
+			match CpxV0Utils.classify block |> snd with
 			| None -> (BigInt.zero, BigInt.zero)
 			| Some maxX ->
 				let liste = MyList.init (maxX+1) CpxV0Types.(fun i -> List.fold_left (fun (lvl, under) -> function
@@ -353,7 +353,7 @@ struct
 					| x0::x1::tail -> aux0 BigInt.(if0 + x0, if1 + x1) tail
 				in
 				CpxV0Types.(Tools.cswap (not block.shift) (aux0 BigInt.(zero, zero) liste))
-		let do_node ()    = Extra.(CpxV0Gops.binload_node >> CpxV0Gops.node_split >> CpxV0Types.(fun (blockX, blockY) ->
+		let do_node ()    = Extra.(CpxV0DumpLoad.binload_node >> CpxV0Utils.block_split >> CpxV0Types.(fun (blockX, blockY) ->
 			let nX = p blockX in
 			let x01 = x blockX in
 			let nY = p blockY in
@@ -384,7 +384,7 @@ struct
 
 		let cswap b (x, y) = if b then (y, x) else (x, y)
 		let x block =
-			let _, maxX = CpxV0Gops.classify block in
+			let _, maxX = CpxV0Utils.classify block in
 			match maxX with
 			| None -> ([], [])
 			| Some maxX ->
@@ -436,7 +436,7 @@ struct
 		let shift block l01 = CpxV0Types.(cswap block.neg (add (x block) (map_compose block l01)))
 
 		let do_leaf (():extra) (():GroBdd.M.leaf) = (([], [[]]):xnode)
-		let do_node ()    = Extra.(CpxV0Gops.binload_node >> CpxV0Gops.node_split >> CpxV0Types.(fun (blockX, blockY) ->
+		let do_node ()    = Extra.(CpxV0DumpLoad.binload_node >> CpxV0Utils.block_split >> CpxV0Types.(fun (blockX, blockY) ->
 			Utils.MNode (fun lX lY -> add
 				(map_push false (shift blockX lX))
 				(map_push true  (shift blockY lY)))))
