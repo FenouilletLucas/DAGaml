@@ -3,6 +3,132 @@ open CpxV0Utils
 
 module CpxDL = CpxV0DumpLoad
 
+let consensus f x y =
+	let xy, xy' = List.split(List.map f (List.combine x y)) in
+	xy, MyList.list_of_oplist xy'
+
+let block_is_singleton block =
+	let res = List.fold_left (function
+		| None -> fun _ -> None
+		| Some b -> (function
+			| S -> None
+			| P -> Some b
+			| X _ -> if b then None else (Some true))
+		) (Some false) block.sub in
+	match res with
+	| Some true -> true
+	| _			-> false
+
+let final_solve_cons blockC (blockX, iX) (blockY, iY) =
+	let blockC = reduce blockC
+	and blockX = reduce blockX
+	and blockY = reduce blockY in
+	let mnode () = Utils.MNode (
+		reduce {
+			neg = blockC.neg <> blockX.neg;
+			shift = blockC.shift <> blockX.neg;
+			sub = blockC.sub;
+		},
+		(
+			{
+				negX = false;
+				negY = blockY.neg <> blockX.neg;
+				shiftX = blockX.shift;
+				shiftY = blockY.shift;
+				subXY = List.combine blockX.sub blockY.sub;
+			},
+			iX,
+			iY
+		)
+	) in
+	match block_is_const blockX with
+	| Some th -> Utils.MEdge(compose blockC (push_X false 0 th blockY, iY))
+	| None -> match block_is_const blockY with
+	| Some th -> Utils.MEdge(compose blockC (push_X true  0 th blockX, iX))
+	| None ->
+	(
+		let allign = ( blockX.neg <> blockX.shift ) = ( blockY.neg <> blockY.shift ) in
+		let xx0 () = List.fold_left (function
+			| Some x -> (fun _ -> Some x)
+			| None -> (function
+				(* when ... && (if allign then b = b' else b <> b' ) *)
+				| X(b, i), X(b', i') when i = 0 && i' = 0 && (allign <> b <> b') -> Some(b, b')
+				| _ -> None)
+			) None (List.combine blockX.sub blockY.sub)
+		in
+		match block_is_singleton blockX, block_is_singleton blockY with
+		| true , true  ->
+		(
+			assert(blockX.shift = true);
+			assert(blockY.shift = true);
+			if blockX.sub = blockY.sub
+			then
+			(
+				assert(List.length blockX.sub = 1);
+				assert(List.length blockY.sub = 1);
+				assert(blockX.neg <> blockY.neg);
+				(* the first can't be non-significant without having been detected *)
+			)
+			else
+			(
+				assert(List.length blockX.sub = 2);
+				assert(List.length blockY.sub = 2);
+			);
+			mnode()
+		)
+		| true , false ->
+		(
+			assert(blockX.shift = true);
+			match xx0() with
+			| None -> ( mnode() )
+			| Some(_, b') ->
+			(
+				let subC', subY = consensus (function
+					| X _, X _ -> X(b', 0), None
+					| _  , y   -> S, (Some y) ) blockX.sub blockY.sub in
+				let negX = blockX.neg = allign in
+				let blockY = reduce {
+					neg = blockY.neg <> negX;
+					shift = blockY.shift;
+					sub = subY;
+				} in
+				let blockC' = reduce {
+					neg = negX;
+					shift = true;
+					sub = S::subC';
+				} in
+				Utils.MEdge(compose blockC (compose blockC' (push_X false 0 false blockY, iY)))
+			)
+		)
+		| false, true  ->
+		(
+			assert(blockY.shift = true);
+			match xx0() with
+			| None -> ( mnode() )
+			| Some(b, _) ->
+			(
+				let subC', subX = consensus (function
+					| X _, X _ -> X(b, 0), None
+					| x  , _   -> S, (Some x) ) blockX.sub blockY.sub in
+				let negY = blockY.neg = allign in
+				let blockX = reduce {
+					neg = blockX.neg <> negY;
+					shift = blockX.shift;
+					sub = subX;
+				} in
+				let blockC' = reduce {
+					neg = negY;
+					shift = true;
+					sub = S::subC';
+				} in
+				Utils.MEdge(compose blockC (compose blockC' (push_X true 0 false blockX, iX)))
+			)
+		)
+		| false, false ->
+		(
+			mnode()
+		)
+	)
 
 let compare_subs = List.fold_left2 (fun (x_sub_y, y_sub_x, max_xy, equal) x y -> match x, y with
 (* TODO the equal component is not used, remove it *)
@@ -23,239 +149,79 @@ let compare_subs = List.fold_left2 (fun (x_sub_y, y_sub_x, max_xy, equal) x y ->
 
 
 let solve_cons_2 (e0, i0) (e1, i1) =
-	let sub, subsub = List.split(List.map2 (fun x y -> match x, y with
+	let subC, subsub = consensus (function
 		| P, P -> (P, None)
 		| X(b, i), X(b', i') -> assert(b = b' && i = i'); (X(b, i), None)
 		| X _, _
 		| _, X _ -> assert false
-		| _ -> (S, Some(x, y))) e0.sub e1.sub) in
+		| (x, y) -> (S, Some(x, y))) e0.sub e1.sub in
+	let subX, subY = List.split subsub in
+	final_solve_cons
 	{
 		neg		= e0.neg;
 		shift	= e0.shift;
-		sub		= S::sub;
-	},
-	(
-		{
-			negX = false;
-			negY = e1.neg <> e0.neg;
-			shiftX = e0.shift;
-			shiftY = e1.shift;
-			subXY = MyList.list_of_oplist subsub;
-		},
-		i0,
-		i1
-	)
+		sub		= S::subC;
+	}
+	({
+		neg = false;
+		shift = e0.shift;
+		sub = subX;
+	}, i0)
+	({
+		neg = e0.neg <> e1.neg;
+		shift = e1.shift;
+		sub = subY;
+	}, i1)
 	
 
 let solve_cons_1 rank (e0, i0) (e1, i1) =
-	let sub, subsub = List.split(List.map2 (fun x y -> match x, y with
+	let sub, subsub = consensus (function
 		| P, P -> (P, None)
 		| X(b, i), X(b', i') when (b = b') && (i = i') && (i <= rank) -> (X(b, i), None)
-		| _ -> (S, Some(x, y))) e0.sub e1.sub) in
-	let sub0, sub1 = List.split (MyList.list_of_oplist subsub) in
-	let blockC = {
+		| (x, y) -> (S, Some(x, y))) e0.sub e1.sub in
+	let sub0, sub1 = List.split subsub in
+	final_solve_cons {
 		neg		= e0.neg;
 		shift	= e0.shift;
-		sub		= sub;
+		sub		= S::sub;
 	}
-	and block0 = reduce {
+	({
 		neg		= false;
 		shift	= e0.shift;
 		sub		= sub0;
-	}
-	and block1 = reduce {
+	}, i0)
+	({
 		neg		= e1.neg <> e0.neg;
 		shift	= e1.shift;
 		sub		= sub1;
-	} in
-	let blockC0 = compose_block blockC block0 in assert(blockC0 = e0);
-	let blockC1 = compose_block blockC block1 in assert(blockC1 = e1);
-	let blockC = push_S blockC in
-	if		List.for_all (function P -> true | _ -> false) block0.sub
-	(* block0 is const equal to block0.neg *)
-	then Utils.MEdge (compose blockC (push_X false 0 block0.neg block1, i1))
-	else if List.for_all (function P -> true | _ -> false) block1.sub
-	(* block1 is const equal to block1.sub *)
-	then Utils.MEdge (compose blockC (push_X true  0 block1.neg block0, i0))
-	else
-	Utils.MNode (
-		reduce {
-			neg = blockC.neg <> block0.neg;
-			shift = blockC.shift <> block0.neg;
-			sub = blockC.sub;
-		},
-		(
-			{
-				negX	= false;
-				negY	= block1.neg <> block0.neg;
-				shiftX	= block0.shift;
-				shiftY	= block1.shift;
-				subXY	= List.combine block0.sub block1.sub;
-			},
-			i0,
-			i1
-		)
-	)
+	}, i1)
 
 
 let solve_cons_0 (e0, i0) (e1, i1) =
 	(* X-less merging *)
-	let subsubXY = List.map	( function
+	let subC, subXY = consensus ( function
 		| (P, P) -> (P, None)
 		| (x, y) -> (S, Some(x, y))
-	) (List.combine e0.sub e1.sub) in
-	let sub, subXY = List.split subsubXY in
-	let subXY = MyList.list_of_oplist subXY in
-	(
-		{
-			neg		= e0.neg;
-			shift	= false;
-			sub		= S::sub;
-		},
-		(
-			{
-				negX	= false;
-				negY	= e1.neg <> e0.neg;
-				shiftX	= e0.shift;
-				shiftY	= e1.shift;
-				subXY	= subXY;
-			},
-			i0,
-			i1
-		)
-	)
+	) e0.sub e1.sub in
+	let subX, subY = List.split subXY in
+	final_solve_cons
+	{
+		neg = e0.neg;
+		shift = e0.shift;
+		sub = S::subC;
+	}
+	({
+		neg = false;
+		shift = e0.shift;
+		sub = subX;
+	}, i0)
+	({
+		neg = e1.neg <> e0.neg;
+		shift = e1.shift;
+		sub = subY;
+	}, i1)
 
-let solve_cons_3 ((blockC, (blockXY, iX, iY)) : block * (block2 * _ * _ )) =
-	assert(blockXY.negX = false);
-	let xX, xXY, xY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b <> b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY
-	and yX, yXY, yY = List.fold_left (fun (xX, xXY, xY) -> function X(b, 0), X(b', 0) when b = b' -> (xX, xXY+1, xY) | X _, X _ -> (xX+1, xXY, xY+1) | X _, _ -> (xX+1, xXY, xY) | _, X _ -> (xX, xXY, xY+1) | _ -> (xX, xXY, xY)) (0, 0, 0) blockXY.subXY in
-	let sX, sY = List.fold_left (fun (sX, sY) -> fun (x, y) -> (sX || (x = S), sY || (y = S))) (false, false) blockXY.subXY in
-	let uX = ( xX = 0 ) && ( not sX ) (* x is zero-ending subset of y *)
-	and uY = ( xY = 0 ) && ( not sY ) (* y is zero-ending subset of x *) in
-	let vX = ( yX = 0 ) && ( not sX )
-	and vY = ( yY = 0 ) && ( not sY ) in
-	let shifted = blockXY.shiftX <> blockXY.negY <> blockXY.shiftY in
-	if shifted && xXY = 1 && (uX || uY)
-	then
-	(
-		Utils.MEdge (compose blockC (
-			if		uY
-			then
-			(
-				let subC', subX = List.split(List.map (function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b <> b')); X(b, i), None | (x, _) -> S, (Some x)) blockXY.subXY) in
-				let blockX = reduce {
-					neg = false;
-					shift = blockXY.shiftX;
-					sub = MyList.list_of_oplist subX;
-				} in
-				let blockC' = reduce {
-					neg = false;
-					shift = blockXY.shiftX;
-					sub = S::subC';
-				} in
-				compose blockC' (push_X true 0 (not blockXY.negY) blockX, iX)
-			)
-			else
-			(
-				assert(uX);
-				let subC', subY = List.split(List.map(function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b <> b')); X(b', i'), None | (_, y) -> S, (Some y)) blockXY.subXY) in
-				let blockY = reduce {
-					neg = false;
-					shift = blockXY.shiftY;
-					sub = MyList.list_of_oplist subY;
-				} in
-				let blockC' = reduce {
-					neg = blockXY.negY;
-					shift = blockXY.shiftY;
-					sub = S::subC';
-				} in
-				compose blockC' (push_X false 0 (not blockXY.negY) blockY, iY)
-			)
-		))
-	)
-	else if (not shifted) && yXY = 1 && (vX || vY)
-	then
-	(
-		Utils.MEdge (compose blockC (
-			if		vY
-			then
-			(
-				let subC', subX = List.split(List.map (function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b = b')); X(b, i), None | (x, _) -> S, (Some x)) blockXY.subXY) in
-				let blockX = reduce {
-					neg = false;
-					shift = blockXY.shiftX;
-					sub = MyList.list_of_oplist subX;
-				}
-				and blockC' = reduce {
-					neg = false;
-					shift = blockXY.shiftX;
-					sub = S::subC';
-				} in
-				compose blockC' (push_X true 0 blockXY.negY blockX, iX)
-			)
-			else
-			(
-				assert(vX);
-				let subC', subY = List.split(List.map(function X(b, i), X(b', i') -> assert(i = 0 && i' = 0 && (b = b')); X(b', i'), None | (_, y) -> S, (Some y)) blockXY.subXY) in
-				let blockY = reduce {
-					neg = blockXY.negY;
-					shift = blockXY.shiftY;
-					sub = MyList.list_of_oplist subY;
-				} in
-				let blockC' = reduce {
-					neg = false;
-					shift = blockXY.shiftX;
-					sub = S::subC';
-				} in
-				compose blockC' (push_X false 0 false blockY, iY)
-			)
-		))
-	)
-	else if xXY = 0 && (uX || uY)
-	then
-	(
-		let blockX, blockY = block_split blockXY in
-		let blockX = reduce blockX
-		and blockY = reduce blockY in
-		Utils.MEdge (compose blockC (if uX
-		then
-		(
-			assert(List.for_all (function P -> true | _ -> false) blockX.sub);
-			(push_X false 0 blockX.neg blockY, iY)
-		)
-		else
-		(
-			assert(uY);
-			assert(List.for_all (function P -> true | _ -> false) blockY.sub);
-			(push_X true  0 blockY.neg blockX, iX)
-		)))
-	)
-	else
-	(
-		let blockX, blockY = block_split blockXY in
-		let blockX = reduce blockX
-		and blockY = reduce blockY in
-		let blockX = {
-			neg = false;
-			shift = blockX.shift;
-			sub = blockX.sub;
-		}
-		and blockY = {
-			neg = blockY.neg <> blockX.neg;
-			shift = blockY.shift;
-			sub = blockY.sub;
-		}
-		and blockC = reduce {
-			neg = blockC.neg <> blockX.neg;
-			shift = blockC.shift <> blockX.neg;
-			sub = blockC.sub;
-		}
-		in
-		Utils.MNode (blockC, (block_merge blockX blockY, iX, iY))
-	)
-
-
-let solve_cons' getid ((e0, i0) as f0) ((e1, i1) as f1) =
+let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	assert(check e0);
 	assert(check e1);
 	let cmp = CpGops.cmpid getid (i0, i1) in
@@ -284,26 +250,21 @@ let solve_cons' getid ((e0, i0) as f0) ((e1, i1) as f1) =
 		(
 			let x_sub_y, y_sub_x, max_xy, equal = compare_subs e0.sub e1.sub in
 			if equal
-			then Utils.MNode (solve_cons_2 f0 f1)
+			then solve_cons_2 f0 f1
 			else
 			(
 				assert(not(x_sub_y && y_sub_x)); (* they can't be both a subset of each other without being equal *)
 				match max_xy with
 				| Some max_xy -> (solve_cons_1 max_xy f0 f1)
 				(* no X-related conflict has been detected, thus we focus only on P-related problems *)
-				| None -> Utils.MNode (solve_cons_2 f0 f1)
+				| None -> solve_cons_2 f0 f1
 			)
 		)
 		(* X-less merging *)
-		| _ -> Utils.MNode (solve_cons_0 f0 f1)
+		| _ -> solve_cons_0 f0 f1
 	)
 	(* X-less merging *)
-	else (Utils.MNode (solve_cons_0 f0 f1))
-
-let solve_cons gid x y =
-	match solve_cons' gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (blockC, (blockXY, iX, iY)) -> solve_cons_3 (blockC, (blockXY, iX, iY))
+	else (solve_cons_0 f0 f1)
 
 let pull_S i block =
 	(*print_string"block: "; print_string(CpxDL.block_dummydump block); print_newline();*)
