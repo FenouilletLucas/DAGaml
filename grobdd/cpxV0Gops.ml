@@ -322,12 +322,14 @@ let node_pull getid (b, i) = match b.sub with
 
 
 let solve_and_1 (ex, ix) (ey, iy) =
-	let a, bc = List.split(List.map (function (P, P) -> P, None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
+	let sub, subXY = consensus(function
+		| (P, P) -> P, None
+		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
 	Utils.MNode (
 		{
 			neg = false;
 			shift = false;
-			sub = a;
+			sub;
 		},
 		(
 			{
@@ -335,7 +337,7 @@ let solve_and_1 (ex, ix) (ey, iy) =
 				negY = ey.neg;
 				shiftX = ex.shift;
 				shiftY = ey.shift;
-				subXY = MyList.list_of_oplist bc;
+				subXY;
 			},
 			ix,
 			iy
@@ -343,16 +345,16 @@ let solve_and_1 (ex, ix) (ey, iy) =
 	)
 
 let solve_and_2 (ex, ix) (ey, iy) =
-	let a, bc = List.split(List.map (function
+	let sub, subXY = consensus(function
 		| (P, P)			-> P, None
 		| X(b, 0), X(b', 0) -> assert(b = b'); X(b, 0), None
 		| (x, y)			-> S, Some(x, y)
-		) (List.combine ex.sub ey.sub)) in
+		) ex.sub ey.sub in
 	Utils.MNode (
 		{
 			neg = false;
 			shift = false;
-			sub = a;
+			sub;
 		},
 		(
 			{
@@ -360,7 +362,7 @@ let solve_and_2 (ex, ix) (ey, iy) =
 				negY = ey.neg;
 				shiftX = ex.shift;
 				shiftY = ey.shift;
-				subXY = MyList.list_of_oplist bc;
+				subXY;
 			},
 			ix,
 			iy
@@ -368,16 +370,16 @@ let solve_and_2 (ex, ix) (ey, iy) =
 	)
 
 let solve_and_3 (ex, ix) (ey, iy) =
-	let a, bc = List.split(List.map (function
+	let sub, subXY = consensus(function
 		| (P, P)						-> P, None
 		| X(b, 0), X(b', 0) when b = b'	-> X(b, 0), None
 		| (x, y)						-> S, Some(x, y)
-		) (List.combine ex.sub ey.sub)) in
+		) ex.sub ey.sub in
 	Utils.MNode (
 		{
 			neg = false;
 			shift = true;
-			sub = a;
+			sub;
 		},
 		(
 			{
@@ -385,7 +387,7 @@ let solve_and_3 (ex, ix) (ey, iy) =
 				negY = ey.neg;
 				shiftX = ex.shift;
 				shiftY = ey.shift;
-				subXY = MyList.list_of_oplist bc;
+				subXY;
 			},
 			ix,
 			iy
