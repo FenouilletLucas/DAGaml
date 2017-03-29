@@ -68,7 +68,7 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 		(*let strman = Udag.String.newman () in
 		let stredges = CpxV0.GroBdd.to_dot man strman edges in
 		Udag.String.to_dot_file strman stredges err_file;*)
-		CpxV0.GroBdd.dumpfile man edges err_file;
+		ignore(CpxV0.GroBdd.dumpfile man edges err_file);
 		assert false;
 	);
 	)) |> Iter.iter ignore;;
