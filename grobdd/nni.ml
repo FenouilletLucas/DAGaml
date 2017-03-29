@@ -69,7 +69,8 @@ struct
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in
-		Udag.StrTree.dumpfile strman stredges target
+		Udag.StrTree.dumpfile strman stredges target;
+		strman
 	
 	let loadfile target =
 		let strman, stredges = Udag.StrTree.loadfile target in

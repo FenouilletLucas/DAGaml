@@ -441,7 +441,7 @@ let solve_and getid ((ex, ix) as x) ((ey, iy) as y) =
 			| Some b -> Utils.MEdge (compose e (if b then (ey, iy) else (ex, ix)))
 			| None -> match block_is_const ey with
 			| Some b -> Utils.MEdge (compose e (if b then (ex, ix) else (ey, iy)))
-			| None ->	Utils.MNode (e, (block_merge ex ey, ix, iy))
+			| None ->	Utils.MNode (e, (if (ex, ix) < (ey, iy) then (block_merge ex ey, ix, iy) else (block_merge ey ex, iy, ix)))
 	)
 
 let solve_xor_0 (ex, ix) (ey, iy) =
@@ -530,7 +530,16 @@ let solve_xor getid ((ex, ix) as x) ((ey, iy) as y) =
 	| None ->
 	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
 	then Utils.MEdge (get_root (ex.neg <> ey.neg) x )
-	else Utils.MNode (solve_xor_0 x y)
+	else
+	(
+		let e, (xy, ix, iy) = solve_xor_0 x y in
+		let ex, ey = block_split xy in
+		let ex = reduce ex
+		and ey = reduce ey in
+		Utils.MNode (e, (if (ex, ix) < (ey, iy)
+		then (block_merge ex ey, ix, iy)
+		else (block_merge ey ex, iy, ix)))
+	)
 
 
 let node_push_cons gid x y = match solve_cons gid x y with

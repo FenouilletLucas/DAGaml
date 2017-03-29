@@ -61,7 +61,8 @@ struct
 	let dumpfile man edges target =
 		let strman = Udag.StrTree.newman() in
 		let stredges = dump man strman edges in
-		Udag.StrTree.dumpfile strman stredges target
+		Udag.StrTree.dumpfile strman stredges target;
+		strman
 	
 	let loadfile target =
 		let strman, stredges = Udag.StrTree.loadfile target in
@@ -180,7 +181,7 @@ let ( *! ) man x y = TACX.push man CpTypes.Cons x y
 let ( &! ) man x y = TACX.push man CpTypes.And x y
 and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
 
-module PURE_OF_TACX =
+module EVAL =
 struct
 	module VISITOR =
 	struct

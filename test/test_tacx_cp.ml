@@ -59,7 +59,7 @@ StrTree.dumpfile [dump_edges] "test.cp.tacx";;
 
 let groman = Cp.newman ();;
 
-let evaman, mapcalc = Cp.PURE_OF_TACX.newman man groman;;
+let evaman, mapcalc = Cp.EVAL.newman man groman;;
 
 let eval_edges = mapcalc edges;;
 
