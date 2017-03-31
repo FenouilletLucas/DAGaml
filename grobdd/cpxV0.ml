@@ -557,4 +557,5 @@ struct
 
 	let compose = CpxV0Utils.compose
 end;;
+module ANDE = GroBdd.IBOP_EVAL(AND_ME)
 module XORE = GroBdd.IBOP_EVAL(XOR_ME)

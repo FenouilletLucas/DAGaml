@@ -14,6 +14,9 @@ let ( *! ) = T.push man;;
 let and_man, ( &! ) = CpxV0.AND.newman man;;
 let xor_man, ( ^! ) = CpxV0.XOR.newman man;;
 
+let ande_man, ( &@ ) = CpxV0.ANDE.newman man;;
+let xore_man, ( ^@ ) = CpxV0.XORE.newman man;;
+
 let make_bool b = CpxV0.make_const b 0;;
 
 let gen_bnb =
@@ -53,7 +56,10 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	assert(calcX = calcY);
 	)) |> Iter.iter ignore;;
 print_newline();;
-print_string "TEST 3.0 : xor is consistant"; print_newline();;
+print_string "TEST 3.0 : xor primitives are consistent"; print_newline();;
+
+Iter.iter (fun (x, y) -> assert((make_bool x) ^! (make_bool y) = (make_bool (x<>y)));) (Iter.gen_bool $* Iter.gen_bool);;
+print_string "TEST 3.1 : xor is consistant"; print_newline();;
 gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	let x01 = x0 *! x1
 	and y01 = y0 *! y1
@@ -90,5 +96,43 @@ gn2 $* (gen_assign n) |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, 
 	assert(pe_set_x0 = pe_0set_x01);
 	assert(pe_set_x1 = pe_1set_x01);
 	assert(pe_Nset_x01 = pe_set_x0_pe_set_x1);
+	)) |> Iter.iter ignore;;
+print_newline();;
+
+print_string "TEST 5.0 : ande primitives are consistent"; print_newline();;
+
+Iter.iter (fun (x, y) -> assert((make_bool x) &@ (make_bool y) = (make_bool (x&&y)));) (Iter.gen_bool $* Iter.gen_bool);;
+print_string "TEST 5.1 : ande is consistant"; print_newline();;
+gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
+	let x01 = x0 *! x1
+	and y01 = y0 *! y1
+	and xy0 = x0 &@ y0
+	and xy1 = x1 &@ y1 in
+	let calcX = x01 &@ y01
+	and calcY = xy0 *! xy1 in
+	assert(calcX = calcY);
+	)) |> Iter.iter ignore;;
+print_newline();;
+print_string "TEST 6.0 : xore primitives are consistent"; print_newline();;
+
+Iter.iter (fun (x, y) -> assert((make_bool x) ^! (make_bool y) = (make_bool (x<>y)));) (Iter.gen_bool $* Iter.gen_bool);;
+print_string "TEST 6.1 : xore is consistant"; print_newline();;
+gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
+	let x01 = x0 *! x1
+	and y01 = y0 *! y1
+	and xy0 = x0 ^@ y0
+	and xy1 = x1 ^@ y1 in
+	let calcX = x01 ^@ y01
+	and calcY = xy0 *! xy1 in
+	if (calcX <> calcY)
+	then
+	(
+		let edges = [x0; x1; y0; y1; x01; y01; xy0; xy1; calcX; calcY] in
+		(*let strman = Udag.String.newman () in
+		let stredges = CpxV0.GroBdd.to_dot man strman edges in
+		Udag.String.to_dot_file strman stredges err_file;*)
+		ignore(CpxV0.GroBdd.dumpfile man edges err_file);
+		assert false;
+	);
 	)) |> Iter.iter ignore;;
 print_newline();;
