@@ -231,7 +231,9 @@ let reduce' block =
 		}
 	)
 
-
+let node_reduce (block, gtree) = match gtree with
+	| Utils.Leaf () -> (reduce  block, gtree)
+	| Utils.Node _  -> (reduce' block, gtree)
 
 let push_X iB rN tB (* if, rank, then *) block =
 	assert(rN >= 0);

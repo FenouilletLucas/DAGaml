@@ -485,3 +485,76 @@ struct
 	include GroBdd.EVAL(Eval_VISITOR)
 
 end
+
+module AND_ME : GroBdd.MODELE_IBOP_EVAL =
+struct
+	type compact = Bitv.t
+	type residual = CpxV0Types.edge_state
+	type eval = bool option list
+
+	let solver gid x y = match CpxV0Gops.node_push_and gid (x, y) with
+		| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
+		| Utils.MNode (r, (c, x, y)) -> Utils.M3Node (r, (c, (None, x), (None, y)))
+	
+	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
+
+	let solver' gid c x' y' =
+		let x, y = CpxV0DumpLoad.binload_node c |> CpxV0Utils.block_split in
+		let x = match x' with
+			| Utils.MNode gtree -> CpxV0Utils.node_reduce (x, gtree)
+			| Utils.MEdge edge  -> CpxV0Utils.compose x edge
+		and y = match y' with
+			| Utils.MNode gtree -> CpxV0Utils.node_reduce (y, gtree)
+			| Utils.MEdge edge  -> CpxV0Utils.compose y edge
+		in solver gid x y
+	
+	let eval set (ex, ix) =
+		let (ex, ix), set = CpxV0Gops.assign (Some set) (ex, ix) in
+		(ex, (set, ix))
+	
+	let read = function
+		| [] -> assert false
+		| head::tail -> match head with
+			| None		 -> Utils.MPull (tail, tail)
+			| Some false -> Utils.Go0 tail
+			| Some true  -> Utils.Go1 tail
+
+	let compose = CpxV0Utils.compose
+end;;
+
+module XOR_ME : GroBdd.MODELE_IBOP_EVAL =
+struct
+	type compact = Bitv.t
+	type residual = CpxV0Types.edge_state
+	type eval = bool option list
+
+	let solver gid x y = match CpxV0Gops.node_push_xor gid (x, y) with
+		| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
+		| Utils.MNode (r, (c, x, y)) -> Utils.M3Node (r, (c, (None, x), (None, y)))
+	
+	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
+
+	let solver' gid c x' y' =
+		let x, y = CpxV0DumpLoad.binload_node c |> CpxV0Utils.block_split in
+		let x = match x' with
+			| Utils.MNode gtree -> CpxV0Utils.node_reduce (x, gtree)
+			| Utils.MEdge edge  -> CpxV0Utils.compose x edge
+		and y = match y' with
+			| Utils.MNode gtree -> CpxV0Utils.node_reduce (y, gtree)
+			| Utils.MEdge edge  -> CpxV0Utils.compose y edge
+		in solver gid x y
+	
+	let eval set (ex, ix) =
+		let (ex, ix), set = CpxV0Gops.assign (Some set) (ex, ix) in
+		(ex, (set, ix))
+	
+	let read = function
+		| [] -> assert false
+		| head::tail -> match head with
+			| None		 -> Utils.MPull (tail, tail)
+			| Some false -> Utils.Go0 tail
+			| Some true  -> Utils.Go1 tail
+
+	let compose = CpxV0Utils.compose
+end;;
+module XORE = GroBdd.IBOP_EVAL(XOR_ME)
