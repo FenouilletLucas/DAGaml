@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 let string_of_vec = StrUtil.catmap""(function true -> "1" | false -> "0")
 let print_vec vec = print_string (string_of_vec vec)
 

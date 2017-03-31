@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 let strdump_node = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
 let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> NniGops.binload_node >> NniGops.node_split)
 

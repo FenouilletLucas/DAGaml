@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 let pm_of_bool = function
 	| true	-> "+"
 	| false	-> "-"

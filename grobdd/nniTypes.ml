@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 type invar = bool * (Bitv.t option)
 
 type uniq_elem =

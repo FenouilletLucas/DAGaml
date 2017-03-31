@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 let make_const  b n = Cp.TACX.push_leaf (b, MyList.ntimes CpTypes.P n) ()
 
 let make_ident man b n = Cp.( *! ) man (make_const (not b) n) (make_const b n)

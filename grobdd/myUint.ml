@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 type t = {
 	arity : int;
 	array : Cp.TACX.edge array; (* uint = sum(b_i 2^i) *)

@@ -1,3 +1,8 @@
+(* All Right Reserved
+
+   Copyright (c) 2017 Joan Thibault
+*)
+
 type elem =
 	| S (* significant variable *)
 	| P (* useless variable *)
