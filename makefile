@@ -26,6 +26,8 @@ tests:
 		test/test_eval_tacx_to_pure_cpx.native \
 		test/test_upgrade_tacx_cp_to_nni.native \
 		test/test_upgrade_tacx_cp_to_cpx.native \
+		test/test_noreg_cp_cons.native \
+		test/test_noreg_cp_cons.d.byte \
 		test/test_noreg_nni_cons.native \
 		test/test_eval_pure_to_dot.native
 

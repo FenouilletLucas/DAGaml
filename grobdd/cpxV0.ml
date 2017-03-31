@@ -40,7 +40,7 @@ struct
 	let pull : ('t -> 'i) -> 't e -> ('t e * 't e, 't n -> ('t e * 't e)) Utils.merge = fun gid edge -> match CpxV0Gops.node_pull gid edge with
 		| Utils.MEdge e -> Utils.MEdge e
 		| Utils.MNode f -> Utils.MNode (fun (node, i1, i2) -> f (CpxV0DumpLoad.binload_node node, i1, i2))
-	let compose _ = CpxV0Utils.compose
+	let compose = CpxV0Utils.compose
 	
 	let pull_node _ (n, i0, i1) = CpxV0Utils.node_split (CpxV0DumpLoad.binload_node n, i0, i1)
 	
@@ -454,34 +454,29 @@ struct
 end
 
 
-(*
-module Eval =
+module PartEval =
 struct
-	module Eval_VISITOR =
+	module Eval_VISITOR : GroBdd.MODELE_EVAL with
+			type pars = bool option list option
+		and type back = GroBdd.M.edge
+	=
 	struct
-		type pars = bool option list
+		type pars = bool option list option
 		type back = GroBdd.M.edge
 
-		let pars gid pars ((be, le), ie) =
-			let lb, lpe = List.split(List.map2(fun p e -> match p, e with
-				| None, CpTypes.P -> Some CpTypes.P, None
-				| None, CpTypes.S -> Some CpTypes.S, Some(None, CpTypes.S)
-				| Some _, CpTypes.P -> None, None
-				| Some b, CpTypes.S -> Some CpTypes.S, Some(Some b, CpTypes.S)) pars le) in
-			let lb = MyList.list_of_oplist lb
-			and pars, le = List.split(MyList.list_of_oplist lpe) in
-			if List.for_all (function None -> true | Some _ -> false) pars
-			then Utils.MStop (CpxV0Gops.compose (false, lb) ((be, le), ie))
-			else match pars with
-				| [] -> assert false
-				| h::t -> match h with
-					| None       -> Utils.MPull ((false, lb), t, t)
-					| Some false -> Utils.Go0 ((false, lb), t)
-					| Some true	 -> Utils.Go1 ((false, lb), t)
+		let pars gid pars (ex, ix) =
+			let (ex, ix), pars = CpxV0Gops.assign pars (ex, ix) in
+			match pars with
+			| None -> Utils.MStop (ex, ix)
+			| Some [] -> assert false
+			| Some (head::tail) -> match head with
+				| None			-> Utils.MPull	(ex, (Some tail), (Some tail))
+				| Some false	-> Utils.Go0	(ex, (Some tail))
+				| Some true		-> Utils.Go1	(ex, (Some tail))
 
-		let back = CpxV0Gops.compose
+		let back = CpxV0Utils.compose
 	end
 
-end
+	include GroBdd.EVAL(Eval_VISITOR)
 
-*)
+end

@@ -38,7 +38,7 @@ struct
 
 	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge = CpGops.node_push_cons
 	let pull	= CpGops.node_pull
-	let compose _ = CpGops.compose
+	let compose = CpGops.compose
 	
 	let pull_node	= CpGops.node_pull_node
 	
@@ -304,14 +304,19 @@ struct
 	
 end
 
-module Eval =
+module PartEval =
 struct
-	module Eval_VISITOR =
+	module Eval_VISITOR : GroBdd.MODELE_EVAL with
+			type pars = bool option list option
+		and type back = GroBdd.M.edge
+	=
 	struct
-		type pars = bool option list
+		type pars = bool option list option
 		type back = GroBdd.M.edge
 
-		let pars gid pars ((be, le), ie) =
+		let pars gid pars ((be, le), ie) = match pars with
+		| None -> Utils.MStop ((be, le), ie)
+		| Some pars ->
 			let lb, lpe = List.split(List.map2(fun p e -> match p, e with
 				| None, CpTypes.P -> Some CpTypes.P, None
 				| None, CpTypes.S -> Some CpTypes.S, Some(None, CpTypes.S)
@@ -324,11 +329,13 @@ struct
 			else match pars with
 				| [] -> assert false
 				| h::t -> match h with
-					| None       -> Utils.MPull ((false, lb), t, t)
-					| Some false -> Utils.Go0 ((false, lb), t)
-					| Some true	 -> Utils.Go1 ((false, lb), t)
+					| None       -> Utils.MPull ((false, lb), Some t, Some t)
+					| Some false -> Utils.Go0 ((false, lb), Some t)
+					| Some true	 -> Utils.Go1 ((false, lb), Some t)
 
 		let back = CpGops.compose
 	end
+
+	include GroBdd.EVAL(Eval_VISITOR)
 
 end

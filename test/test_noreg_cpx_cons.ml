@@ -73,3 +73,22 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	);
 	)) |> Iter.iter ignore;;
 print_newline();;
+print_string "TEST 4.0 : partial evaluation is consistant"; print_newline();;
+
+let gen_assign n = (Iter.of_list [None; Some false; Some true]) $^ n;;
+
+let peman, peval = CpxV0.PartEval.newman man;;
+
+gn2 $* (gen_assign n) |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), set) ->
+	let x01 = x0 *! x1 in
+	let pe_set_x0 = peval (Some set) x0 in
+	let pe_set_x1 = peval (Some set) x1 in
+	let pe_0set_x01 = peval (Some((Some false)::set)) x01 in
+	let pe_1set_x01 = peval (Some((Some true )::set)) x01 in
+	let pe_Nset_x01 = peval (Some( None       ::set)) x01 in
+	let pe_set_x0_pe_set_x1 = pe_set_x0 *! pe_set_x1 in
+	assert(pe_set_x0 = pe_0set_x01);
+	assert(pe_set_x1 = pe_1set_x01);
+	assert(pe_Nset_x01 = pe_set_x0_pe_set_x1);
+	)) |> Iter.iter ignore;;
+print_newline();;

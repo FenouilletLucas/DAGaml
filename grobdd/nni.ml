@@ -39,7 +39,7 @@ struct
 	let push : ('t -> 'i) -> 't e -> 't e -> ('t e, edge * 't n) Utils.merge =
 		NniGops.node_push_cons
 	let pull = NniGops.node_pull
-	let compose _ = NniGops.compose
+	let compose = NniGops.compose
 	
 	let pull_node = NniGops.node_pull_node
 	

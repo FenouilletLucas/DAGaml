@@ -578,13 +578,17 @@ let tacx_push gid = CpTypes.(function
 	| And  -> tacx_push_and  gid
 	| Xor  -> tacx_push_xor  gid)
 
-let contiguify block =
+let contiguify (block, ident) =
 	let min_bigger_than x sub = List.fold_left (fun opmin -> function X(b, i) when i > x -> Tools.opmin i opmin | _ -> opmin) None sub in
 	let dec_bigger_than x dec sub = List.map (function X(b, i) when i > x -> X(b, i-dec) | x -> x) sub in
 	let min sub = List.fold_left (fun opmin -> function X(b, i) -> Tools.opmin i opmin | _ -> opmin) None sub in
-	let dec dec sub = List.map (function X(b, i) -> X(b, i-dec) | x -> x) sub in
+	let dec dec sub =
+		if dec = 0
+		then sub
+		else (List.map (function X(b, i) -> X(b, i-dec) | x -> x) sub)
+	in
 	match min block.sub with
-	| None -> block
+	| None -> ({neg = block.neg; shift = false; sub = block.sub}, ident)
 	| Some min ->
 	(
 		let rec aux pos sub = match min_bigger_than pos sub with
@@ -596,15 +600,16 @@ let contiguify block =
 				aux (if diff mod 2 = 0 then pos else (pos+1)) (if dec = 0 then sub else (dec_bigger_than pos dec sub))
 			)
 		in
-		reduce (if min = 0
-		then {neg = block.neg; shift = block.shift; sub = (aux 0 block.sub)}
-		else {neg = block.neg; shift = block.shift<>(mod2 min); sub = (aux 0 (dec min block.sub))})
+		let block = {neg = block.neg; shift = block.shift<>(mod2 min); sub = aux 0 (dec min block.sub)} in
+		((match ident with Utils.Leaf () -> reduce_0 block | Utils.Node _ -> block), ident)
 	)
+
 	
 
 let assign = function
 	| None -> fun block -> block, None
 	| Some set -> fun (block, ident) ->
+		assert(List.length set = List.length block.sub);
 		let foldmap f i l =
 			let rec aux l' i = function
 				| [] -> List.rev l', i
@@ -614,14 +619,15 @@ let assign = function
 			in aux [] i l
 		in
 		let opsubopset, opmin = foldmap (fun opmin -> fun (set, sub) -> match set with
-			| None		  -> (Some sub, Some None), opmin
+			| None	   -> ( Some sub, (match sub with S -> Some None | _ -> None)), opmin
 			| Some set -> match sub with
 				| P		  -> (None    , None     ), opmin
-				| S		  -> (None    , Some set ), opmin
-				| X(b, i) -> (None    , None     ), Tools.opmin i opmin) None (List.combine set block.sub) in
+				| S		  -> (None    , Some (Some set) ), opmin
+				| X(b, i) -> (None    , None     ), if b = set then Tools.opmin i opmin else opmin
+			) None (List.combine set block.sub) in
 		let opsub, opset = List.split opsubopset in
 		let sub = MyList.list_of_oplist opsub
 		and set = MyList.list_of_oplist opset in
 		match opmin with
-		| None -> ((contiguify {neg = block.neg; shift = block.shift; sub = sub}, ident), (if List.for_all ((=)None) set then None else (Some set)))
-		| Some min -> ((contiguify {neg = block.neg <> block.shift <> (mod2 min); shift = (mod2 min); sub = List.map (function S | P -> P | X(_, i) when i >= min -> P | (X _) as x -> x) sub}, Utils.Leaf()), None)
+		| None -> ((contiguify ({neg = block.neg; shift = block.shift; sub = sub}, ident)), (if List.for_all ((=)None) set then None else (Some set)))
+		| Some min -> ((contiguify ({neg = block.neg <> block.shift <> (mod2 min); shift = (mod2 min); sub = List.map (function S | P -> P | X(_, i) when i >= min -> P | (X _) as x -> x) sub}, Utils.Leaf())), None)

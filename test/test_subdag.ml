@@ -19,7 +19,7 @@ struct
 		| Utils.Leaf ()	-> assert false
 		| Utils.Node n	-> Utils.MNode (fun (((), nx, ny):'t n) -> (((), nx):'t e), (((), ny): 't e))
 	let pull_node _ (((), nx, ny):'t n) = ((((), nx):'t e), (((), ny):'t e))
-	let compose _ (():edge) (x:'t e)  = x
+	let compose  (():edge) (x:'t e)  = x
 
 
 	let dump_node = Some (fun () -> Tree.Node [])

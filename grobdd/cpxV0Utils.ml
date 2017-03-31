@@ -117,6 +117,64 @@ let check block =
 		)
 	))
 
+let reduce_0 block =
+	match (List.fold_left (fun opmax -> function X(_, i) -> Tools.opmax i opmax | _ -> opmax) None block.sub) with
+	| None ->
+	{
+		neg   = block.neg;
+		shift = false;
+		sub   = block.sub;
+	}
+	| Some maxX ->
+	(
+		let block, maxX = if block.shift <> (mod2 maxX) then block, maxX else
+		{
+			neg		= block.neg;
+			shift	= block.shift;
+			sub		= List.map (function X(_, i) when i = maxX -> P | x -> x) block.sub;
+		}, maxX - 1 in
+		if maxX = - 1
+		then
+		{
+			neg		= block.neg;
+			shift	= false;
+			sub		= block.sub;
+		}
+		else
+		(
+			let n = MyList.count (function X(_, i) -> i = maxX | _ -> false) block.sub in
+			assert(n>=1);
+			if n = 1
+			then ( if maxX = 0
+			then
+			(
+				(* single significant variable *)
+				let iB = match (List.fold_left   ( function
+						| Some x -> (fun _ -> Some x)
+						| None   -> function
+						| S | P -> None
+						| X(b, 0) -> Some b
+						| _       -> assert false ) None block.sub) with
+					| None -> assert false
+					| Some iB -> iB
+				in
+				{
+					neg	  = block.neg <> iB;
+					shift = true;
+					sub	  = List.map (function X _ -> X(false, 0) | x -> x) block.sub;
+				}
+			)
+			else
+			{
+				neg   = not block.neg;
+				shift = not block.shift;
+				sub   = List.map (function X(b, i) when i = maxX -> X(not b, i-1) | x -> x) block.sub;
+			}
+				)
+			else block
+		)
+	)
+
 let reduce block =
 	let minX = List.fold_left (fun x -> function S | P -> x | X(_, i) -> Tools.opmin i x) None block.sub in
 	match minX with
@@ -127,6 +185,7 @@ let reduce block =
 		sub		= block.sub;
 	}
 	| Some minX ->
+	(
 		assert(minX>=0);
 		let block = {
 			neg		= block.neg;
@@ -138,64 +197,35 @@ let reduce block =
 				| P -> P
 				| X(b, i) -> X(b, i-minX)) block.sub
 		} in
-		let hasS, maxX = classify block in
-		let maxX = match maxX with None -> assert false | Some maxX -> maxX in
-		if hasS = false
-		then
-		(
-			let  block = if block.shift <> (mod2 maxX)
-				then block
-				else
-				{
-					neg		= block.neg;
-					shift	= block.shift;
-					sub		= List.map (function X(_, i) when i = maxX -> P | x -> x) block.sub;
-				}
-			in
-			let hasS, maxX = classify block in
-			assert(hasS = false);
-			match maxX with
-			| None ->
-			{
-				neg		= block.neg;
-				shift	= false;
-				sub		= block.sub;
-			}
-			| Some maxX ->
-			(
-				let n = MyList.count (function X(_, i) -> i = maxX | _ -> false) block.sub in
-				assert(n>=1);
-				if n = 1
-				then ( if maxX = 0
-				then
-				(
-					(* single significant variable *)
-					let iB = match (List.fold_left   ( function
-						| Some x -> (fun _ -> Some x)
-						| None   -> function
-							| S | P -> None
-							| X(b, 0) -> Some b
-							| _       -> assert false ) None block.sub) with
-					| None -> assert false
-					| Some iB -> iB
-					in
-					{
-						neg		= block.neg <> iB;
-						shift	= true;
-						sub		= List.map (function X _ -> X(false, 0) | x -> x) block.sub;
+		if List.exists (function S -> true | _ -> false) block.sub
+		then block
+		else (reduce_0 block)
+	)
 
-					}
-				)
-				else
-				{
-					neg		= not block.neg;
-					shift	= not block.shift;
-					sub		= List.map (function X(b, i) when i = maxX -> X(not b, i-1) | x -> x) block.sub;
-				} )
-				else block
-			)
-		)
-		else block
+let reduce' block =
+	let minX = List.fold_left (fun x -> function S | P -> x | X(_, i) -> Tools.opmin i x) None block.sub in
+	match minX with
+	| None ->
+	{
+		neg		= block.neg;
+		shift	= false;
+		sub		= block.sub;
+	}
+	| Some minX ->
+	(
+		assert(minX>=0);
+		{
+			neg		= block.neg;
+			shift	= block.shift <> (mod2 minX);
+			sub		= if minX = 0
+			then block.sub
+			else List.map (function
+				| S -> S
+				| P -> P
+				| X(b, i) -> X(b, i-minX)) block.sub
+		}
+	)
+
 
 
 let push_X iB rN tB (* if, rank, then *) block =
@@ -299,7 +329,7 @@ let tacx_split (ttag, block) =
 	let blockX, blockY = block_split block in
 	(ttag, blockX, blockY)
 
-let compose_block blockC blockc =
+let compose_block' blockC blockc =
 	let hasS, maxX = classify blockC in
 	match maxX with
 	| None ->
@@ -311,7 +341,7 @@ let compose_block blockC blockc =
 			| (S::_, []) -> assert false
 			| ((X _)::x' , _) -> assert false
 			| (P::x', y') -> aux (P::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
-		reduce {
+		{
 			neg		= blockC.neg <> blockc.neg;
 			shift	= blockc.shift;
 			sub		= sub;
@@ -328,14 +358,20 @@ let compose_block blockC blockc =
 			| (S::x', y::y') -> aux ((match y with X(b, i) -> X(b, i+blockc_dec) | _ -> y)::carry) (x', y')
 			| (S::_, []) -> assert false
 			| (x::x', y') -> aux (x::carry) (x', y') in aux [] (blockC.sub, blockc.sub)) in
-		reduce {
+		{
 			neg		= blockC_neg;
 			shift	= blockC_shift;
 			sub		= sub;
 		}
 	)
 
-let compose bC (bc, ic) = (compose_block bC bc, ic)
+let compose_block blockC blockc = compose_block' blockC blockc |> reduce
+
+(*let compose bC (bc, ic) = (compose_block bC bc, ic)*)
+
+let compose bC (bc, ic) = match ic with
+	| Utils.Leaf () -> (compose_block  bC bc, ic)
+	| Utils.Node _  -> (compose_block' bC bc, ic)
 
 let get_root b (block, _) = ({neg = b; shift = false; sub = List.map (fun _ -> P) block.sub}, Utils.Leaf())
 
