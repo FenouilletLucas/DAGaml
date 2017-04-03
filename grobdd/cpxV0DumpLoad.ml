@@ -21,7 +21,8 @@ let bindump_elem2 elem2 stream = match elem2 with
 		| S, S					-> true ::stream
 		| S, P					-> false::true::false ::stream
 		| P, S					-> false::true::true  ::stream
-		| P, P					-> false::false::false::false::false::false::stream
+(*		| P, P					-> false::false::false::false::false::false::stream *)
+		| P, P					-> assert false
 		| S, X(b, i)			-> false::false::true ::false::b::(BinDump.int i stream)
 		| X(b, i), S			-> false::false::true ::true ::b::(BinDump.int i stream)
 		| P, X(b, i)			-> false::false::false::true ::false::b::(BinDump.int i stream)

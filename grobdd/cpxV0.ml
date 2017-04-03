@@ -541,7 +541,23 @@ struct
 	let solver gid x y = match CpxV0Gops.node_push_xor gid (x, y) with
 		| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
 		| Utils.MNode (r, (c, x, y)) -> Utils.M3Node (r, (c, (None, x), (None, y)))
-	
+(*		CpxV0Types.(
+			let return () = Utils.M3Node (r, (c, (None, x), (None, y))) in
+			if List.length c.subXY >= 1
+			then match c.subXY with
+			| [] -> assert false
+			| (X(b, 0), X(b', 0))::subXY when b <> b' ->
+			(
+				let ex, ey = CpxV0Utils.block_split {negX = c.negX <> c.negY <> c.shiftY; negY = c.negY <> c.negX <> c.shiftX; shiftX = x.shiftX; shiftY = c.shiftY; subXY } in
+				let x = (CpxV0Utils.reduce ex, (None, x))
+				and y = (CpxV0Utils.reduce ey, (None, y)) in
+				Utils.M3Cons (r, Tools.cswap b (y, x))
+			)
+			| _ -> result()
+			else (result())
+		)
+*)
+
 	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
 
 	let solver' gid c x' y' =

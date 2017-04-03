@@ -784,6 +784,11 @@ let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
 		| Utils.M3Edge (e, (ope, i)) -> Utils.M3Edge (reduce' e, (ope, i))
 		| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
 		| Utils.M3Node (e, (exy, (opex, ix), (opey, iy))) ->
+			let sub, subXY = List.split(List.map(function(P, P) -> P, None | (x, y) -> S, Some(x, y))exy.subXY) in
+			let subXY = MyList.list_of_oplist subXY in
+			let e = compose_block' e {neg = false; shift = false; sub}
+			and exy = {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY} in
+			assert(not(List.exists (function(P, P) -> true | _ -> false) exy.subXY));
 			if (opex = None) && (opey = None)
 			then
 			(
@@ -803,10 +808,40 @@ let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
 				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ey, iy) else (ex, ix)) in (edge, (None, gtree)))
 				| None -> match block_is_const ey with
 				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ex, ix) else (ey, iy)) in (edge, (None, gtree)))
-				| None -> Utils.M3Node (e, (if (ex, ix) < (ey, iy) then (block_merge ex ey, (None, ix), (None, iy)) else (block_merge ey ex, (None, iy), (None, ix))))
+				| None ->
+				(
+					let return () = Utils.M3Node (e, (if (ex, ix) < (ey, iy) then (block_merge ex ey, (None, ix), (None, iy)) else (block_merge ey ex, (None, iy), (None, ix)))) in
+					assert(List.length ex.sub = List.length ey.sub);
+					assert(List.length ex.sub >= 1);
+					if (ex.neg <> ex.shift) && (ey.neg <> ex.shift)
+					then match ex.sub, ey.sub with
+						| X(b, 0)::subX, X(b', 0)::subY when b <> b' ->
+						(
+							let x = (reduce {neg = ex.neg; shift = ex.shift; sub = subX}, (None, ix))
+							and y = (reduce {neg = ey.neg; shift = ey.shift; sub = subY}, (None, iy)) in
+							Utils.M3Cons (e, (Tools.cswap b (y, x)))
+						)
+						| _ -> return()
+					else return()
+				)
 			)
 			else
 			(
+				let return () = Utils.M3Node (e, (exy, (opex, ix), (opey, iy))) in
+				if (List.length exy.subXY >= 1) && (exy.negX <> exy.shiftX) && (exy.negY <> exy.shiftY)
+				then match exy.subXY with
+					| [] -> assert false
+					| (X(b, 0), X(b', 0))::subXY when b <> b' ->
+					(
+						let ex, ey = CpxV0Utils.block_split {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY } in
+						let x = (reduce {neg = ex.neg; shift = ex.shift; sub = ex.sub}, (opex, ix))
+						and y = (reduce {neg = ey.neg; shift = ey.shift; sub = ey.sub}, (opey, iy)) in
+						Utils.M3Cons (e, (Tools.cswap b (y, x)))
+					)
+					| _ -> return()
+				else return()
+			)
+			(*(
 				(*print_string "[PROPA] solve_ande_0"; print_newline();
 				let ex, ey = block_split exy in
 				print_string "\te: "; print_string(CpxDL.block_dummydump e); print_newline();
@@ -815,7 +850,7 @@ let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
 				print_string "\tsetX:"; print_string (assign_dummydump opex); print_newline();
 				print_string "\tsetY:"; print_string (assign_dummydump opey); print_newline();*)
 				Utils.M3Node (e, (exy, (opex, ix), (opey, iy)))
-			)
+			)*)
 	)
 
 

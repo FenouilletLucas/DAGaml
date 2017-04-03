@@ -1,6 +1,5 @@
 import sys
 def onefile(NAME):
-	print(NAME)
 	FILE = open(NAME, 'r')
 	TEXT = FILE.read().split('\n')
 	FILE.close()
