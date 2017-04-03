@@ -572,7 +572,8 @@ struct
 			and pull_node = function
 				| Utils.Leaf _		-> assert false
 				| Utils.Node node	-> pull_node man node in
-			let rec	read (set:D0.eval) (gtree:G.tree) = apply_eval (fun (set, gtree) -> match D0.read set with
+			let rec	read (set:D0.eval) (gtree:G.tree) =
+				apply_eval (fun (set, gtree) -> match D0.read set with
 				| Utils.MStop () -> assert false
 				| Utils.Go0 set ->
 				(
@@ -606,11 +607,16 @@ struct
 				| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> ((D0.compose residual (propa compact nodeX nodeY)):edge)
 			and		propa compact (opevaX, gtreeX) (opevaY, gtreeY) = 
 				if opevaX = None && opevaY = None
-				then (apply calc (compact, gtreeX, gtreeY))
+				then
+				(
+(*					print_string "{SUBDAG.IBOP_EVAL} opevax = None && opevay = None"; print_newline();*)
+					apply calc (compact, gtreeX, gtreeY)
+				)
 				else
 				(
+(*					print_string "{SUBDAG.IBOP_EVAL} not(opevax = None && opevay = None)"; print_newline();*)
 					let edgeX = match opevaX with None -> Utils.MNode gtreeX | Some set -> Utils.MEdge (read set gtreeX)
-					and edgeY = match opevaY with None -> Utils.MNode gtreeX | Some set -> Utils.MEdge (read set gtreeY) in
+					and edgeY = match opevaY with None -> Utils.MNode gtreeY | Some set -> Utils.MEdge (read set gtreeY) in
 					match D0.solver' G.get_ident compact edgeX edgeY with
 					| Utils.M3Edge eog -> eval_eog eog
 					| Utils.M3Cons (edge, (eogX, eogY)) -> compose edge (push (eval_eog eogX) (eval_eog eogY))

@@ -21,14 +21,14 @@ let bindump_elem2 elem2 stream = match elem2 with
 		| S, S					-> true ::stream
 		| S, P					-> false::true::false ::stream
 		| P, S					-> false::true::true  ::stream
-		| P, P					-> assert false
+		| P, P					-> false::false::false::false::false::false::stream
 		| S, X(b, i)			-> false::false::true ::false::b::(BinDump.int i stream)
 		| X(b, i), S			-> false::false::true ::true ::b::(BinDump.int i stream)
 		| P, X(b, i)			-> false::false::false::true ::false::b::(BinDump.int i stream)
 		| X(b, i), P			-> false::false::false::true ::true ::b::(BinDump.int i stream)
 		| X(b, i), X(b', i')	-> false::false::false::false::true ::b::b'::(BinDump.int i (BinDump.int i' stream))
 	)
-	| None						-> false::false::false::false::false::stream
+	| None						-> false::false::false::false::false::true ::stream
 
 let binload_elem = function
 	| true::stream -> Some S, stream
@@ -57,7 +57,8 @@ let binload_elem2 = function
 		let i, stream = BinLoad.int stream in
 		let i', stream = BinLoad.int stream in
 		Some(X(b, i), X(b', i')), stream
-	| false::false::false::false::false::stream -> None, stream
+	| false::false::false::false::false::true ::stream -> None, stream
+	| false::false::false::false::false::false::stream -> Some(P, P), stream
 	| _ -> assert false
 
 
@@ -76,13 +77,16 @@ let binload_edge stream =
 	assert(stream = []);
 	x
 
-let block_dummydump block =
-	(if block.neg then "-" else "+")^
-	(if block.shift then "-" else "+")^"["^
-	(StrUtil.catmap ", " (function
+let sub_dummydump sub = "["^(StrUtil.catmap ", " (function
 		| S -> "S"
 		| P -> "P"
-		| X(b, i) -> "X("^(if b then "1" else "0")^", "^(string_of_int i)^")") block.sub)^" ]"
+		| X(b, i) -> "X("^(if b then "1" else "0")^", "^(string_of_int i)^")") sub)^" ]"
+
+let block_dummydump block =
+	(GUtils.mp_of_bool block.neg)^(GUtils.mp_of_bool block.shift)^(sub_dummydump block.sub)
+
+let edge_dummydump (block, gtree) = "( "^(block_dummydump block)^", "^(match gtree with Utils.Leaf () -> "Leaf" | Utils.Node _ -> "Node")^" )"
+
 
 
 let bindump_block2 block stream =

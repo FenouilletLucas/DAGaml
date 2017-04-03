@@ -79,6 +79,7 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	);
 	)) |> Iter.iter ignore;;
 print_newline();;
+
 print_string "TEST 4.0 : partial evaluation is consistant"; print_newline();;
 
 let gen_assign n = (Iter.of_list [None; Some false; Some true]) $^ n;;

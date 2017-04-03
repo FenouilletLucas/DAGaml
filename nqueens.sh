@@ -1,4 +1,4 @@
-for i in $(seq 1 8)
+for i in $(seq 2 8)
 do
 	echo "starting $i-queen(s)"
 	echo "  -> generation of $i-tcqueens.cp.tacx"

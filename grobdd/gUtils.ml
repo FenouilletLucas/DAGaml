@@ -3,6 +3,14 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
+open CpTypes
+
+let mp_of_bool = function
+	| true	-> "-"
+	| false	-> "+"
+let mp_char_of_bool = function
+	| true	-> '-'
+	| false -> '+'
 let pm_of_bool = function
 	| true	-> "+"
 	| false	-> "-"

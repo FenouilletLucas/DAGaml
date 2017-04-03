@@ -636,3 +636,190 @@ let assign = function
 		match opmin with
 		| None -> ((contiguify ({neg = block.neg; shift = block.shift; sub = sub}, ident)), (if List.for_all ((=)None) set then None else (Some set)))
 		| Some min -> ((contiguify ({neg = block.neg <> block.shift <> (mod2 min); shift = (mod2 min); sub = List.map (function S | P -> P | X(_, i) when i >= min -> P | (X _) as x -> x) sub}, Utils.Leaf())), None)
+
+
+let assign_dummydump = function
+	| None -> "None"
+	| Some set -> "["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) set)^"]"
+
+
+
+let solve_ande_P2 (ex, ix) (ey, iy) =
+	let sub, subXY = consensus(function
+		| (P, P) -> P, None
+		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
+	Utils.M3Node (
+		{
+			neg = false;
+			shift = false;
+			sub;
+		},
+		(
+			{
+				negX = ex.neg;
+				negY = ey.neg;
+				shiftX = ex.shift;
+				shiftY = ey.shift;
+				subXY;
+			},
+			(None, ix),
+			(None, iy)
+		)
+	)
+
+let solve_ande_P2X2_11 (ex, ix) (ey, iy) =
+	(*print_string "solve_ande_P2PX2_11"; print_newline();*)
+	let sub, subXY = consensus(function
+		| P, P -> P, None
+		| X(b, 0), X(b', 0) when b = b' -> X(b, 0), None
+		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
+	Utils.M3Node (
+		{
+			neg = false;
+			shift = true;
+			sub;
+		},
+		(
+			{
+				negX = ex.neg;
+				negY = ey.neg;
+				shiftX = ex.shift;
+				shiftY = ey.shift;
+				subXY;
+			},
+			(None, ix),
+			(None, iy)
+		)
+	)
+
+exception Return_False
+
+let solve_ande_P2X2 bX bY (ex, ix) (ey, iy) =
+	if (not bX) && (not bY)
+	then ( solve_ande_P2X2_11 (ex, ix) (ey, iy) )
+	else try
+	(
+		(*print_string "solve_ande_P2PX2"; print_newline();
+		print_string "\tbX: "; print_string(StrUtil.string_of_bool bX); print_newline();
+		print_string "\tbY: "; print_string(StrUtil.string_of_bool bY); print_newline();*)
+		let sub, setsubXsetsubY = List.split(List.map(function
+			| P, P -> P, (None, None)
+			| X(b, 0), X(b', 0) when bX && bY -> if b = b' then (X(b, 0), (None, None)) else (raise Return_False) 
+			| X(b, 0), y		when bX -> X(b, 0), (None, Some(Some(not b), y))
+			| x, X(b, 0)		when bY -> X(b, 0), (Some(Some(not b), x), None)
+			| x, y				-> S, (Some(None, x), Some(None, y))
+		) (List.combine ex.sub ey.sub)) in
+		let setsubX, setsubY = List.split setsubXsetsubY in
+		let setX, subX = List.split(MyList.list_of_oplist setsubX)
+		and setY, subY = List.split(MyList.list_of_oplist setsubY) in
+		let subX = if bX then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subX) else subX
+		and subY = if bY then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subY) else subY in
+		let ex = {neg = ex.neg; shift = ex.shift<>bX; sub = subX}
+		and ey = {neg = ey.neg; shift = ey.shift<>bY; sub = subY} in
+		(*print_string "[0] solve_ande_P2X2"; print_newline();
+		print_string "\tex: "; print_string(CpxDL.block_dummydump ex); print_newline();
+		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();
+		print_string "\tsetX:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setX)^"]"); print_newline();
+		print_string "\tsetY:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setY)^"]"); print_newline();*)
+		let (ex, ix), setX = assign (Some setX) (ex, ix)
+		and (ey, iy), setY = assign (Some setY) (ey, iy) in
+		(*print_string "[1] solve_ande_P2X2"; print_newline();
+		print_string "\tex: "; print_string(CpxDL.block_dummydump ex); print_newline();
+		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();*)
+
+		Utils.M3Node (
+			{
+				neg = false;
+				shift = false;
+				sub;
+			},
+			(
+				{
+					negX = ex.neg;
+					negY = ey.neg;
+					shiftX = ex.shift;
+					shiftY = ey.shift;
+					subXY = List.combine ex.sub ey.sub;
+				},
+				(setX, ix),
+				(setY, iy)
+			)
+		)
+	)
+	with Return_False -> ( let edge, gtree = get_root false (ex, ix) in Utils.M3Edge (edge, (None, gtree)) )
+
+let solve_ande_0 ((blockX, ix) as x) ((blockY, iy) as y) =
+	(*print_string "solve_ande_0"; print_newline();
+	print_string "\tblockX: "; print_string(CpxDL.edge_dummydump (blockX, ix)); print_newline();
+	print_string "\tblockY: "; print_string(CpxDL.edge_dummydump (blockY, iy)); print_newline();*)
+	let _, maxXX = classify blockX
+	and _, maxXY = classify blockY in
+	if (maxXX = None) && (maxXY = None)
+	then ( solve_ande_P2 x y )
+	else
+	(
+		let tx = blockX.neg <> blockX.shift
+		and ty = blockY.neg <> blockY.shift in
+		solve_ande_P2X2 (not tx) (not ty) x y
+	)
+
+let compose blockC (blockc, e) =
+	(*print_string "compose: "; print_newline();
+	print_string "\tblockC: "; print_string(CpxDL.block_dummydump blockC); print_newline();
+	print_string "\tblockc: "; print_string(CpxDL.edge_dummydump (blockc, e)); print_newline();*)
+	let edge = compose blockC (blockc, e) in
+	(*print_string "\tblockCc: "; print_string(CpxDL.edge_dummydump edge); print_newline();*)
+	edge
+
+let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
+	match node_is_const x with
+	| Some b -> Utils.M3Edge ( let edge, gtree = if b then y else x in (edge, (None, gtree)))
+	| None -> match node_is_const y with
+	| Some b -> Utils.M3Edge ( let edge, gtree = if b then x else y in (edge, (None, gtree)))
+	| None ->
+	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
+	then Utils.M3Edge (let edge, gtree = if ex.neg = ey.neg then x (* = y *) else get_root false x in (edge, (None, gtree)))
+	else
+	( match solve_ande_0 x y with
+		| Utils.M3Edge (e, (ope, i)) -> Utils.M3Edge (reduce' e, (ope, i))
+		| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
+		| Utils.M3Node (e, (exy, (opex, ix), (opey, iy))) ->
+			if (opex = None) && (opey = None)
+			then
+			(
+				let ex, ey = block_split exy in
+				(*print_string "[POST] solve_ande_0"; print_newline();
+				print_string "e: "; print_string(CpxDL.block_dummydump e); print_newline();
+				print_string "ex: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
+				print_string "ey: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();*)
+				let e = reduce' e in
+				let ex = reduce ex
+				and ey = reduce ey in
+				(*print_string "[POST] solve_ande_0"; print_newline();
+				print_string "e: "; print_string(CpxDL.block_dummydump e); print_newline();
+				print_string "blockX: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
+				print_string "blockY: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();*)
+				match block_is_const ex with
+				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ey, iy) else (ex, ix)) in (edge, (None, gtree)))
+				| None -> match block_is_const ey with
+				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ex, ix) else (ey, iy)) in (edge, (None, gtree)))
+				| None -> Utils.M3Node (e, (if (ex, ix) < (ey, iy) then (block_merge ex ey, (None, ix), (None, iy)) else (block_merge ey ex, (None, iy), (None, ix))))
+			)
+			else
+			(
+				(*print_string "[PROPA] solve_ande_0"; print_newline();
+				let ex, ey = block_split exy in
+				print_string "\te: "; print_string(CpxDL.block_dummydump e); print_newline();
+				print_string "\tex: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
+				print_string "\tey: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();
+				print_string "\tsetX:"; print_string (assign_dummydump opex); print_newline();
+				print_string "\tsetY:"; print_string (assign_dummydump opey); print_newline();*)
+				Utils.M3Node (e, (exy, (opex, ix), (opey, iy)))
+			)
+	)
+
+
+let node_push_ande gid (x, y) = match solve_ande gid x y with
+	| Utils.M3Edge e -> Utils.M3Edge e
+	| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
+	| Utils.M3Node (e, (block, x, y)) -> Utils.M3Node (e, (CpxDL.bindump_node block, x, y))

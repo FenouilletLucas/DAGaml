@@ -492,9 +492,7 @@ struct
 	type residual = CpxV0Types.edge_state
 	type eval = bool option list
 
-	let solver gid x y = match CpxV0Gops.node_push_and gid (x, y) with
-		| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
-		| Utils.MNode (r, (c, x, y)) -> Utils.M3Node (r, (c, (None, x), (None, y)))
+	let solver gid x y = CpxV0Gops.node_push_ande gid (x, y)
 	
 	let decomp x y c = (CpxV0DumpLoad.binload_node c, x, y) |> CpxV0Utils.node_split
 
@@ -502,11 +500,23 @@ struct
 		let x, y = CpxV0DumpLoad.binload_node c |> CpxV0Utils.block_split in
 		let x = match x' with
 			| Utils.MNode gtree -> CpxV0Utils.node_reduce (x, gtree)
-			| Utils.MEdge edge  -> CpxV0Utils.compose x edge
+			| Utils.MEdge edge  ->
+			(
+				(*print_string "x' = MEdge edge -> edge: "; print_string(CpxV0DumpLoad.edge_dummydump edge); print_newline();*)
+				CpxV0Utils.compose x edge
+			)
 		and y = match y' with
 			| Utils.MNode gtree -> CpxV0Utils.node_reduce (y, gtree)
-			| Utils.MEdge edge  -> CpxV0Utils.compose y edge
-		in solver gid x y
+			| Utils.MEdge edge  ->
+			(
+				(*print_string "y' = MEdge edge -> edge: "; print_string(CpxV0DumpLoad.edge_dummydump edge); print_newline();*)
+				CpxV0Utils.compose y edge
+			)
+		in
+		(*print_string "[0] solver'"; print_newline();
+		print_string "\tex: "; print_string(CpxV0DumpLoad.edge_dummydump x); print_newline();
+		print_string "\tey: "; print_string(CpxV0DumpLoad.edge_dummydump y); print_newline();*)
+		solver gid x y
 	
 	let eval set (ex, ix) =
 		let (ex, ix), set = CpxV0Gops.assign (Some set) (ex, ix) in
@@ -559,3 +569,52 @@ struct
 end;;
 module ANDE = GroBdd.IBOP_EVAL(AND_ME)
 module XORE = GroBdd.IBOP_EVAL(XOR_ME)
+
+module EVALE =
+struct
+	module EVAL_VISITOR =
+	struct
+		type xnode = GroBdd.edge
+		type xedge = GroBdd.edge
+		type cons = xedge -> xedge -> xedge
+		type extra = cons * cons * cons (* (a, c, x) *)
+
+		let do_leaf _ () = default_leaf
+		let do_node (a, c, x) = Extra.(CpxV0DumpLoad.binload_tacx >> CpxV0Utils.tacx_split >> (fun (tag, edgeX, edgeY) ->
+			let merge = NniTypes.(match tag with CpTypes.And -> a | CpTypes.Cons -> c | CpTypes.Xor -> x) in
+			Utils.MNode (fun nodeX nodeY -> merge (CpxV0Utils.compose edgeX nodeX) (CpxV0Utils.compose edgeY nodeY))))
+		let do_edge _ = CpxV0Utils.compose
+	end
+
+	module EVAL = TACX.NODE_VISITOR(EVAL_VISITOR)
+
+	type manager = {
+		grobdd : GroBdd.manager;
+		andman : ANDE.manager;
+		xorman : XORE.manager;
+		theman : EVAL.manager;
+		calc   : TACX.edge -> GroBdd.edge
+	}
+
+	let newman tacx man =
+		let c = GroBdd.push man in
+		let aman, a = ANDE.newman man
+		and xman, x = XORE.newman man in
+		let theman, calc = EVAL.newman tacx (a, c, x) in
+		{
+			grobdd = man;
+			andman = aman;
+			xorman = xman;
+			theman = theman;
+			calc = calc
+		}, List.map calc
+	
+	let dump_stat man = Tree.Node [
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
+		Tree.Node [Tree.Leaf "andman:"; ANDE.dump_stat man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XORE.dump_stat man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	]
+
+
+end
