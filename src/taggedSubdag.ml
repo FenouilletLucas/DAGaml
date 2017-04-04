@@ -12,7 +12,7 @@ module type MODELE = sig
 	val pull : ('t -> 'i) -> 't e -> (tag, 't e, 't n) Utils.unmerge_tagged
 
 	val pull_node : ('t -> 'i) -> 't n -> tag * 't e * 't e
-	val compose : ('t -> 'i) -> edge -> 't e -> 't e	
+	val compose : edge -> 't e -> 't e	
 	
 	val dump_leaf : (leaf -> StrTree.tree) option
 	val load_leaf : (StrTree.tree -> 't e) option
@@ -91,7 +91,7 @@ struct
 			| Utils.Leaf _ -> assert false
 			| Utils.Node p -> f(G.pull man p)
 
-	let compose = M.compose G.get_ident
+	let compose = M.compose
 
 	let dump_stat = G.dump_stat
 	
@@ -317,5 +317,68 @@ struct
 	let load man dump_man =
 		let man, calc = LOAD.newman dump_man man in
 		List.map calc
+	
+	module type MODELE_IUOP =
+	sig
+		type eval
+
+		val eval : eval -> edge -> (
+			edge,
+			M.edge * (eval * G.pnode)
+		) Utils.merge
+		val read : eval -> M.tag -> (
+			edge,				(* MStop *)
+			eval,				(*  Go0  *)
+			eval,				(*  Go1  *)
+			M.tag * eval * eval	(* MPull *)
+		) Utils.binpull
+	end
+
+	module IUOP(D0:MODELE_IUOP) =
+	struct
+		type memo = {
+			man     : manager;
+			calc    : D0.eval -> edge -> edge;
+			memo    : (D0.eval * G.pnode, edge) MemoTable.t;
+		}
+
+		type manager = memo
+		
+		let makeman man extra hsize=
+			let memo, apply = MemoTable.make hsize in
+			let rec calcrec mess edge = match D0.eval mess edge with
+				| Utils.MEdge edge -> edge
+				| Utils.MNode (medge, (mess, node)) -> compose medge (apply calc (mess, node))
+			and		calc (mess, node) =
+				let tag, edgeX, edgeY = pull_node man node in
+				match D0.read mess tag with
+				| Utils.MStop edge -> edge
+				| Utils.Go0 eval -> calcrec eval edgeX
+				| Utils.Go1 eval -> calcrec eval edgeY
+				| Utils.MPull (tag, messX, messY) -> push man tag (calcrec messX edgeX) (calcrec messY edgeY)
+			in
+			({
+				man  = man;
+				calc = calcrec;
+				memo = memo;
+			}, calcrec)
+
+		let newman man extra = makeman man extra 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+		]
+		
+	end
+	
+(*
+	module type MODELE_IUOP_EVAL =
+	sig
+	end
+
+	module IUOP_EVAL(D0:MODELE_IUOP_EVAL) =
+	struct
+	end
+*)
 
 end

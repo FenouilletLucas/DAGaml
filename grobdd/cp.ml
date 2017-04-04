@@ -148,7 +148,7 @@ struct
 
 	let push = CpGops.tacx_push
 	let pull = CpGops.tacx_pull
-	let compose _ = CpGops.compose
+	let compose = CpGops.compose
 	
 	let pull_node = CpGops.tacx_pull_node
 	

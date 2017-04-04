@@ -142,7 +142,7 @@ struct
 
 	let push = CpxGops.tacx_push
 	let pull = CpxGops.tacx_pull
-	let compose _ = CpxUtils.compose
+	let compose = CpxUtils.compose
 	
 	let pull_node = CpxGops.tacx_pull_node
 	
@@ -182,7 +182,10 @@ and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
 
 module EVAL =
 struct
-	module EVAL_VISITOR =
+	module EVAL_VISITOR : TACX.MODELE_NODE_VISITOR with
+			type xnode = GroBdd.edge
+		and type xedge = GroBdd.edge
+		and type extra = (GroBdd.edge -> GroBdd.edge -> GroBdd.edge) * (GroBdd.edge -> GroBdd.edge -> GroBdd.edge) * (GroBdd.edge -> GroBdd.edge -> GroBdd.edge) =
 	struct
 		type xnode = GroBdd.edge
 		type xedge = GroBdd.edge
@@ -632,5 +635,35 @@ struct
 		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
 	]
 
+
+end
+
+module TacxPartEval =
+struct
+	module Eval_VISITOR : TACX.MODELE_IUOP with
+			type eval = bool option list
+	=
+	struct
+		type eval = bool option list
+
+		let eval pars (ex, ix) =
+			let (ex, ix), pars = CpxGops.assign (Some pars) (ex, ix) in
+			match pars with
+			| None -> Utils.MEdge(ex, ix)
+			| Some pars -> match ix with
+				| Utils.Leaf () -> assert false
+				| Utils.Node node -> Utils.MNode(ex, (pars, node))
+		let read mess = function
+			| CpTypes.And -> Utils.MPull (CpTypes.And, mess, mess)
+			| CpTypes.Xor -> Utils.MPull (CpTypes.Xor, mess, mess)
+			| CpTypes.Cons -> match mess with
+				| [] -> assert false
+				| head::tail -> match head with
+					| None -> Utils.MPull (CpTypes.Cons, mess, mess)
+					| Some false -> Utils.Go0 mess
+					| Some true  -> Utils.Go1 mess
+	end
+
+	include TACX.IUOP(Eval_VISITOR)
 
 end

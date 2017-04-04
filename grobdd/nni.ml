@@ -156,7 +156,7 @@ struct
 
 	let push = NniGops.tacx_push
 	let pull = NniGops.tacx_pull
-	let compose _ = NniGops.compose
+	let compose = NniGops.compose
 	
 	let pull_node = NniGops.tacx_pull_node
 	
