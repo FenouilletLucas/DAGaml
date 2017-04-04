@@ -1,4 +1,4 @@
-module T = CpxV0;;
+module T = Cpx;;
 
 let file = Sys.argv.(1) in
 let tacx, edges = T.TACX.loadfile file in

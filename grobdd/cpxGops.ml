@@ -3,10 +3,10 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
-open CpxV0Types
-open CpxV0Utils
+open CpxTypes
+open CpxUtils
 
-module CpxDL = CpxV0DumpLoad
+module CpxDL = CpxDumpLoad
 
 let consensus f x y =
 	let xy, xy' = List.split(List.map f (List.combine x y)) in
@@ -833,7 +833,7 @@ let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
 					| [] -> assert false
 					| (X(b, 0), X(b', 0))::subXY when b <> b' ->
 					(
-						let ex, ey = CpxV0Utils.block_split {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY } in
+						let ex, ey = CpxUtils.block_split {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY } in
 						let x = (reduce {neg = ex.neg; shift = ex.shift; sub = ex.sub}, (opex, ix))
 						and y = (reduce {neg = ey.neg; shift = ey.shift; sub = ey.sub}, (opey, iy)) in
 						Utils.M3Cons (e, (Tools.cswap b (y, x)))

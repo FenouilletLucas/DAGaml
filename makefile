@@ -33,23 +33,32 @@ tests:
 
 full:
 	$(OB) \
-		bitv/bitv.native \
+		grobdd/cpTypes.native \
 		grobdd/cpGops.native \
 		grobdd/cp.native \
+		bitv/bitv.native \
+		grobdd/nniTypes.native \
 		grobdd/bsev.native \
 		grobdd/bsevTest.native \
 		grobdd/nniGops.native \
 		grobdd/nni.native \
+		grobdd/cpxTypes.native \
+		grobdd/cpxUtils.native \
+		grobdd/cpxDumpLoad.native \
+		grobdd/cpxGops.native \
+		grobdd/cpx.native
+
+
 
 
 extra:
 	$(OB) \
 		grobdd/oops.native \
 		grobdd/myUint.native \
-		grobdd/cpxV0Gops.native \
-		grobdd/cpxV0GopsTest.native \
-		grobdd/cpxV0GopsTest.d.byte \
-		grobdd/cpxV0.native \
+		grobdd/cpxGops.native \
+		grobdd/cpxGopsTest.native \
+		grobdd/cpxGopsTest.d.byte \
+		grobdd/cpx.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_noreg_cpx_cons.d.byte \

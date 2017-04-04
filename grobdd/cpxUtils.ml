@@ -3,7 +3,7 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
-open CpxV0Types
+open CpxTypes
 
 let block_split block =
 	let subX, subY = List.split block.subXY in

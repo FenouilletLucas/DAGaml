@@ -15,8 +15,8 @@ let stredges = match Sys.argv.(1) with
 )
 | "--cpx" ->
 (
-	let pure, edges = CpxV0.GroBdd.loadfile file_in in
-	CpxV0.GroBdd.to_dot pure strman edges
+	let pure, edges = Cpx.GroBdd.loadfile file_in in
+	Cpx.GroBdd.to_dot pure strman edges
 )
 | _ -> assert false
 in

@@ -5,19 +5,19 @@ let n = (int_of_string Sys.argv.(1));;
 let file = Sys.argv.(2);;
 let err_file = Sys.argv.(3);;
 
-module T = CpxV0.GroBdd;;
+module T = Cpx.GroBdd;;
 
 let man = T.newman ();;
 
 let ( *! ) = T.push man;;
 
-let and_man, ( &! ) = CpxV0.AND.newman man;;
-let xor_man, ( ^! ) = CpxV0.XOR.newman man;;
+let and_man, ( &! ) = Cpx.AND.newman man;;
+let xor_man, ( ^! ) = Cpx.XOR.newman man;;
 
-let ande_man, ( &@ ) = CpxV0.ANDE.newman man;;
-let xore_man, ( ^@ ) = CpxV0.XORE.newman man;;
+let ande_man, ( &@ ) = Cpx.ANDE.newman man;;
+let xore_man, ( ^@ ) = Cpx.XORE.newman man;;
 
-let make_bool b = CpxV0.make_const b 0;;
+let make_bool b = Cpx.make_const b 0;;
 
 let gen_bnb =
 	let gen_bool = Iter.gen_bool $$ make_bool in
@@ -38,7 +38,7 @@ let gn2 = gn $* gn;;
 let gn22 = gn2 $* gn2;;
 
 print_string "TEST 1.0 : cons is reversible"; print_newline();;
-CpxV0.GroBdd.dumpfile man (gn |> Iter.enumerate 0 $$ (count "T:1.0 : " 10000 (fun x -> x)) |> Iter.to_list) file;;
+Cpx.GroBdd.dumpfile man (gn |> Iter.enumerate 0 $$ (count "T:1.0 : " 10000 (fun x -> x)) |> Iter.to_list) file;;
 print_newline();;
 
 
@@ -72,9 +72,9 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	(
 		let edges = [x0; x1; y0; y1; x01; y01; xy0; xy1; calcX; calcY] in
 		(*let strman = Udag.String.newman () in
-		let stredges = CpxV0.GroBdd.to_dot man strman edges in
+		let stredges = Cpx.GroBdd.to_dot man strman edges in
 		Udag.String.to_dot_file strman stredges err_file;*)
-		ignore(CpxV0.GroBdd.dumpfile man edges err_file);
+		ignore(Cpx.GroBdd.dumpfile man edges err_file);
 		assert false;
 	);
 	)) |> Iter.iter ignore;;
@@ -84,7 +84,7 @@ print_string "TEST 4.0 : partial evaluation is consistant"; print_newline();;
 
 let gen_assign n = (Iter.of_list [None; Some false; Some true]) $^ n;;
 
-let peman, peval = CpxV0.PartEval.newman man;;
+let peman, peval = Cpx.PartEval.newman man;;
 
 gn2 $* (gen_assign n) |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), set) ->
 	let x01 = x0 *! x1 in
@@ -130,9 +130,9 @@ gn22 |> Iter.enumerate 0 $$ (count "T:2.0 : " 10000 (fun ((x0, x1), (y0, y1)) ->
 	(
 		let edges = [x0; x1; y0; y1; x01; y01; xy0; xy1; calcX; calcY] in
 		(*let strman = Udag.String.newman () in
-		let stredges = CpxV0.GroBdd.to_dot man strman edges in
+		let stredges = Cpx.GroBdd.to_dot man strman edges in
 		Udag.String.to_dot_file strman stredges err_file;*)
-		ignore(CpxV0.GroBdd.dumpfile man edges err_file);
+		ignore(Cpx.GroBdd.dumpfile man edges err_file);
 		assert false;
 	);
 	)) |> Iter.iter ignore;;

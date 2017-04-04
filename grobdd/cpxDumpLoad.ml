@@ -3,8 +3,8 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
-open CpxV0Types
-open CpxV0Utils
+open CpxTypes
+open CpxUtils
 
 let bindump_elem elem stream = match elem with
 	| Some x ->
