@@ -371,6 +371,82 @@ struct
 		
 	end
 	
+	module type MODELE_IUOP2 =
+	sig
+		type eval
+
+		val eval : eval -> edge -> (
+			edge,
+			M.edge * (eval * G.pnode)
+		) Utils.merge
+		val read : eval -> M.tag -> (
+			edge,				(* MStop *)
+			eval,				(*  Go0  *)
+			eval,				(*  Go1  *)
+			M.tag * eval * eval	(* MPull *)
+		) Utils.binpull
+
+		val solver : (G.pnode -> G.ident) -> M.tag -> edge -> edge -> (
+			M.edge * (eval option * G.tree),
+			M.edge * (M.tag * (M.edge * (eval option * G.tree)) * (M.edge * (eval option * G.tree)))
+		) Utils.merge
+
+	end
+
+	module IUOP2(D0:MODELE_IUOP2) =
+	struct
+		type memo = {
+			man     : manager;
+			calc    : edge -> edge;
+			eval    : (D0.eval * G.pnode  , edge) MemoTable.t;
+			memo    : (M.tag * edge * edge, edge) MemoTable.t;
+		}
+
+		type manager = memo
+		
+		let makeman man hsize=
+			let memo, apply = MemoTable.make hsize in
+			let memo_eval, apply_eval = MemoTable.make hsize in
+			let rec eval_edge mess edge = match D0.eval mess edge with
+				| Utils.MEdge edge -> edge
+				| Utils.MNode (medge, (mess, node)) -> compose medge (apply_eval eval_node (mess, node))
+			and		eval_node (mess, node) =
+				let tag, edgeX, edgeY = pull_node man node in
+				match D0.read mess tag with
+				| Utils.MStop edge -> edge
+				| Utils.Go0 eval -> eval_edge eval edgeX
+				| Utils.Go1 eval -> eval_edge eval edgeY
+				| Utils.MPull (tag, messX, messY) -> solve_node (tag, (eval_edge messX edgeX), (eval_edge messY edgeY))
+			and		eval_eog (edge, (opset, gtree)) : edge = match opset with
+				| None -> (edge, gtree)
+				| Some set -> compose edge (match gtree with Utils.Leaf _ -> assert false | Utils.Node node -> (apply_eval eval_node (set, node)))
+			and		solve_node node : edge = apply (fun (tag, edgeX, edgeY) -> match D0.solver G.get_ident tag edgeX edgeY with
+				| Utils.MEdge eog -> eval_eog eog
+				| Utils.MNode (edge, (tag, (edgeX, (None, gtreeX)), (edgeY, (None, gtreeY)))) -> compose edge (push man tag (edgeX, gtreeX) (edgeY, gtreeY))
+				| Utils.MNode (edge, (tag, eogX, eogY)) -> compose edge (solve_node (tag, eval_eog eogX, eval_eog eogY))) node
+			in
+			let rec solve_pnode (pnode:G.pnode) =
+				let tag, edgeX, edgeY = pull_node man pnode in
+				solve_node (tag, solve_edge edgeX, solve_edge edgeY)
+			and		solve_edge (edge, gtree) : edge = match gtree with
+				| Utils.Leaf leaf -> (((edge:M.edge), Utils.Leaf leaf):edge)
+				| Utils.Node (node:G.pnode) -> compose (edge:M.edge) (solve_pnode node)
+			in
+			({
+				man  = man;
+				calc = solve_edge;
+				eval = memo_eval;
+				memo = memo;
+			}, solve_edge)
+
+		let newman man = makeman man 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+		]
+	end
+	
 (*
 	module type MODELE_IUOP_EVAL =
 	sig

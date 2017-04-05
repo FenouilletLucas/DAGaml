@@ -61,6 +61,7 @@ extra:
 		grobdd/cpx.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
+		test/test_propa_tacx_cpx.native \
 		test/test_noreg_cpx_cons.d.byte \
 		test/test_upgrade_tacx_cp_to_cpx.native \
 		test/test_eval_tacx_to_pure_cpx.native \

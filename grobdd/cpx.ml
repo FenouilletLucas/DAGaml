@@ -667,3 +667,36 @@ struct
 	include TACX.IUOP(Eval_VISITOR)
 
 end
+
+
+module TACX_PROPA_M : TACX.MODELE_IUOP2 with
+	type eval = bool option list
+=
+struct
+	type eval = bool option list
+
+	let eval pars (ex, ix) =
+		let (ex, ix), pars = CpxGops.assign (Some pars) (ex, ix) in
+		match pars with
+		| None -> Utils.MEdge(ex, ix)
+		| Some pars -> match ix with
+			| Utils.Leaf () -> assert false
+			| Utils.Node node -> Utils.MNode(ex, (pars, node))
+
+	let read mess = function
+		| CpTypes.And -> Utils.MPull (CpTypes.And, mess, mess)
+		| CpTypes.Xor -> Utils.MPull (CpTypes.Xor, mess, mess)
+		| CpTypes.Cons -> match mess with
+			| [] -> assert false
+			| head::tail -> match head with
+				| None -> Utils.MPull (CpTypes.Cons, mess, mess)
+				| Some false -> Utils.Go0 mess
+				| Some true  -> Utils.Go1 mess
+
+	type eog = TACX.M.edge * (eval option * TACX.G.tree)
+
+	let solver = CpxGops.tacx_propa
+
+end
+
+module TACX_PROPA = TACX.IUOP2(TACX_PROPA_M)

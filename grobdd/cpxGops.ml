@@ -546,6 +546,10 @@ let solve_xor getid ((ex, ix) as x) ((ey, iy) as y) =
 		else (block_merge ey ex, iy, ix)))
 	)
 
+let solve_xore gid x y = match solve_xor gid x y with
+	| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
+	| Utils.MNode (edge, (block, x, y)) -> Utils.M3Node (edge, (block, (None, x), (None, y)))
+
 
 let node_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
@@ -858,3 +862,34 @@ let node_push_ande gid (x, y) = match solve_ande gid x y with
 	| Utils.M3Edge e -> Utils.M3Edge e
 	| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
 	| Utils.M3Node (e, (block, x, y)) -> Utils.M3Node (e, (CpxDL.bindump_node block, x, y))
+
+let tacx_propa_cons gid x y = match solve_cons gid x y with
+	| Utils.MEdge (edge, gtree) -> Utils.MEdge (edge, (None, gtree))
+	| Utils.MNode (e, (block, gtreeX, gtreeY)) ->
+	(
+		let edgeX, edgeY = block_split block in
+		Utils.MNode (e, (CpTypes.Cons, (edgeX, (None, gtreeX)), (edgeY, (None, gtreeY))))
+	)
+
+let tacx_propa_and gid x y = match solve_ande gid x y with
+	| Utils.M3Edge e -> Utils.MEdge e
+	| Utils.M3Cons (e, (eogX, eogY)) -> Utils.MNode (e, (CpTypes.Cons, eogX, eogY))
+	| Utils.M3Node (e, (block, ogX, ogY)) ->
+	(
+		let edgeX, edgeY = block_split block in
+		Utils.MNode (e, (CpTypes.And, (edgeX, ogX), (edgeY, ogY)))
+	)
+
+let tacx_propa_xor gid x y = match solve_xore gid x y with
+	| Utils.M3Edge e -> Utils.MEdge e
+	| Utils.M3Cons (e, (eogX, eogY)) -> Utils.MNode (e, (CpTypes.Cons, eogX, eogY))
+	| Utils.M3Node (e, (block, ogX, ogY)) ->
+	(
+		let edgeX, edgeY = block_split block in
+		Utils.MNode (e, (CpTypes.Xor, (edgeX, ogX), (edgeY, ogY)))
+	)
+
+let tacx_propa gid = CpTypes.(function
+	| Cons -> tacx_propa_cons gid
+	| And  -> tacx_propa_and  gid
+	| Xor  -> tacx_propa_xor  gid)
