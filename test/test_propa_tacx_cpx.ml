@@ -12,4 +12,12 @@ StrTree.tree_print print_string [Cpx.TACX_PROPA.dump_stat pman];
 
 Cpx.TACX.dumpfile tacx edges file_out;
 
+if(Array.length Sys.argv > 3)
+then
+(
+    let strman = Udag.String.newman() in
+    let stredges = Cpx.TACX.to_dot tacx strman edges in
+    Udag.String.to_dot_file strman stredges Sys.argv.(3)
+);
+
 exit 0;

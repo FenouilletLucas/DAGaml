@@ -12,4 +12,12 @@ StrTree.tree_print print_string [Nni.TACX_OF_CP.dump_stat evaman];
 let file = Sys.argv.(2) in
 Nni.TACX.dumpfile tacx_nni edges file;
 
+if(Array.length Sys.argv > 3)
+then
+(
+    let strman = Udag.String.newman() in
+    let stredges = Nni.TACX.to_dot tacx_nni strman edges in
+    Udag.String.to_dot_file strman stredges Sys.argv.(3)
+);
+
 exit 0;
