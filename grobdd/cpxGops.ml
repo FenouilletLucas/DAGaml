@@ -699,6 +699,19 @@ let solve_ande_P2X2_11 (ex, ix) (ey, iy) =
 exception Return_False
 
 let solve_ande_P2X2 bX bY (ex, ix) (ey, iy) =
+	let bX, ex = if (bX = false) && (block_is_singleton ex)
+		then (true,(
+			assert(ex.shift = true);
+			{neg = not ex.neg; shift = true; sub = List.map (function X(b, i) -> assert(i = 0); X(not b, 0) | x -> x) ex.sub};
+		))
+		else (bX, ex)
+	and bY, ey = if (bY = false) && (block_is_singleton ey)
+		then (true,(
+			assert(ey.shift = true);
+			{neg = not ey.neg; shift = true; sub = List.map (function X(b, i) -> assert(i = 0); X(not b, 0) | x -> x) ey.sub};
+		))
+		else (bY, ey)
+	in
 	if (not bX) && (not bY)
 	then ( solve_ande_P2X2_11 (ex, ix) (ey, iy) )
 	else try
@@ -716,6 +729,8 @@ let solve_ande_P2X2 bX bY (ex, ix) (ey, iy) =
 		let setsubX, setsubY = List.split setsubXsetsubY in
 		let setX, subX = List.split(MyList.list_of_oplist setsubX)
 		and setY, subY = List.split(MyList.list_of_oplist setsubY) in
+		let setX = if List.for_all (function None -> true | _ -> false) setX then None else Some setX
+		and setY = if List.for_all (function None -> true | _ -> false) setY then None else Some setY in
 		let subX = if bX then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subX) else subX
 		and subY = if bY then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subY) else subY in
 		let ex = {neg = ex.neg; shift = ex.shift<>bX; sub = subX}
@@ -725,8 +740,8 @@ let solve_ande_P2X2 bX bY (ex, ix) (ey, iy) =
 		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();
 		print_string "\tsetX:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setX)^"]"); print_newline();
 		print_string "\tsetY:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setY)^"]"); print_newline();*)
-		let (ex, ix), setX = assign (Some setX) (ex, ix)
-		and (ey, iy), setY = assign (Some setY) (ey, iy) in
+		let (ex, ix), setX = assign setX (ex, ix)
+		and (ey, iy), setY = assign setY (ey, iy) in
 		(*print_string "[1] solve_ande_P2X2"; print_newline();
 		print_string "\tex: "; print_string(CpxDL.block_dummydump ex); print_newline();
 		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();*)

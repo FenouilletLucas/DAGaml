@@ -1,4 +1,4 @@
-for i in $(seq 2 9)
+for i in $(seq 2 8)
 do
     echo "starting $i-queen(s)"
     echo "  -> generation of $i-tcqueens.cp.tacx"
@@ -8,7 +8,7 @@ do
     echo "  -> generation of $i-tcqueens.cpx.tacx"
     ./test_upgrade_tacx_cp_to_cpx.native workdir/$i-tcqueens.cp.tacx workdir/$i-tcqueens.cpx.tacx &> workdir/$i-tcqueens.cp-to-cpx.log
     echo "  -> generation of $i-tcqueens.cp.pure"
-    #./pure_of_tacx.sh --cp workdir/$i-tcqueens.cp.tacx   --no-dot &> workdir/$i-tcqueens.solve-cp.log
+    ./pure_of_tacx.sh --cp workdir/$i-tcqueens.cp.tacx   --no-dot &> workdir/$i-tcqueens.solve-cp.log
     echo "  -> generation of $i-tcqueens.nni.pure"
     ./pure_of_tacx.sh --nni workdir/$i-tcqueens.nni.tacx --no-dot &> workdir/$i-tcqueens.solve-nni.log
     echo "  -> generation of $i-tcqueens.cpx.pure"
