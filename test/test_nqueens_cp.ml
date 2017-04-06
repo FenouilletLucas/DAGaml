@@ -76,7 +76,7 @@ print_string " s.";;
 print_newline();;
 
 
-let name = "workdir/"^(string_of_int n)^"-queens.cp.tacx"
+let name = "workdir/"^(string_of_int n)^"-nqueens.cp.tacx"
 
 let dump_man = Udag.StrTree.newman ();;
 let dump_queens = T.dump man dump_man [n_queens];;
