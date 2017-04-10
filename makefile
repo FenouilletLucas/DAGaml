@@ -62,12 +62,14 @@ extra:
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_propa_tacx_cpx.native \
+		test/test_propa_tacx_cpx.d.byte \
 		test/test_noreg_cpx_cons.d.byte \
 		test/test_upgrade_tacx_cp_to_cpx.native \
 		test/test_eval_tacx_to_pure_cpx.native \
 		test/test_bin_of_int.native \
 		test/test_roundup_tacx_cpx.native \
 		test/test_roundup_tacx_cpx.d.byte \
+		test/test_roundup1_tacx_cpx.native \
 
 extraephe:
 		$(OB) \

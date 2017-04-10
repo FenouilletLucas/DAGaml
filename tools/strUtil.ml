@@ -42,18 +42,29 @@ let implode l =
 
 let catmap s f l = String.concat s (Extra.(l ||> f))
 
-let index c s =
-	try	 Some (String.index s c)
+let index s c =
+	try               Some (String.index s c)
 	with Not_found -> None
 
-let split c s =
-	let rec aux s = match index c s with
-		| Some i ->	(
-			let l = String.sub s 0 i
-			and r = String.sub s (i+1) ((String.length s)-(i+1)) in
-			l::(aux r)
-					)
-		| None -> [s]
-	in aux s
+let index_from s i c =
+	try               Some(String.index_from s i c)
+	with Not_found -> None
+
+let split (c:char) (s:string) : string list =
+	let rec aux carry i =
+		if i >= String.length s then (List.rev carry) else (
+		match index_from s i c with
+			| Some j ->
+			(
+				let str = String.sub s i j in
+				aux (str::carry) (j+1)
+			)
+			| None ->
+			(
+				let str = String.sub s i (String.length s - 1) in
+				List.rev (str::carry)
+			)
+		)
+	in aux [] 0
 
 let ntimes s n = String.concat "" (MyList.ntimes s n)
