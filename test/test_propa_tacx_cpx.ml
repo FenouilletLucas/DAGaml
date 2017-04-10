@@ -4,9 +4,13 @@ assert(Array.length Sys.argv > 2);
 let file_in = Sys.argv.(1) in
 let file_out = Sys.argv.(2) in
 
+print_string "load tacx : start"; print_newline();
 let tacx, edges = Cpx.TACX.loadfile file_in in
+print_string "load tacx : done "; print_newline();
 let pman, propa = Cpx.TACX_PROPA.newman tacx in
+print_string "propa : start"; print_newline();
 let edges = List.map propa edges in
+print_string "propa : done"; print_newline();
 
 StrTree.tree_print print_string [Cpx.TACX_PROPA.dump_stat pman];
 

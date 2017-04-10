@@ -676,6 +676,7 @@ struct
 	type eval = bool option list
 
 	let eval pars (ex, ix) =
+		assert(List.length pars = CpxUtils.block_size ex);
 		let (ex, ix), pars = CpxGops.assign (Some pars) (ex, ix) in
 		match pars with
 		| None -> Utils.MEdge(ex, ix)
@@ -688,10 +689,10 @@ struct
 		| CpTypes.Xor -> Utils.MPull (CpTypes.Xor, mess, mess)
 		| CpTypes.Cons -> match mess with
 			| [] -> assert false
-			| head::tail -> match head with
-				| None -> Utils.MPull (CpTypes.Cons, mess, mess)
-				| Some false -> Utils.Go0 mess
-				| Some true  -> Utils.Go1 mess
+			| head::mess' -> match head with
+				| None -> Utils.MPull (CpTypes.Cons, mess', mess')
+				| Some false -> Utils.Go0 mess'
+				| Some true  -> Utils.Go1 mess'
 
 	type eog = TACX.M.edge * (eval option * TACX.G.tree)
 

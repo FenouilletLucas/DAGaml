@@ -40,7 +40,7 @@ let implode l =
 		| c :: l -> Bytes.set res i c; imp (i + 1) l
 	in imp 0 l
 
-let catmap s f l = String.concat s (List.map f l)
+let catmap s f l = String.concat s (Extra.(l ||> f))
 
 let index c s =
 	try	 Some (String.index s c)

@@ -398,8 +398,9 @@ struct
 		type memo = {
 			man     : manager;
 			calc    : edge -> edge;
-			eval    : (D0.eval * G.pnode  , edge) MemoTable.t;
-			memo    : (M.tag * edge * edge, edge) MemoTable.t;
+			eval    : D0.eval -> edge -> edge;
+			meval   : (D0.eval * G.pnode  , edge) MemoTable.t;
+			mcalc   : (M.tag * edge * edge, edge) MemoTable.t;
 		}
 
 		type manager = memo
@@ -435,15 +436,17 @@ struct
 			({
 				man  = man;
 				calc = solve_edge;
-				eval = memo_eval;
-				memo = memo;
+				eval = eval_edge;
+				meval = memo_eval;
+				mcalc = memo;
 			}, solve_edge)
 
 		let newman man = makeman man 10000
 		let calc man = man.calc
+		let eval man = man.eval
 		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.meval];
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.mcalc];
 		]
 	end
 	

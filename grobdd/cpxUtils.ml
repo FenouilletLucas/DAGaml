@@ -314,6 +314,14 @@ let push_X iB rN tB (* if, rank, then *) block =
 		)
 	)
 
+let push_Xs liste = List.fold_right (function (iB, rB, tB) -> push_X iB rB tB) liste
+
+
+(* propagate the specialisation *)
+let push_XsRT liste rB tB = List.fold_right (function iB -> push_X iB rB tB) liste
+
+let node_push_XsRT liste rB tB (block, gtree) = (push_XsRT liste rB tB block, gtree)
+
 let count_nS = MyList.count (function S -> true | _ -> false) 
 let make_nSS n = {
 	negX   = false;
