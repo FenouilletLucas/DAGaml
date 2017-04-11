@@ -51,17 +51,20 @@ let index_from s i c =
 	with Not_found -> None
 
 let split (c:char) (s:string) : string list =
+	let n = String.length s in
 	let rec aux carry i =
-		if i >= String.length s then (List.rev carry) else (
+		if i >= n then (List.rev carry) else (
 		match index_from s i c with
 			| Some j ->
 			(
-				let str = String.sub s i j in
+				assert(i >= 0 && i < n);
+				assert(j >= i && j < n);
+				let str = String.sub s i (j-i) in
 				aux (str::carry) (j+1)
 			)
 			| None ->
 			(
-				let str = String.sub s i (String.length s - 1) in
+				let str = String.sub s i (n-i) in
 				List.rev (str::carry)
 			)
 		)

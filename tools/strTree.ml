@@ -70,7 +70,9 @@ let load text =
 	in aux [] strlist
 
 let loadfile target =
-	let file = open_in target in
+	let stream = Stream.of_channel (open_in target) in
+	StrTreeParser.str_tree_parser stream
+(*	let file = open_in target in
 	let read() =
 		try Some(input_line file)
 		with End_of_file ->
@@ -84,7 +86,7 @@ let loadfile target =
 		| None -> String.concat "\n" (List.rev carry)
 	in
 	load (loop [])
-
+*)
 		
 
 let to_pretty =

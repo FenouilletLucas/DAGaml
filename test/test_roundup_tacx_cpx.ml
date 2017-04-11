@@ -29,7 +29,7 @@ let roundup edge =
 				let edge0 = peval set0 edge
 				and edge1 = peval set1 edge in
 				StrTree.tree_print print_string [Cpx.TACX.dump_stat tacx; Cpx.TACX_PROPA.dump_stat pman];
-				aux (k-1) (edge0 *! edge1)
+				propa (aux (k-1) (edge0 *! edge1))
 			)
 		in aux n edge
 	)

@@ -34,6 +34,10 @@ StrTree.tree_print print_string [Cpx.TACX.dump_stat tacx; Cpx.TACX_PROPA.dump_st
 print_string "roundup : start"; print_newline();
 let edges = List.map roundup edges in
 print_string "roundup : done"; print_newline();
+print_string "propa : start"; print_newline();
+let edges = List.map propa edges in
+print_string "propa : done"; print_newline();
+StrTree.tree_print print_string [Cpx.TACX.dump_stat tacx; Cpx.TACX_PROPA.dump_stat pman];
 
 Cpx.TACX.dumpfile tacx edges file_out;
 
