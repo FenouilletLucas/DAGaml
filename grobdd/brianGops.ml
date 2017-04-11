@@ -6,27 +6,50 @@
 open BrianTypes
 open Extra
 
-let strdump_uniq (i, j) = List.map string_of_int [i; j]
-let strload_uniq = List.map int_of_string >> (function [i; j] -> (i, j) | _ -> assert false)
+let bindump_uniq (i, j) stream = BinDump.int i (BinDump.int j stream)
+let binload_uniq stream =
+	let i, stream = BinLoad.int stream in
+	let j, stream = BinLoad.int stream in
+	(i, j), stream
 
-let strdump_edge (b, u) = Tree.Node ((GUtils.pm_of_bool b)::(strdump_uniq u))
-let strload_edge = function
-	| Tree.Node(pm::tail) -> (GUtils.bool_of_pm pm, strload_uniq tail)
-	| _ -> assert false
+let bindump_pair (i, j0, j1) stream = BinDump.int i (BinDump.int j0 (BinDump.int j1 stream))
+let binload_pair stream =
+	let i, stream  = BinLoad.int stream in
+	let j0, stream = BinLoad.int stream in
+	let j1, stream = BinLoad.int stream in
+	(i, j0, j1), stream
 
-let strdump_edge_and ((bx, by), u) = Tree.Node((GUtils.pm_of_bool bx)::(GUtils.pm_of_bool by)::(strdump_uniq u))
-let strload_edge_and = function
-	| Tree.Node(pmx::pmy::tail) -> ((GUtils.bool_of_pm pmx, GUtils.bool_of_pm pmy), strload_uniq tail)
-	| _ -> assert false
+let bindump_edge (b, u) stream = BinDump.bool b (bindump_uniq u stream)
+let binload_edge stream =
+	let b, stream = BinLoad.bool stream in
+	let u, stream = binload_uniq stream in
+	(b, u), stream
 
-let strdump_edge_xor u = Tree.Node(strdump_uniq u)
-let strload_edge_xor = function
-	| Tree.Node(tail) -> strload_uniq tail
-	| _ -> assert false
+let bindump_node (b, p) stream = BinDump.bool b (bindump_pair p stream)
+let binload_node stream =
+	let b, stream = BinLoad.bool stream in
+	let p, stream = binload_pair stream in
+	(b, p), stream
+
+let bindump_node_and (b0, b1, p) stream = BinDump.bool b0 (BinDump.bool b1 (bindump_pair p stream))
+let binload_node_and stream =
+	let b0, stream = BinLoad.bool stream in
+	let b1, stream = BinLoad.bool stream in
+	let p, stream = binload_pair stream in
+	(b0, b1, p), stream
+
+let bindump_node_xor = bindump_pair
+let binload_node_xor = binload_pair
+
+let bindump_tacx (ttag, p) stream = CpGops.bindump_ttag (bindump_pair p) ttag
+let binload_tacx stream =
+	let ttag, stream = CpGops.binload_ttag stream in
+	let p, stream = binload_pair stream in
+	(ttag, p), stream
 
 
-let bindump_tacx (t, l) = bindump_ttag (bindump_pair l) t |> Array.of_list |> Bitv.L.of_bool_array
-let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> binload_ttag >> (fun (t, l) -> (t, binload_pair l))
+
+let strdump_edge (b, (i, j)) = (GUtils.bool_of_mp b)^" "^(string_of_int i)^" -> "^(string_of_int j)
 
 let eq getid = function
 	| (Utils.Leaf (), Utils.Leaf ()) -> true
@@ -39,26 +62,26 @@ let solve_cons getid (((bX, (xX, yX)) as eX), iX) (((bY, (xY, yY)) as eY), iY) =
 	then (Utils.MEdge ((bX, (xX+1, yX)), iX))
 	else
 	(
-		Utils.MNode ((bX, (xX+1, xX+1)), ((bX<>, (xX+1, yX, yY)), iX, iY))
+		Utils.MNode ((bX, (xX+1, xX+1)), ((bX<>bY, (xX, yX, yY)), iX, iY))
 	)
 
 let node_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, (e', x, y))
+	| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, ((e' |> bindump_node), x, y))
 
 let tacx_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, ((TCons b, l), x, y))
+	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (((TCons b, l) |> bindump_tacx), x, y))
 
 let get_root b (_, (xX, _)) = (b, (xX, 0))
 
 let solve_and gid ((((bX, (xX, yX)) as eX), iX) as x) ((((bY, (xY, yY)) as eY), iY) as y)= 
 	assert(xX = xY);
 	match iX with
-	| Utils.Leaf () -> Utils.MEdge (if bX then (* x ~ 1 *) y else (* x ~ 0 *) x)
+	| Utils.Leaf () -> Utils.MEdge (if bX then (* x = 1 *) y else (* x = 0 *) x)
 	| Utils.Node nx ->
 	match iY with
-	| Utils.Leaf () -> Utils.MEdge (if bY then (* y ~ 1 *) x else (* y ~ 0 *) y)
+	| Utils.Leaf () -> Utils.MEdge (if bY then (* y = 1 *) x else (* y = 0 *) y)
 	| Utils.Node ny ->
 	if (gid nx = gid ny) && (yX = yY)
 	then Utils.MEdge (if bx = by
@@ -73,12 +96,12 @@ let solve_and gid ((((bX, (xX, yX)) as eX), iX) as x) ((((bY, (xY, yY)) as eY), 
 
 let tacx_push_and gid x y = match solve_and gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (TAnd (bx, by), lxy), x, y))
+	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx ((TAnd (bx, by), lxy) |> bindump_tacx), x, y))
 
 let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (Bitv.t * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode)) Utils.merge =
 	fun gid (x, y) -> match solve_and gid x y with
 		| Utils.MEdge e -> Utils.MEdge e
-		| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, (bindump_node_and e', x, y))
+		| Utils.MNode (e, (e', x, y)) -> Utils.MNode (e, ((e' |> bindump_node_and), x, y))
 
 let neg ((b, l), i) = ((not b, l), i)
 let cneg x ((b, l), i) = (( x <> b, l), i)
