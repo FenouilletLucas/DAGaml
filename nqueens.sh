@@ -1,4 +1,4 @@
-pblm="tcqueens"
+pblm="nqueens"
 for i in $(seq 2 8)
 do
     echo "starting $i-queen(s)"

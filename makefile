@@ -72,7 +72,6 @@ extra:
 		test/test_roundup_tacx_cpx.d.byte \
 		test/test_roundup1_tacx_cpx.native \
 		tools/strTreeParser.native \
-		test/sandbox.native \
 
 extraephe:
 		$(OB) \
