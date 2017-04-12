@@ -21,9 +21,17 @@ let bool_of_pm = function
 	| "+" -> true
 	| "-" -> false
 	| _ -> assert false
+let bool_of_mp = function
+	| "+" -> false
+	| "-" -> true
+	| _ -> assert false
 let bool_of_pm_char = function
 	| '+' -> true
 	| '-' -> false
+	| _ -> assert false
+let bool_of_mp_char = function
+	| '+' -> false
+	| '-' -> true
 	| _ -> assert false
 
 let bindump_ttag carry = function

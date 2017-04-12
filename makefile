@@ -72,7 +72,7 @@ full:
 extra:
 	$(OB) \
 		grobdd/oops.native \
-		grobdd/brian.native \
+		grobdd/bryant.native \
 		grobdd/myUint.native \
 		grobdd/cpxGops.native \
 		grobdd/cpxGopsTest.native \

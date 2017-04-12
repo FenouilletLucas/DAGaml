@@ -112,8 +112,7 @@ let strdump_riuniq b =
 let strdump_edge (b, u) = strdump_riuniq b (xiuniq_of_xuniq u)
 
 let bindump_invar (b, opi) (stream:bool list) : bool list =
-	let stream = BinDump.option BinDump.bitv stream opi in
-	BinDump.bool stream b
+	BinDump.bool b (BinDump.option BinDump.bitv opi stream)
 
 let binload_invar i stream =
 	let b, stream = BinLoad.bool stream in

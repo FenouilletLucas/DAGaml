@@ -344,3 +344,38 @@ struct
 	include GroBdd.EVAL(Eval_VISITOR)
 
 end
+
+module PURE_TO_BRYANT =
+struct
+	module CONS_VISITOR =
+	struct
+		type xedge = Bryant.GroBdd.edge
+		type xresi = int
+		type extra = Bryant.GroBdd.manager
+
+		let do_edge _ ((b, l), i) = match i with
+			| Utils.Leaf () ->
+			(
+				assert(List.for_all (function CpTypes.P -> true | _ -> false) l);
+				Utils.MEdge ((b, (List.length l, 0)), Utils.Leaf())
+			)
+			| Utils.Node n ->
+			(
+				let rec aux carry = function
+					| [] -> assert false
+					| head::tail as liste -> match head with
+						| CpTypes.P -> aux (1+carry) tail
+						| _			-> carry, liste
+				in 
+				let shift, l = aux 0 l in
+				Utils.MNode (shift, ((b, l), Utils.Node n))
+			)
+
+		let push = Bryant.GroBdd.push
+
+		let compose _ (shift:xresi) ((b, (x, y)), i) = ((b, (shift+x, y)), i)
+	end
+
+	include GroBdd.CONS_VISITOR(CONS_VISITOR)
+
+end

@@ -1,9 +1,9 @@
-let option dump stream = function
+let option dump opx stream = match opx with
 	| None -> false::stream
 	| Some x -> true::(dump stream x)
 
-let bool stream x = x :: stream
-let bool_list stream x = x @ stream
+let bool x stream = x :: stream
+let bool_list x stream = x @ stream
 
 let bitv stream x = bool_list stream (Bitv.L.to_bool_list x)
 

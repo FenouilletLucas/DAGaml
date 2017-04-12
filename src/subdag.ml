@@ -227,6 +227,57 @@ struct
 		]
 		
 	end
+	
+	module type MODELE_CONS_VISITOR =
+	sig
+		type xedge
+		type xresi
+		type extra
+
+
+		val do_edge: extra -> edge -> (xedge, xresi * edge) Utils.merge
+		val push : extra -> xedge -> xedge -> xedge
+		val compose : extra -> xresi -> xedge -> xedge
+	end
+
+
+	module CONS_VISITOR(D0:MODELE_CONS_VISITOR) =
+	struct
+		
+		type memo = {
+			man     : manager;
+			extra   : D0.extra;
+			calc    : edge -> D0.xedge;
+			memo	: (edge,  D0.xedge) MemoTable.t;
+		}
+		
+		let makeman man extra hsize=
+			let memo, apply = MemoTable.make hsize in
+			let rec calcrec edge = apply (fun edge ->
+				match D0.do_edge extra edge with
+				| Utils.MEdge xedge -> xedge
+				| Utils.MNode (xresi, edge) ->
+				(
+					let edge0, edge1 = pull man edge in
+					D0.compose extra xresi (D0.push extra (calcrec edge0) (calcrec edge1))
+				)
+
+			) edge
+			in
+			({
+				man  = man;
+				extra = extra;
+				calc = calcrec;
+				memo = memo;
+			}, calcrec)
+
+		let newman man extra = makeman man extra 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "man edge:"; MemoTable.dump_stat man.memo];
+		]
+		
+	end
 
 	module type MODELE_EUOP =
 	(* External Unary OPerator *)
