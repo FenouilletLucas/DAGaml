@@ -12,7 +12,6 @@
 
 ##DEBUG
 - bug detected in SUBDAG.to\_dot : leafs are not dumped (probably from UDAG.to\_dot)
-- bug detected in grobdd/nni\* : detected while running nqueens.sh verification and evaluation . error detected in the composition unit with a block size mismatch.
 - bug detected in CPX.AllSat : unexpected output : no entry point for the problem
 
 
