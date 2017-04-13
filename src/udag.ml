@@ -162,7 +162,10 @@ struct
                 )
                                             ):ident -> unit) (ident:ident)
             in
-            H2Table.iter memo_leaf (fun leaf ident -> print("\tL"^(string_of_int ident)^" "^(dump_leaf leaf)));
+            H2Table.iter memo_leaf (fun leaf ident ->
+				print_string("\tL"^(string_of_int ident)^" "^(dump_leaf leaf));
+				print("\tL"^(string_of_int ident)^" "^(dump_leaf leaf))
+			);
             List.iteri (fun idx edge ->
                 let edge_, dst_ = dump_edge_t parcours getleaf edge in
                 print ("\tE"^(string_of_int idx)^" -> "^dst_^" "^edge_^"\n" )) edges

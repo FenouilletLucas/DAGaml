@@ -73,6 +73,7 @@ extra:
 	$(OB) \
 		grobdd/oops.native \
 		grobdd/bryant.native \
+		grobdd/zdd.native \
 		grobdd/myUint.native \
 		grobdd/cpxGops.native \
 		grobdd/cpxGopsTest.native \
@@ -90,6 +91,8 @@ extra:
 		test/test_roundup_tacx_cpx.d.byte \
 		test/test_roundup1_tacx_cpx.native \
 		tools/strTreeParser.native \
+		test/test_dowgrade_pure_cp_to_bryant.native \
+		test/test_dowgrade_pure_cp_to_zdd.native \
 
 extraephe:
 		$(OB) \

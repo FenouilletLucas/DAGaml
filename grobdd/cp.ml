@@ -379,3 +379,31 @@ struct
 	include GroBdd.CONS_VISITOR(CONS_VISITOR)
 
 end
+
+module PURE_TO_ZDD =
+struct
+	module CONS_VISITOR =
+	struct
+		type xedge = Zdd.GroBdd.edge
+		type xresi = unit
+		type extra = Zdd.GroBdd.manager
+
+		let do_edge _ ((b, l), i) = match i with
+			| Utils.Leaf () ->
+			(
+				assert(List.for_all (function CpTypes.P -> true | _ -> false) l);
+				Utils.MEdge ((List.length l, 0), Utils.Leaf b)
+			)
+			| Utils.Node n ->
+			(
+				Utils.MNode ((), ((b, l), Utils.Node n))
+			)
+
+		let push = Zdd.GroBdd.push
+
+		let compose _ () edge = edge
+	end
+
+	include GroBdd.CONS_VISITOR(CONS_VISITOR)
+
+end
