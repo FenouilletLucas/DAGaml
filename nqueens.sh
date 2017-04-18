@@ -1,5 +1,5 @@
-pblm="nqueens"
-for i in $(seq 2 8)
+pblm="tcqueens"
+for i in $(seq 2 7)
 do
     echo "starting $i-queen(s)"
     echo "  -> generation of $i-$pblm.cp.tacx"
