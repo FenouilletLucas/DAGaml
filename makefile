@@ -93,6 +93,7 @@ extra:
 		tools/strTreeParser.native \
 		test/test_dowgrade_pure_cp_to_bryant.native \
 		test/test_dowgrade_pure_cp_to_zdd.native \
+		test/test_upgrade_benchmark_v_to_tacx_cp.native \
 
 extraephe:
 		$(OB) \
