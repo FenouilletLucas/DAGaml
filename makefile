@@ -94,6 +94,8 @@ extra:
 		test/test_dowgrade_pure_cp_to_bryant.native \
 		test/test_dowgrade_pure_cp_to_zdd.native \
 		test/test_upgrade_benchmark_v_to_tacx_cp.native \
+		test/test_upgrade_benchmark_v_to_tacx_cp.d.byte \
+		test/test_eval_tacx_to_dot.native \
 
 extraephe:
 		$(OB) \

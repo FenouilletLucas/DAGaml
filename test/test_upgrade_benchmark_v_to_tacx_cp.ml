@@ -1,30 +1,79 @@
-open GenLex
+let file_in = Sys.argv.(1)
+and file_out = Sys.argv.(2);;
 
-let file_in = Sys.argv.(0)
-and file_out = Sys.argv.(1);;
+(* STEP 1: verilog parsing [START]*)
 
-let my_lexer stream =
-	let kwds = ["assign"; "module"; "endmodule"; "input"; "output"; "wire"; "="; "~"; "&"; "|"; "("; ")"; ";", ","; "1'd0"] in
-	make_lexer kwds stream
+type token =
+	| Kwd of string
+	| Sym of char
+	| Ident of string
+
+type module_tacx = {
+	tacx_name : string;
+	tacx_input: string list;
+	tacx_man  : Cp.TACX.manager;
+	tacx_edges: (string * Cp.TACX.edge) list;
+}
+
+let my_lexer stream : token Stream.t =
+	let is_space = function ' ' | '\t' | '\n' -> true | _ -> false in
+	let rec spaces () = match Stream.peek stream with
+	| None -> ()
+	| Some head -> if is_space head then (Stream.junk stream; spaces ()) else ()
+	in
+	let is_symbol = function '=' | '~' | '&' | '|' | '^' | '(' | ')' | ';' | ',' -> true | _ -> false in
+	let word () =
+		let rec aux s = match Stream.peek stream with
+			| None -> StrUtil.implode (List.rev s)
+			| Some c ->
+			( if is_space c || is_symbol c
+				then (StrUtil.implode (List.rev s))
+				else (Stream.junk stream; aux (c::s))
+			)
+		in
+		let w = aux [] in match w with
+		| "assign"
+		| "module"
+		| "endmodule"
+		| "input"
+		| "output"
+		| "wire"
+		| "1'd0"		-> (print_newline(); print_string w; flush stdout; Kwd w)
+		| _				-> (print_string w; flush stdout; Ident w)
+	in
+	let rec aux x : token option=
+		spaces ();
+		print_string " ";
+		match Stream.peek stream with
+		| None -> None
+		| Some head ->
+		Some (
+			assert(not(is_space head));
+			if is_symbol head
+			then (Stream.junk stream; print_char head; flush stdout; Sym head)
+			else (word ())
+		)
+	in
+	Stream.from aux
 ;;
 
 type uop = PNot | PNop
-type bop = PAnd | POr | PIff | PImp
+type bop = PAnd | POr | PIff | PImp | PXor
 type expr =
 	| PVar of string
 	| PUop of (uop * expr)
-	| PBop of (uop * expr * expr)
+	| PBop of (bop * expr * expr)
 
 let rec parse_leaf stream = match Stream.next stream with
 	| Ident var -> PVar var
-	| Kwd "(" ->
+	| Sym '(' ->
 	(
 		let expr = parse_expr stream in
 		match Stream.next stream with
-			| Kwd ")" -> PUop (Nop, expr)
+			| Sym ')' -> PUop (PNop, expr)
 			| _ -> assert false
 	)
-	| Kwd "~" ->
+	| Sym '~' ->
 	(
 		let expr = parse_leaf stream in
 		PUop (PNot, expr)
@@ -34,16 +83,21 @@ let rec parse_leaf stream = match Stream.next stream with
 and     parse_expr stream =
 	let first = parse_leaf stream in
 	match Stream.next stream with
-	| Kwd ";" -> first
-	| Kwd "&" ->
+	| Sym ';' -> first
+	| Sym '&' ->
 	(
 		let second = parse_expr stream in
 		PBop (PAnd, first, second)
 	)
-	| Kwd "|" ->
+	| Sym '|' ->
 	(
 		let second = parse_expr stream in
 		PBop (POr, first, second)
+	)
+	| Sym '^' ->
+	(
+		let second = parse_expr stream in
+		PBop (PXor, first, second)
 	)
 	| _ -> assert false
 ;;
@@ -57,119 +111,186 @@ type module_v = {
 	assign : (string * expr) list;
 }
 
-let rec parse_coma_list carry = match Stream.peek stream with
-	| Ident ident ->
-	(
-		Stream.junk stream;
-		match Stream.next with
-			| Kwd "," -> parse_coma_list (ident::carry) stream
-			| _ -> assert false
-	)
-	| _ -> List.rev carry
+let parse_ident stream = match Stream.next stream with
+	| Ident name -> name
+	| _ -> assert false
+;;
+
+let rec parse_coma_list stream =
+	let rec aux carry = match Stream.peek stream with
+	| None -> assert false
+	| Some head -> match head with
+		| Sym ',' ->
+		(
+			Stream.junk stream;
+			let ident = parse_ident stream in
+			aux (ident::carry)
+		)
+		| _ -> List.rev carry
+	in
+	match Stream.next stream with
+	| Ident ident -> aux [ident]
+	| _ -> assert false
 ;;
 
 let parse_braket_list stream = match Stream.next stream with
-	| Kwd "(" ->
+	| Sym '(' ->
 	(
 		let liste = parse_coma_list stream in
-		match Stream.next with
-		| Kwd ")" -> liste
+		match Stream.next stream with
+		| Sym ')' -> liste
 		| _ -> assert false
 	)
 	| _ -> assert false
 ;;
 
 let parse_semicolon stream = match Stream.next stream with
-	| Kwd ";" -> ()
+	| Sym ';' -> ()
 	| _ -> assert false
 	
 
 let parse_semicolon_list stream =
 	let liste = parse_coma_list stream in
-	parse_semilcolon();
+	parse_semicolon stream;
 	liste
 ;;
 
-let parse_ident stream = match Stream.next stream with
-	| Ident name -> name
-	| _ -> assert false
-;;
 
 let parse_kwd stream = match Stream.next stream with
 	| Kwd kwd -> kwd
 	| _ -> assert false
 ;;
 
+let parse_sym stream = match Stream.next stream with
+	| Sym sym -> sym
+	| _ -> assert false
+;;
+
 let parse_assign stream =
 	let ident = parse_ident stream in
-	assert("=" = parse_kwd stream);
+	assert('=' = parse_sym stream);
 	let expr = parse_expr stream in
 	(ident, expr)
 ;;	
 
-let rec parse_module_aux mymodule stream = match Stream.next with
+let parse_module_aux mymodule stream =
+	let rec aux mymodule = match Stream.next stream with
 	| Kwd "endmodule" -> mymodule
 	| Kwd "input" ->
 	(
 		let liste = parse_semicolon_list stream in
-		let mymodule = {
+		aux {
 			name    = mymodule.name;
 			params  = mymodule.params;
-			intput  = mymodule.input @ liste; 
+			input   = mymodule.input @ liste; 
 			output  = mymodule.output;
 			wire    = mymodule.wire;
-			assigns = mymodule.assigns
-		} in
-		parse_module_aux mymodule stream
+			assign  = mymodule.assign;
+		}
 	)
 	| Kwd "output" ->
 	(
 		let liste = parse_semicolon_list stream in
-		let mymodule = {
+		aux {
 			name    = mymodule.name;
 			params  = mymodule.params;
-			intput  = mymodule.input; 
+			input   = mymodule.input; 
 			output  = mymodule.output @ liste;
 			wire    = mymodule.wire;
-			assigns = mymodule.assigns
-		} in
-		parse_module_aux mymodule stream
+			assign  = mymodule.assign
+		}
 	)
 	| Kwd "wire" ->
 	(
 		let liste = parse_semicolon_list stream in
-		let mymodule = {
+		aux {
 			name    = mymodule.name;
 			params  = mymodule.params;
-			intput  = mymodule.input; 
+			input   = mymodule.input; 
 			output  = mymodule.output;
 			wire    = mymodule.wire @ liste;
-			assigns = mymodule.assigns
-		} in
-		parse_module_aux mymodule stream
+			assign  = mymodule.assign
+		}
 	)
 	| Kwd "assign" ->
 	(
 		let assign = parse_assign stream in
-		let mymodule = {
+		aux {
 			name    = mymodule.name;
 			params  = mymodule.params;
-			intput  = mymodule.input; 
+			input   = mymodule.input; 
 			output  = mymodule.output;
 			wire    = mymodule.wire;
-			assigns = mymodule.assigns@[assign];
-		} in
-		parse_module_aux mymodule stream
+			assign  = mymodule.assign @ [assign];
+		}
 	)
 	| _ -> assert false
+	in aux mymodule
+;;
 
-
-let rec parse_module stream = match Stream.next stream with
+let parse_module stream =
+	let rec aux () = match Stream.next stream with
 	| Kwd "module" ->
 	(
 		let name = parse_ident stream in
 		let params = parse_braket_list stream in
 		parse_semicolon stream;
-		parse_module_aux {name=name; params=params; input=[]; output=[]; wire=[]; assign=[]}
+		let mymodule = parse_module_aux {name=name; params=params; input=[]; output=[]; wire=[]; assign=[]} stream in
+		print_newline();
+		mymodule;
 	)
-	| _ -> parse_module stream
+	| _ -> aux ()
+	in aux ()
+;;
+
+let my_verilog = parse_module (my_lexer (Stream.of_channel (open_in file_in)));;
+(* STEP 1: verilog parsing [DONE] *)
+
+
+(* STEP 2: from verilog to Cp.TACX *)
+
+let upgrade mymodule =
+	let man = Cp.TACX.newman() in
+(*	let ( *! ) = Cp.( *! ) man *)
+	let ( &! ) = Cp.( &! ) man
+	and ( ^! ) = Cp.( ^! ) man in
+	let neg = Cp.no in
+	let inputs = Oops.list_make_n_var man (List.length mymodule.input) in
+	let assoc = Hashtbl.create 10000 in
+	List.iter2 (fun name func -> Hashtbl.add assoc name func) mymodule.input inputs;
+	let rec eval = function
+		| PVar ident -> Hashtbl.find assoc ident
+		| PUop (uop, expr) ->
+		(
+			let func = eval expr in
+			match uop with
+			| PNop ->     func
+			| PNot -> neg func 
+		)
+		| PBop (bop, exprX, exprY) ->
+		(
+			let funcX = eval exprX
+			and funcY = eval exprY in
+			match bop with
+			| PAnd  -> funcX &! funcY
+			| POr	-> neg((neg funcX)&!(neg funcY))
+			| PImp	-> neg(funcX &! (neg funcY))
+			| PIff	-> neg(funcX ^! funcY)
+			| PXor	-> funcX ^! funcY
+		)
+	in
+	List.iter (fun (name, expr) -> Hashtbl.add assoc name (eval expr)) mymodule.assign;
+	let edges = List.map (fun name -> (name, Hashtbl.find assoc name)) mymodule.output in
+	{
+		tacx_name = mymodule.name;
+		tacx_man  = man;
+		tacx_input= mymodule.input;
+		tacx_edges= edges
+	}
+;;
+
+let my_tacx = upgrade my_verilog;;
+
+Cp.TACX.dumpfile my_tacx.tacx_man (List.map (fun (name, edge) -> edge) my_tacx.tacx_edges) file_out;;
+
+exit 0;;
