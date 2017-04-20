@@ -38,8 +38,8 @@ let my_lexer stream : token Stream.t =
 		| "input"
 		| "output"
 		| "wire"
-		| "1'd0"		-> (print_newline(); print_string w; flush stdout; Kwd w)
-		| _				-> (print_string w; flush stdout; Ident w)
+		| "1'd0"		-> Kwd w
+		| _				-> Ident w
 	in
 	let rec aux x : token option=
 		spaces ();
@@ -50,7 +50,7 @@ let my_lexer stream : token Stream.t =
 		Some (
 			assert(not(is_space head));
 			if is_symbol head
-			then (Stream.junk stream; print_char head; flush stdout; Sym head)
+			then (Stream.junk stream; Sym head)
 			else (word ())
 		)
 	in

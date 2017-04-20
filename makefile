@@ -96,6 +96,8 @@ extra:
 		test/test_upgrade_benchmark_v_to_tacx_cp.native \
 		test/test_upgrade_benchmark_v_to_tacx_cp.d.byte \
 		test/test_eval_tacx_to_dot.native \
+		test/test_tacx_cp_stats.native \
+		test/test_pure_cp_stats.native \
 
 extraephe:
 		$(OB) \
