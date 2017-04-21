@@ -3,7 +3,7 @@ def onefile(NAME):
 	FILE = open(NAME, 'r')
 	TEXT = FILE.read().split('\n')
 	FILE.close()
-	L = [4, 7, 10, 13, 16]
+	L = [4, 7, 10, 13, 16, 19, 22]
 	def select(l):
 		U = [x for x in TEXT[l-1].split(' ') if x!='']
 		U = [x for x in U[-1].split('\t') if x!='']
@@ -13,5 +13,7 @@ def onefile(NAME):
         except:
             print(TEXT[0])
 
+print('\n')
 for name in sys.argv[1:]:
 	onefile(name)
+print('\n')

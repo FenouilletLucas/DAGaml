@@ -1,4 +1,4 @@
-assert(Array.length Sys.argv > 1);
+assert(Array.length Sys.argv > 2);
 (* TODO: display --help *)
 
 let file = Sys.argv.(2) in

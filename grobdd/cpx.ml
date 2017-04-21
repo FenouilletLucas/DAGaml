@@ -71,9 +71,9 @@ struct
 		Udag.StrTree.dumpfile strman stredges target;
 		strman
 	
-	let loadfile target =
+	let loadfile ?man target =
 		let strman, stredges = Udag.StrTree.loadfile target in
-		let man = newman () in
+		let man = match man with None -> newman () | Some man -> man in
 		let edges = load man strman stredges in
 		man, edges
 end
@@ -278,6 +278,56 @@ struct
 
 
 end
+
+module PURE_OF_CP =
+struct
+	module EVAL_VISITOR =
+	struct
+		type xnode = GroBdd.edge
+		type xedge = GroBdd.edge
+		type cons = xedge -> xedge -> xedge
+		type extra = GroBdd.manager
+
+		let do_leaf _ () = default_leaf
+		let mu_cpx_of_cp = function
+			| CpTypes.S -> CpxTypes.S
+			| CpTypes.P -> CpxTypes.P
+		let cpx_of_cp (b, u) = CpxTypes.{neg = b; shift = false; sub = List.map mu_cpx_of_cp u}
+		let do_node extra = Extra.(CpGops.binload_node >> CpGops.node_split >> (fun (edgeX, edgeY) ->
+			let edgeX = cpx_of_cp edgeX
+			and edgeY = cpx_of_cp edgeY in
+			let result = Utils.MNode CpxGops.(fun nodeX nodeY ->
+				GroBdd.push extra (CpxUtils.compose edgeX nodeX) (CpxUtils.compose edgeY nodeY)) in
+			(result : (xnode, xnode -> xnode -> xnode) Utils.merge)))
+
+		let do_edge _ e = CpxUtils.compose (cpx_of_cp e)
+	end
+
+	module EVAL = Cp.GroBdd.NODE_VISITOR(EVAL_VISITOR)
+
+	type manager = {
+		man_cp : Cp.GroBdd.manager;
+		mannni : GroBdd.manager;
+		theman : EVAL.manager;
+		calc   : Cp.GroBdd.edge -> GroBdd.edge
+	}
+
+	let newman tacx_cp tacx_nni =
+		let theman, calc = EVAL.newman tacx_cp tacx_nni in
+		{
+			man_cp = tacx_cp;
+			mannni = tacx_nni;
+			theman = theman;
+			calc   = calc;
+		}, List.map calc
+	
+	let dump_stat man = Tree.Node [
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	]
+
+
+end
+
 
 module TACX_OF_CP =
 struct
@@ -697,3 +747,38 @@ struct
 end
 
 module TACX_PROPA = TACX.IUOP2(TACX_PROPA_M)
+
+module PURE_TO_BRYANT =
+struct
+	module CONS_VISITOR =
+	struct
+		type xedge = Bryant.GroBdd.edge
+		type xresi = bool * int
+		type extra = Bryant.GroBdd.manager
+
+		let do_edge _ (block, i) = match CpxUtils.block_is_const block with
+			| Some b ->
+			(
+				Utils.MEdge ((b, (CpxUtils.block_size block, 0)), Utils.Leaf())
+			)
+			| None ->
+			CpxTypes.(
+				let rec aux carry = function
+					| [] -> assert false
+					| head::tail as liste -> match head with
+						| P -> aux (1+carry) tail
+						| _			-> carry, liste
+				in 
+				let shift, sub' = aux 0 block.sub in
+				let block' = {neg = false; shift = block.shift; sub = sub'} in
+				Utils.MNode ((block.neg, shift), (block', i))
+			)
+
+		let push = Bryant.GroBdd.push
+
+		let compose _ ((neg, shift):xresi) ((b, (x, y)), i) = ((neg<>b, (shift+x, y)), i)
+	end
+
+	include GroBdd.CONS_VISITOR(CONS_VISITOR)
+
+end

@@ -41,13 +41,23 @@ tests:
 		test/test_eval_tacx_to_pure_cp.native \
 		test/test_eval_tacx_to_pure_nni.native \
 		test/test_eval_tacx_to_pure_cpx.native \
+		test/test_eval_tacx_to_dot.native \
 		test/test_upgrade_tacx_cp_to_nni.native \
 		test/test_upgrade_tacx_cp_to_cpx.native \
-		test/test_upgrade_tacx_cp_to_cpx.d.byte \
 		test/test_noreg_cp_cons.native \
 		test/test_noreg_cp_cons.d.byte \
 		test/test_noreg_nni_cons.native \
-		test/test_eval_pure_to_dot.native
+		test/test_eval_pure_to_dot.native \
+		test/test_tacx_stats.native \
+		test/test_pure_stats.native \
+		test/test_upgrade_pure_cp_to_nni.native \
+		test/test_upgrade_pure_cp_to_cpx.native \
+		test/test_upgrade_benchmark_v_to_tacx_cp.native \
+		test/test_downgrade_pure_cp_to_bryant.native \
+		test/test_downgrade_pure_cp_to_zdd.native \
+		test/test_propa_tacx_cpx.native \
+		test/test_roundup_tacx_cpx.native \
+		test/test_roundup1_tacx_cpx.native \
 
 full:
 	$(OB) \
@@ -66,38 +76,12 @@ full:
 		grobdd/cpxGops.native \
 		grobdd/cpx.native
 
-
-
-
 extra:
 	$(OB) \
-		grobdd/oops.native \
-		grobdd/bryant.native \
-		grobdd/zdd.native \
-		grobdd/myUint.native \
-		grobdd/cpxGops.native \
-		grobdd/cpxGopsTest.native \
-		grobdd/cpxGopsTest.d.byte \
-		grobdd/cpx.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
-		test/test_propa_tacx_cpx.native \
-		test/test_propa_tacx_cpx.d.byte \
-		test/test_noreg_cpx_cons.d.byte \
-		test/test_upgrade_tacx_cp_to_cpx.native \
-		test/test_eval_tacx_to_pure_cpx.native \
 		test/test_bin_of_int.native \
-		test/test_roundup_tacx_cpx.native \
-		test/test_roundup_tacx_cpx.d.byte \
-		test/test_roundup1_tacx_cpx.native \
-		tools/strTreeParser.native \
-		test/test_dowgrade_pure_cp_to_bryant.native \
-		test/test_dowgrade_pure_cp_to_zdd.native \
-		test/test_upgrade_benchmark_v_to_tacx_cp.native \
-		test/test_upgrade_benchmark_v_to_tacx_cp.d.byte \
-		test/test_eval_tacx_to_dot.native \
-		test/test_tacx_stats.native \
-		test/test_pure_stats.native \
+		test/test_downgrade_pure_cpx_to_bryant.native \
 
 extraephe:
 		$(OB) \

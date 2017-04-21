@@ -18,6 +18,16 @@ let stredges = match Sys.argv.(1) with
 	let pure, edges = Cpx.GroBdd.loadfile file_in in
 	Cpx.GroBdd.to_dot pure strman edges
 )
+| "--bryant" ->
+(
+	let pure, edges = Bryant.GroBdd.loadfile file_in in
+	Bryant.GroBdd.to_dot pure strman edges
+)
+| "--zdd" ->
+(
+	let pure, edges = Zdd.GroBdd.loadfile file_in in
+	Zdd.GroBdd.to_dot pure strman edges
+)
 | _ -> assert false
 in
 Udag.String.to_dot_file strman stredges file_out;

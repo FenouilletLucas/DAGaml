@@ -243,6 +243,58 @@ struct
 
 end
 
+module PURE_OF_CP =
+struct
+	module EVAL_VISITOR =
+	struct
+		type xnode = GroBdd.edge
+		type xedge = GroBdd.edge
+		type cons = xedge -> xedge -> xedge
+		type extra = GroBdd.manager
+
+		let do_leaf _ () = default_leaf
+		let mu_nni_of_cp = function
+			| CpTypes.S -> NniTypes.S false
+			| CpTypes.P -> NniTypes.P (false, None)
+		let nni_of_cp (b, u) = (b, List.map mu_nni_of_cp u)
+		let do_node extra = Extra.(CpGops.binload_node >> CpGops.node_split >> (fun (edgeX, edgeY) ->
+			let edgeX = nni_of_cp edgeX
+			and edgeY = nni_of_cp edgeY in
+			let result = Utils.MNode NniGops.(fun nodeX nodeY ->
+				GroBdd.push extra (compose edgeX nodeX) (compose edgeY nodeY)) in
+			(result : (xnode, xnode -> xnode -> xnode) Utils.merge)))
+
+		let do_edge _ e = NniGops.compose (nni_of_cp e)
+	end
+
+	module EVAL = Cp.GroBdd.NODE_VISITOR(EVAL_VISITOR)
+
+	type manager = {
+		man_cp : Cp.GroBdd.manager;
+		mannni : GroBdd.manager;
+		theman : EVAL.manager;
+		calc   : Cp.GroBdd.edge -> GroBdd.edge
+	}
+
+	let newman tacx_cp tacx_nni =
+		let theman, calc = EVAL.newman tacx_cp tacx_nni in
+		{
+			man_cp = tacx_cp;
+			mannni = tacx_nni;
+			theman = theman;
+			calc   = calc;
+		}, List.map calc
+	
+	let dump_stat man = Tree.Node [
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
+(*		Tree.Node [Tree.Leaf "man_cp:"; Cp.TACX.dump_stat man.man_cp]; *)
+(*		Tree.Node [Tree.Leaf "mannni:"; TACX.dump_stat man.mannni]; *)
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	]
+
+
+end
+
 module TACX_OF_CP =
 struct
 	module EVAL_VISITOR =
