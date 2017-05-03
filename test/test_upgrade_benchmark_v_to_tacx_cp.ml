@@ -64,17 +64,20 @@ type expr =
 	| PUop of (uop * expr)
 	| PBop of (bop * expr * expr)
 
+let pstring x = print_string x; print_string " "; flush stdout;;
+let pchar x = print_char x; print_char ' '; flush stdout;;
+
 let rec parse_leaf stream = match Stream.next stream with
-	| Ident var -> PVar var
+	| Ident var -> pstring var; PVar var
 	| Sym '(' ->
 	(
+		pstring "(";
 		let expr = parse_expr stream in
-		match Stream.next stream with
-			| Sym ')' -> PUop (PNop, expr)
-			| _ -> assert false
+		PUop (PNop, expr)
 	)
 	| Sym '~' ->
 	(
+		pstring "~";
 		let expr = parse_leaf stream in
 		PUop (PNot, expr)
 	)
@@ -83,23 +86,27 @@ let rec parse_leaf stream = match Stream.next stream with
 and     parse_expr stream =
 	let first = parse_leaf stream in
 	match Stream.next stream with
-	| Sym ';' -> first
+	| Sym ';' -> pstring "\n"; first
+	| Sym ')' -> pstring ")"; first
 	| Sym '&' ->
 	(
+		pstring "&";
 		let second = parse_expr stream in
 		PBop (PAnd, first, second)
 	)
 	| Sym '|' ->
 	(
+		pstring "|";
 		let second = parse_expr stream in
 		PBop (POr, first, second)
 	)
 	| Sym '^' ->
 	(
+		pstring "^";
 		let second = parse_expr stream in
 		PBop (PXor, first, second)
 	)
-	| _ -> assert false
+	| x -> assert false
 ;;
 
 type module_v = {

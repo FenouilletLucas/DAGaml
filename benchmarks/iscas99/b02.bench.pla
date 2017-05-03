@@ -1,0 +1,25 @@
+# Equations for "b02" written by ABC on Wed May  3 12:02:46 2017
+INORDER = LINEA U_REG STATO_REG_2_ STATO_REG_1_ STATO_REG_0_;
+OUTORDER = U_REG n6 n10 n15 n20;
+n15_1 = !STATO_REG_1_ * !STATO_REG_0_;
+n6 = STATO_REG_2_ * n15_1;
+n17 = !LINEA * STATO_REG_2_;
+n18 = LINEA * !STATO_REG_2_;
+n19 = !n17 * !n18;
+n20_1 = !STATO_REG_0_ * n19;
+n21 = STATO_REG_1_ * !n20_1;
+n22 = !LINEA * !STATO_REG_2_;
+n23 = STATO_REG_0_ * !n22;
+n10 = n21 + n23;
+n25 = !STATO_REG_2_ * STATO_REG_1_;
+n26 = !STATO_REG_0_ * n25;
+n27 = !LINEA * !STATO_REG_1_;
+n28 = !STATO_REG_2_ * !n27;
+n29 = STATO_REG_0_ * !n28;
+n15 = n26 + n29;
+n31 = STATO_REG_0_ * !n18;
+n32 = !STATO_REG_1_ * !n31;
+n33 = !LINEA * !STATO_REG_0_;
+n34 = !STATO_REG_2_ * n33;
+n20 = n32 + n34;
+
