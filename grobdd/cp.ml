@@ -87,6 +87,7 @@ let arity ((_, l), _) = List.length l
 let push_pass ((b, l), i) = ((b, CpTypes.P::l), i)
 
 let no ((b, l), i) = ((not b, l), i)
+let cno b' ((b, l), i) = ((b' <> b, l), i)
 
 let is_root = function
 	| ((b, l), Utils.Leaf ()) -> Some b

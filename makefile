@@ -54,6 +54,8 @@ tests:
 		test/test_upgrade_pure_cp_to_cpx.native \
 		test/test_upgrade_benchmark_v_to_tacx_cp.native \
 		test/test_upgrade_benchmark_pla_to_tacx_cp.native \
+		test/test_upgrade_benchmark_cnf_to_tacx_cp.native \
+		test/test_upgrade_benchmark_cnf_to_tacx_cp.d.byte \
 		test/test_downgrade_pure_cp_to_bryant.native \
 		test/test_downgrade_pure_cp_to_zdd.native \
 		test/test_propa_tacx_cpx.native \

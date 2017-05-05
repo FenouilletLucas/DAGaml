@@ -3,7 +3,7 @@ module T = Cpx;;
 let file = Sys.argv.(1) in
 let tacx, edges = T.TACX.loadfile file in
 let pure = T.newman () in
-let evaman, mapcalc = T.EVAL.newman tacx pure in
+let evaman, mapcalc = T.EVALE.newman tacx pure in
 
 print_string "start computation"; print_newline();
 let edges = mapcalc edges in
@@ -15,7 +15,7 @@ StrTree.tree_print print_string [
 		Tree.Leaf "TOTAL:";
 		Tree.Node [ T.GroBdd.dump_stat pure ];
 	];
-	T.EVAL.dump_stat evaman];
+	T.EVALE.dump_stat evaman];
 
 let cntman, cntsat = T.CntSat.newman pure in 
 print_string "CntSat = [";
