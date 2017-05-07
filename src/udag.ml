@@ -1,28 +1,50 @@
-(* UDAG : Unique - Directed Acyclic Diagramm
+(* UDAG : Unique - Directed Acyclic Diagramm (DAG)
  *
  *)
 
-
+(* Generic typing of a DAG's DATA:
+ * A DAG's type is described as the combination of nodes, edges and leafs
+ *
+ *)
 module type GRAPH_HEADER = sig
+	(* type of data on leafs *)
     type leaf
+	(* type of data on edges *)
     type edge
+	(* type of data on nodes *)
     type node
 end
+
+(* Generic typing of a UDAG
+ * A UDAG has two methods:
+ *   - push : create a new node (if necessarry) from its description and returns its unique identifier
+ *   - pull : return a node's descritpion from its identifier
+ *)
 module type GRAPH = sig
     include GRAPH_HEADER
+	(* identifier's type *)
     type ident
 
+	(* represent either a leaf or a node identifier *)
     type next_t = (leaf, ident) Utils.gnode
+	(* represent an edge *)
     type edge_t = edge * next_t
+	(* represent a node *)
     type node_t = node * (edge_t list)
     
     type manager
     
+	(* create a new manager with some default parameters *)
     val newman : unit -> manager
+	(* manager method : create (only if necessarry) a new node in the structure, returns its identifier *)
     val push : manager -> node_t -> ident
+	(* manager method : return a node assiated to this identifier
+		TODO: catch and emit exception if not found *)
     val pull : manager -> ident -> node_t
     
 end
+
+(* A more evolved representation of a DAG allowing to load/dump/export to dot a DAG by just doing so for its component *)
 module type UDAG_HEADER = sig
     include GRAPH_HEADER
 
