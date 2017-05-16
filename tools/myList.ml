@@ -18,6 +18,7 @@ let option_cons = function
 	| None -> (fun l -> l)
 	| Some x -> (fun l -> (x::l))
 
+let catmap f l = List.flatten (List.map f l)
 
 let list_of_oplistv0 opel = List.fold_right option_cons opel []
 

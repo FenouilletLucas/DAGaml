@@ -97,3 +97,18 @@ let bin_of_int =
 let unop = function
 	| None -> assert false
 	| Some x -> x
+
+
+let bin_of_char c =
+	let rec aux carry x = function
+		| 0 -> List.rev carry
+		| n -> aux ((x mod 2 = 1)::carry) (x/2) (n-1)
+	in aux [] (Char.code c) 8
+
+let int_of_bin bl =
+	let rec aux carry = function
+		| [] -> carry
+		| h::t -> aux (carry*2+(if h then 1 else 0)) t
+	in aux 0 (List.rev bl)
+
+let char_of_bin bl = Char.chr ( int_of_bin bl )

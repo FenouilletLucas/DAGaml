@@ -85,6 +85,8 @@ extra:
 		test/test_noreg_cpx_cons.native \
 		test/test_bin_of_int.native \
 		test/test_downgrade_pure_cpx_to_bryant.native \
+		tools/binStream.native \
+		tools/oStream.native \
 
 extraephe:
 		$(OB) \
