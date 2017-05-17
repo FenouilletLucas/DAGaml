@@ -1,0 +1,230 @@
+// Benchmark "lif/9symml" written by ABC on Tue May 16 16:07:43 2017
+
+module \lif/9symml  ( 
+    \1 , 2, 3, 4, 5, 6, 7, 8, 9,
+    52  );
+  input  \1 , 2, 3, 4, 5, 6, 7, 8, 9;
+  output 52;
+  wire n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21, n22, n23, n24,
+    n25, n26, n27, n28, n29, n30, n31, n32, n33, n34, n35, n36, n37, n38,
+    n39, n40, n41, n42, n43, n44, n45, n46, n47, n48, n49, n50, n51, n52,
+    n53, n54, n55, n56, n57, n58, n59, n60, n61, n62, n63, n64, n65, n66,
+    n67, n68, n69, n70, n71, n72, n73, n74, n75, n76, n77, n78, n79, n80,
+    n81, n82, n83, n84, n85, n86, n87, n88, n89, n90, n91, n92, n93, n94,
+    n95, n96, n97, n98, n99, n100, n101, n102, n103, n104, n105, n106,
+    n107, n108, n109, n110, n111, n112, n113, n114, n115, n116, n117, n118,
+    n119, n120, n121, n122, n123, n124, n125, n126, n127, n128, n129, n130,
+    n131, n132, n133, n134, n135, n136, n137, n138, n139, n140, n141, n142,
+    n143, n144, n145, n146, n147, n148, n149, n150, n151, n152, n153, n154,
+    n155, n156, n157, n158, n159, n160, n161, n162, n163, n164, n165, n166,
+    n167, n168, n169, n170, n171, n172, n173, n174, n175, n176, n177, n178,
+    n179, n180, n181, n182, n183, n184, n185, n186, n187, n188, n189, n190,
+    n191, n192, n193, n194, n195, n196, n197, n198, n199, n200, n201, n202,
+    n203, n204, n205, n206, n207, n208, n209, n210, n211, n212, n213;
+  assign n11 = ~2 & 3;
+  assign n12 = 2 & ~3;
+  assign n13 = ~n11 & ~n12;
+  assign n14 = ~4 & 5;
+  assign n15 = 4 & ~5;
+  assign n16 = ~n14 & ~n15;
+  assign n17 = 5 & ~6;
+  assign n18 = ~n15 & ~n17;
+  assign n19 = ~3 & 4;
+  assign n20 = 3 & ~4;
+  assign n21 = ~n19 & ~n20;
+  assign n22 = 3 & ~n18;
+  assign n23 = 2 & ~n21;
+  assign n24 = ~n22 & ~n23;
+  assign n25 = ~\1  & 5;
+  assign n26 = 6 & n25;
+  assign n27 = n24 & ~n26;
+  assign n28 = ~7 & 8;
+  assign n29 = 7 & ~8;
+  assign n30 = ~n28 & ~n29;
+  assign n31 = ~\1  & 4;
+  assign n32 = \1  & ~4;
+  assign n33 = ~n31 & ~n32;
+  assign n34 = ~5 & n20;
+  assign n35 = ~8 & n34;
+  assign n36 = ~3 & ~7;
+  assign n37 = ~n33 & n36;
+  assign n38 = ~\1  & ~2;
+  assign n39 = ~n30 & n38;
+  assign n40 = ~n37 & ~n39;
+  assign n41 = ~n35 & n40;
+  assign n42 = ~7 & ~8;
+  assign n43 = ~n27 & n42;
+  assign n44 = 6 & ~n41;
+  assign n45 = ~6 & ~n30;
+  assign n46 = ~n16 & n45;
+  assign n47 = ~n44 & ~n46;
+  assign n48 = ~n43 & n47;
+  assign n49 = 2 & ~5;
+  assign n50 = ~7 & n49;
+  assign n51 = ~2 & ~3;
+  assign n52 = 7 & n51;
+  assign n53 = ~n50 & ~n52;
+  assign n54 = 6 & ~7;
+  assign n55 = 2 & ~6;
+  assign n56 = ~n54 & ~n55;
+  assign n57 = ~n29 & n56;
+  assign n58 = ~8 & 9;
+  assign n59 = ~n28 & ~n58;
+  assign n60 = n25 & ~n57;
+  assign n61 = \1  & ~2;
+  assign n62 = ~n59 & n61;
+  assign n63 = 2 & ~9;
+  assign n64 = ~n30 & n63;
+  assign n65 = ~n62 & ~n64;
+  assign n66 = ~n60 & n65;
+  assign n67 = 3 & ~5;
+  assign n68 = ~n12 & ~n67;
+  assign n69 = ~\1  & 8;
+  assign n70 = \1  & ~5;
+  assign n71 = ~n69 & ~n70;
+  assign n72 = 5 & n12;
+  assign n73 = ~8 & n72;
+  assign n74 = 6 & ~9;
+  assign n75 = ~n68 & n74;
+  assign n76 = n11 & ~n71;
+  assign n77 = ~n75 & ~n76;
+  assign n78 = ~n73 & n77;
+  assign n79 = \1  & 8;
+  assign n80 = ~n53 & n79;
+  assign n81 = 3 & ~n66;
+  assign n82 = 7 & ~n78;
+  assign n83 = ~n81 & ~n82;
+  assign n84 = ~n80 & n83;
+  assign n85 = ~3 & 5;
+  assign n86 = 3 & ~9;
+  assign n87 = ~n85 & ~n86;
+  assign n88 = 9 & n29;
+  assign n89 = 2 & 4;
+  assign n90 = ~7 & n89;
+  assign n91 = ~n88 & ~n90;
+  assign n92 = ~5 & 9;
+  assign n93 = 5 & ~7;
+  assign n94 = ~n92 & ~n93;
+  assign n95 = 4 & ~7;
+  assign n96 = ~2 & 7;
+  assign n97 = ~n67 & ~n96;
+  assign n98 = ~n95 & n97;
+  assign n99 = 7 & n20;
+  assign n100 = 6 & ~n98;
+  assign n101 = 5 & n19;
+  assign n102 = ~n100 & ~n101;
+  assign n103 = ~n99 & n102;
+  assign n104 = 9 & n52;
+  assign n105 = 3 & ~6;
+  assign n106 = ~n94 & n105;
+  assign n107 = ~9 & ~n103;
+  assign n108 = ~n106 & ~n107;
+  assign n109 = ~n104 & n108;
+  assign n110 = 4 & 6;
+  assign n111 = ~8 & n110;
+  assign n112 = ~n87 & n111;
+  assign n113 = n67 & ~n91;
+  assign n114 = 8 & ~n109;
+  assign n115 = ~n113 & ~n114;
+  assign n116 = ~n112 & n115;
+  assign n117 = ~5 & 7;
+  assign n118 = 4 & ~6;
+  assign n119 = ~n117 & ~n118;
+  assign n120 = ~n93 & n119;
+  assign n121 = 8 & ~9;
+  assign n122 = ~n120 & n121;
+  assign n123 = ~4 & 9;
+  assign n124 = ~n71 & n123;
+  assign n125 = ~5 & 6;
+  assign n126 = ~n59 & n125;
+  assign n127 = ~n124 & ~n126;
+  assign n128 = ~n122 & n127;
+  assign n129 = ~n29 & ~n93;
+  assign n130 = ~3 & 7;
+  assign n131 = 3 & ~8;
+  assign n132 = ~n130 & ~n131;
+  assign n133 = ~5 & n32;
+  assign n134 = 7 & n133;
+  assign n135 = ~3 & 9;
+  assign n136 = ~n129 & n135;
+  assign n137 = n31 & ~n132;
+  assign n138 = ~n136 & ~n137;
+  assign n139 = ~n134 & n138;
+  assign n140 = ~\1  & ~5;
+  assign n141 = 6 & n140;
+  assign n142 = ~n21 & n141;
+  assign n143 = ~3 & ~n128;
+  assign n144 = ~6 & ~n139;
+  assign n145 = ~n143 & ~n144;
+  assign n146 = ~n142 & n145;
+  assign n147 = 6 & ~8;
+  assign n148 = ~2 & 8;
+  assign n149 = ~n105 & ~n148;
+  assign n150 = ~n147 & n149;
+  assign n151 = \1  & 2;
+  assign n152 = ~8 & n151;
+  assign n153 = 8 & n118;
+  assign n154 = ~n152 & ~n153;
+  assign n155 = ~5 & 8;
+  assign n156 = ~n14 & ~n155;
+  assign n157 = ~2 & ~n156;
+  assign n158 = n53 & ~n157;
+  assign n159 = ~4 & 8;
+  assign n160 = ~n31 & ~n159;
+  assign n161 = ~3 & 6;
+  assign n162 = ~n118 & ~n161;
+  assign n163 = ~6 & 7;
+  assign n164 = ~n160 & n163;
+  assign n165 = 2 & ~8;
+  assign n166 = ~n162 & n165;
+  assign n167 = ~2 & 6;
+  assign n168 = ~n30 & n167;
+  assign n169 = ~n166 & ~n168;
+  assign n170 = ~n164 & n169;
+  assign n171 = 7 & n15;
+  assign n172 = ~n150 & n171;
+  assign n173 = 3 & ~7;
+  assign n174 = ~n154 & n173;
+  assign n175 = \1  & 6;
+  assign n176 = ~n158 & n175;
+  assign n177 = 5 & ~n170;
+  assign n178 = ~n176 & ~n177;
+  assign n179 = ~n174 & n178;
+  assign n180 = ~n172 & n179;
+  assign n181 = \1  & ~3;
+  assign n182 = ~\1  & 9;
+  assign n183 = ~n181 & ~n182;
+  assign n184 = ~n86 & n183;
+  assign n185 = n16 & n30;
+  assign n186 = ~7 & n110;
+  assign n187 = ~8 & n186;
+  assign n188 = n135 & ~n185;
+  assign n189 = ~n18 & ~n30;
+  assign n190 = ~n188 & ~n189;
+  assign n191 = ~n187 & n190;
+  assign n192 = 4 & 5;
+  assign n193 = ~6 & n192;
+  assign n194 = ~n184 & n193;
+  assign n195 = 6 & n67;
+  assign n196 = ~n33 & n195;
+  assign n197 = \1  & ~n191;
+  assign n198 = ~n196 & ~n197;
+  assign n199 = ~n194 & n198;
+  assign n200 = \1  & ~6;
+  assign n201 = ~n16 & n200;
+  assign n202 = ~n13 & n201;
+  assign n203 = 9 & ~n48;
+  assign n204 = ~4 & ~n84;
+  assign n205 = ~\1  & ~n116;
+  assign n206 = 2 & ~n146;
+  assign n207 = ~9 & ~n180;
+  assign n208 = ~2 & ~n199;
+  assign n209 = ~n207 & ~n208;
+  assign n210 = ~n206 & n209;
+  assign n211 = ~n205 & n210;
+  assign n212 = ~n204 & n211;
+  assign n213 = ~n203 & n212;
+  assign 52 = n202 | ~n213;
+endmodule
+
+

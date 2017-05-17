@@ -310,6 +310,30 @@ struct
 	
 end
 
+module GetSize =
+struct
+	module MODELE_VISITOR =
+	struct
+		type xnode = unit
+		type xedge = unit
+		type extra = int ref
+
+		let do_leaf extra (():GroBdd.M.leaf) = ()
+		let do_node extra (c:GroBdd.M.node) = extra := !extra + Bitv.length c; Utils.MNode (fun () () -> ())
+		let do_edge extra _ () = ()
+	end
+
+	module VISITOR = GroBdd.NODE_VISITOR(MODELE_VISITOR)
+
+	let newman man =
+		VISITOR.newman man (ref 0)
+	
+	let dump_stat = VISITOR.dump_stat
+
+	let get man = !(VISITOR.extra man)
+	
+end
+
 module PartEval =
 struct
 	module Eval_VISITOR : GroBdd.MODELE_EVAL with

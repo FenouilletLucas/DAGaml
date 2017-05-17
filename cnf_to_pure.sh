@@ -4,6 +4,8 @@ for file in $@
 do
 	workfile=$(python extract_name.py $file)
 	echo "$file -> $workfile"
+if false
+then
 	echo " - verilog to cp.tacx"
 	(time ./test_upgrade_benchmark_cnf_to_tacx_cp.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
 	echo " - cp.tacx to nni.tacx"
@@ -24,6 +26,7 @@ do
 	(time ./test_upgrade_pure_cp_to_nni.native $workfile.cp.tacx.pure $workfile.nni.pure)	&> $workfile.solved-cp-to-nni.log
 	echo " - cp.pure to cpx.pure"
 	(time ./test_upgrade_pure_cp_to_cpx.native $workfile.cp.tacx.pure $workfile.cpx.pure)	&> $workfile.solved-cp-to-cpx.log
+fi
 	echo " - summarize"
 	echo $workfile > $workfile.stats.log
 	./test_pure_stats.native --bryant $workfile.bryant.pure	>> $workfile.stats.log

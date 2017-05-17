@@ -5,6 +5,8 @@ do
 	echo "$file -> $workfile"
 	echo "    -  verilog to  cp.tacx"
 	(time ./test_upgrade_benchmark_v_to_tacx_cp.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
+if false
+then
 	echo "    -  cp.tacx to nni.tacx"
 	(time ./test_upgrade_tacx_cp_to_nni.native $workfile.cp.tacx $workfile.nni.tacx)	&> $workfile.cp-to-nni.log
 	echo "    -  cp.tacx to cpx.tacx"
@@ -32,4 +34,5 @@ do
 	./test_pure_stats.native --nni    $workfile.nni.tacx.pure >> $workfile.stats.log
 	./test_pure_stats.native --cpx    $workfile.cpx.pure      >> $workfile.stats.log
 	./test_pure_stats.native --cpx    $workfile.cpx.tacx.pure >> $workfile.stats.log
+fi
 done
