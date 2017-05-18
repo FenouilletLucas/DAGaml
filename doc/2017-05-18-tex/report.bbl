@@ -1,0 +1,16 @@
+\begin{thebibliography}{1}
+
+\bibitem{queen8}
+Eight queens puzzle.
+
+\bibitem{Bryant1986}
+Randal~E. Bryant.
+\newblock Graph-based algorithms for boolean function manipulation.
+\newblock {\em IEEE Trans. Comput.}, 35(8):677--691, August 1986.
+
+\bibitem{Somenzi1999}
+Fabio Somenzi.
+\newblock Binary decision diagrams.
+\newblock 1999.
+
+\end{thebibliography}
