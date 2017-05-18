@@ -168,6 +168,7 @@ struct
 			}, calcedge
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
+		let extra man = man.extra
 		let dump_stat man = Tree.Node [
 			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memoLeaf];
 			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memoEdge];
