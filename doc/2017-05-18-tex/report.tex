@@ -34,12 +34,22 @@
 
 \maketitle
 \begin{abstract}
-We propose a more compact representation of Binary Decision Diagrams \cite{Bryant1986}\cite{Somenzi1999} (BDDs).
-If not mentioned otherwise, complexities are given as a function of the number of inputs.
-Our main result is an algorithm which compute a canonical representation of a function under non-support variables removal that takes a linear time and space overhead per node regarding the standard implementation of BDDs.
-However it allows to add non-support variables in linear time, determine in constant time if two functions are equal when restricted to variables of their support, and often reduce the number of nodes in the data structure.
-We also introduce a new formalism for BDDs which allow us to simply describe the operations needed to obtain the previous results.
-We implemented this idea inside a small OCaml package and used it to solve the 8-queens puzzle \cite{queen8}.
+Reduced Ordered Binary Decision Diagram ((RO)BDD)\cite{Bryant1986, Somenzi1999} are the state-of-the-art representation for Boolean functions.
+They are used in various fields such as logic synthesis, artificial intelligence or combinatorics.
+However, BDDs suffer from to main issues: (1) their representation is memory expansive and (2) their manipulation is memory intensive as it induces many random memory accesses.
+
+
+Various variations of ROBDD exists such as Zero-suppressed Decision Diagram (ZDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output inverter"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
+
+
+In this report, we introduce a new generalization of the standard reduction rules that we call the "extraction of useless variables" or "U-extraction" for short.
+Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and to extract them from the local variable order.
+This generalization allows to add/remove useless variables in linear time (in the number of variables), reduces the number of node and tends to reduce the overall memory cost.
+However, several drawback arise: no in-place sifting (permutation of adjacent variables), bigger nodes of variable size and it slightly complexify the manipulation.
+
+
+We implemented both the "U-extraction" and the "output negation" variants in an OCaml program and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
+We observe an average of 25\% less nodes and 32\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
 \end{abstract}
 
 
@@ -154,7 +164,7 @@ The condition (3) simply guarantees that the representation of F consists exclus
 %[TODO]
 \begin{figure}
 \centering
-%\caption{A multi-rooted Binary Decision Diagramm (BDD)}
+%\caption{A multi-rooted Binary Decision Diagram (BDD)}
 \includeframe{1}{1}{}{draws.pdf}
 \caption{For each internal node, the outgoing full (respectively dashed) arrows represent the \texttt{then} (respectively \texttt{else}) arc which is followed when the variable is true (respectively false). Each numbered green square represent the identifier affected to each node during the construction process}
 \label{draws1}
