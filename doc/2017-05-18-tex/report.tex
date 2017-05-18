@@ -1,0 +1,620 @@
+\documentclass[a4paper,10pt]{article}
+%\usepackage{fullpage}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+%\usepackage{mathabx}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\usepackage{cite}
+
+\lstset{breaklines=true,
+  mathescape=true,
+	%language=caml,
+	numbers=left,
+  numberstyle=\tiny \bf, %\color{blue},
+  %stepnumber=2,
+  numbersep=10pt,
+  %firstnumber=11,
+  numberfirstline=true
+	}
+
+\title{BDD Compression}
+\author{Joan Thibault}
+
+\newcommand{\includeframe}[4]{\makebox[#2\linewidth]{\includegraphics[page=#1,width=#2\linewidth,trim=0cm 0cm 0cm 0cm,clip=true,#3]{#4}}}
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+We propose a more compact representation of Binary Decision Diagrams \cite{Bryant1986}\cite{Somenzi1999} (BDDs).
+If not mentioned otherwise, complexities are given as a function of the number of inputs.
+Our main result is an algorithm which compute a canonical representation of a function under non-support variables removal that takes a linear time and space overhead per node regarding the standard implementation of BDDs.
+However it allows to add non-support variables in linear time, determine in constant time if two functions are equal when restricted to variables of their support, and often reduce the number of nodes in the data structure.
+We also introduce a new formalism for BDDs which allow us to simply describe the operations needed to obtain the previous results.
+We implemented this idea inside a small OCaml package and used it to solve the 8-queens puzzle \cite{queen8}.
+\end{abstract}
+
+
+\newpage
+\tableofcontents
+\newpage
+\newcommand{\shannon}[3]{#1 \longrightarrow_S #2, #3}
+\newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
+
+\section{Introduction}
+Finite Algebrae are widely used in computer science.
+In various fields such as computer aided design, artificial intelligence, combinatorics or more recently automated provers.
+In these fields, many problems can be formulated as a sequence of operations over finite set functions. Hence, efficiently manipulating them allow to solve problems that would stay intractable with any naive approach without the need to write (and think/prove/optimize/implement) specific algorithm for each new problem.
+A particular case is made of Boolean Functions which can be used to represent any other functions over finite sets.
+Finding a true (or false) assignment to a function represented by a formula/circuit (or constraints) is become feasible even for large instances (more than thousands of variables) with breakthrough in SAT-solvers and constraint-solvers.
+However, other problems such has circuit optimization, counting problems, or solving quantified formulas are still pretty intractable (around hundreds of variables).
+This lecture will focus on one of the available solutions : manipulation of Reduced Ordered Binary Decision Diagrams also called (RO)BDDs.
+
+The interest of BDDs is due to their canonicity witch allow to compute the equivalence between Boolean functions in constant time (instead of exponential time usually).
+An other interest is that for each binary operators you apply ($\land, \lor, +$) on two BDDs of respective size $n$ and $m$ then the resulting graph has size smaller than $n\times m$.
+A similar result is available for quantifiers $\exists$ and $\forall$ which has an output of size at most quadratic in its input's size.
+Computing $\lnot$ can be performed in linear time and space when the resulting BDD has exactly the same size than the original one.
+These results (that we won't demonstrate) that the structure wont have an unpredictable size blow up when applying operators (which might happen for other representation such has the Sum Of Product normal form).
+
+
+This lecture will be organized as follow : first we will introduce and define BDDs, then we will focus on how to compress them using additional reduction rules.
+We will make a first attempt to formalize these reduction rules.
+After what, we will use this formalism to introduce a new compression scheme in order to detect and remove useless variables.
+
+\section{Preliminaries}
+
+Binary Decision Diagrams represent Boolean functions. In this section we introduce the notation we use for Boolean formulas and recall the basic results that we need for manipulating BDD manipulation.  We denote conjunction by $\land$, disjunction by $\lor$, negation by $\lnot$. We denote $\shannon{}{}{}$ the Shannon operator (n.b. $\shannon{x}{y}{z} = (x \land y) \lor (\lnot x \land z)$).
+
+\paragraph{Restrictions\\}
+
+For each Boolean function $f$ of arity $n+1$, we denote $f[i\leftarrow b] = (x_1, ..., x_n) \rightarrow f(x_1, .., x_{i-1}, b, x_i, ..., x_n)$ the function of arity n called the i-th positive restriction of $f$ if $b=1$, the negative one otherwise.
+
+
+For each Boolean function $f, g$ of arity $n$, we denote $f\star_i g  = (x_0, x_1, ..., x_n) \rightarrow \shannon{x_0}{f(x_1, ..., x_n)}{g(x_1, ..., x_n)}$. Nb : $ (f\star_i g)[i\leftarrow 1] = f$ and $ (f\star_i g)[i\leftarrow 0] = g$.
+
+\paragraph{Expansion Theorem (for restrictions)\\}
+Let $f$ be a function of arity $n$, then $f = f[i\leftarrow 1]\star_i f[i\leftarrow 0]$
+
+\paragraph{Cofactors\\}
+
+For every Boolean function $f$ of arity $n$, we denote $f[x_i = b] = (x_1, ..., x_n) \rightarrow f(x_1, .., x_{i-1}, b, x_{i+1}, ..., x_n)$ the function of arity $n$ called the i-th positive cofactor of $f$ if $b=1$, the negative one otherwise (n.b. $f[x_i = b]$ does not depend on $x_i$).
+
+
+For every Boolean function $f[i\leftarrow 0] \neq f[i \leftarrow 1]$ then $f$ depends on its i-th variable. We define the \textit{support} of $f$ the set of variable on which $f$ depends.
+
+Cofactors have the following properties:\begin{itemize}
+\item $(\lnot f)[x_i = b] = \lnot f[x_i = b]$
+\item $(f\land g)[x_i = b] = f[x_i = b] \land g[x_i = b]$
+\item $(f\lor g)[x_i = b] = f[x_i = b] \lor g[x_i = b]$
+\end{itemize}
+Nb : restrictions have similar properties
+
+\paragraph{Expansion Theorem (for cofactors)\\}
+Let $f$ be a function of arity $n$, then $f = \shannon{x_i}{f[x_i=1]}{f[x_i=0]}$
+
+\section{Binary Decision Diagram (BDD) and Canonicity}
+
+\paragraph{Definition of BDD\\}
+
+A Binary Decision Diagram is a directed acyclic graph $(V\cup \B, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$.
+The nodes are partitioned into two sets : $V$ is the set of internal nodes.
+Each node $v\in V$ has an $var$ identifying a variable, and two outgoing arcs (in $E$): $then$ and $else$. $\B$ are terminal nodes.
+The arcs are partitioned into two sets : $E$ is the set of arcs which has both a $source$ and a $node$ (or $destination$) field and $\Psi$ the set of arcs (which has a cardinality of $k$) that has only a $node$ (or $destination$) field (no $source$ field).
+
+%add beautiful draw (with \psi arcs)$
+
+We denote $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
+\item $\phi(0) = 0$, $\phi(1) = 1$
+\item $\psi(arc) = \phi(arc.node)$
+\item $\phi(node) = \shannon{node.var}{\psi(node.then)}{\psi(node.else)}$
+\end{itemize}
+
+We set that $\forall i arc_i \in \Psi, \psi(arc_i) = f_i$.
+
+We define the equivalence relation $=$ by : $e_1 = e_2$ if $e_1.node = e_2.node$ and $v_1 = v_2$ iff $v_1.var = v_2.var \land v_1.then = v_2.then \land v_1.else = v_2.else$ (nb. $1=1$ and $0=0$).
+
+\paragraph{Definition of ROBDD\\}
+A BDD is said \texttt{ordered} if (1) $\forall v\in V$, $v.then.node \in V \Rightarrow v.var > v.then.node.var$ and $v.else.node \in V \Rightarrow v.var > v.else.node.var$.
+%define an order over variables
+
+A BDD is said \texttt{reduced} if (2) $\forall v\in V v.then \neq v.else$ and (3) every node has an in-degree strictly positive.
+
+\paragraph{Theorem : ROBDD are canonical\\}
+
+Let consider a ROBDD $G$ representing $F=(f_1, ..., f_n)$ over a set of n variables $x_n < x_{n-1} < ... < x_1$. Then, for every nodes $v_1, v_2 \in G$, $\phi(v_1) = \phi(v_2) \Leftrightarrow v_1 = v_2$.
+
+\paragraph{Proof\\}
+The proof is by induction on $n$ the number of variables appearing in the representation.
+\subparagraph{Initialization\\}
+if $n=0$ then there is no internal nodes, then $F$ is a vector of constant functions whose representation is clearly unique (4 cases : $(0\in F) \times (1\in F)$).
+The constant function 0 (respectively 1) is represented by an arc to the terminal node 0 (respectively 1)
+\subparagraph{Induction\\}
+We assume the theorem true for any $0 \leq k < n$.
+
+Let $f$ be a component of $F$. We can write $f = \shannon{x_n}{f[x_n=1]}{f[x_n=0]}$, both $f[x_n=1]$ and $f[x_n=0]$ are uniquely determined by f and have unique representation.
+Suppose that $f$ does not depend on $x_n$ then $f=f[x_n=1]=[x_n=0]$ which is unique (and identical to the representation of $f[x_n=1]$).
+Indeed the condition (2) in the definition of a ROBDD, prevent the representation of $f$ from containing a node with a $var$ attribute $x_n$.
+Suppose now that $f$ does depend on $x_n$, then using the induction hypothesis its representation is unique.
+The condition (3) simply guarantees that the representation of F consists exclusively of the representations of its components, which are unique.
+
+%ajouter un commentaire sur le "à isomorphisme prés"
+%add a comment on why each
+
+\section{Basic Manipulation of Binary Decision Diagram (BDD)}
+
+
+%[TODO]
+\begin{figure}
+\centering
+%\caption{A multi-rooted Binary Decision Diagramm (BDD)}
+\includeframe{1}{1}{}{draws.pdf}
+\caption{For each internal node, the outgoing full (respectively dashed) arrows represent the \texttt{then} (respectively \texttt{else}) arc which is followed when the variable is true (respectively false). Each numbered green square represent the identifier affected to each node during the construction process}
+\label{draws1}
+\end{figure}
+
+
+\subsection{Effective construction}
+In practice one does not build the decision tree and then reduces it.
+Rather, BDDs are created starting from the BDDs for the constants and the variables by application of the usual Boolean connectives and are kept reduced at all times.
+At the same time several functions are represented by one multi-rooted diagram.
+Indeed, each node of a BDD has a function associated with it.
+If we have several functions, they will have subfunctions in common.
+For instance, if we have $f(x_0, x_1, x_2, x_3) = \shannon{x_1}{x_2}{x_3}$ and $f(x_0, x_1, x_2, x_3) = \shannon{\lnot x_1}{x_2}{x_3}$, we represent them like in figure. As a special case two equivalent functions are represented by the same BDD (not just two identical BDDs).
+This approach makes equivalence check a constant-time operation.
+Its implementation is usually based on a dictionary of all BDDs nodes in existence in an application.
+This dictionary is called the \textit{unique table}.
+Operations that build BDDs start from the bottom (the constant nodes) and proceed up to the function nodes.
+Whenever an operation needs to add to a BDD that it is building, it knows already the two nodes (say $f_1$ and $f_0$ represented by some identifier (usually implemented as pointers)) that going to be the new node's children and the decision variable $v$ so it just has to check if the node $(v, f_1, f_0)$ already exist and if so return its identifier and if not generate a new identifier and return it.
+Doing so, the equivalence check is reduced to pointer comparison.
+
+\paragraph{Operator \texttt{CONS}\\}
+
+
+Pseudo-code for dynamic construction of unique nodes.
+
+\begin{lstlisting}
+CONS(var, then, else){
+  if(then.node = else.node){
+    return then
+  }else if (mynode = node(var, then, else) in unique table){
+    return mynode's identifier
+  }else{
+    id = new identifier
+    store (mynode, id) in unique table
+    return arc(node = id)
+  }
+}
+\end{lstlisting}
+
+
+\subsection{Operators}
+
+\newcommand{\op}{~op~}
+
+The usual way of generating new BDDs is to combine existing BDDs using operators such as conjunction $AND$, disjunction $OR$, symmetric difference (XOR).
+As starting point one takes the simple BDDs for the function $f_i = x_i$, for all the variables in the functions of interest.
+We are therefore interested in an algorithm that given BDDs for $f$ and $g$, will build the BDDs for $f\op g$, where $\op$ is a binary operator (a Boolean function of two arguments). The basic idea comes from the \texttt{expansion theorem}, since :
+\[f\op g = f[i\leftarrow 1]\star_i f[i\leftarrow 0] \op g[i\leftarrow 1]\star_i g[i\leftarrow 0]\]
+then
+\[f\op g = (f[i\leftarrow 1]\op g[i\leftarrow 1])\star_i(f[i\leftarrow 0] \op g[i\leftarrow 0])\]
+Therefore, computing $f\op g$ can be performed inductively on the tree structure.
+
+Moreover, if we keep track of previous computation (this process is called memoization), we got a linear algorithm in the product of $f$ and $g$ representation's size.
+
+In order to be complete we have to implement NOT and AND (and XOR)
+
+\paragraph{Example : operator AND\\}
+The terminal cases for this operator are:\begin{itemize}
+\item $AND(f, 0) = AND(0, f) = 0$
+\item $AND(f, 1) = AND(1, f) = f$
+\item $AND(f, f) = f$
+\end{itemize}
+
+These conditions can be computed in constant time, then we use the \texttt{memoization table} to check if the result has already been computed, and if not we apply the \texttt{expansion theorem} and solve the problem inductively.
+
+\begin{lstlisting}
+AND(f, g){
+  if f > g{
+    return AND(g, f)
+  }else if(terminal case){
+    return terminal((f, g))
+  }else if (memoization table has entry (f, g) {
+    return memoization((f, g))
+  }else{
+    let x be the top variable of {f, g}
+    f1, f0 = cofactor(x, f)
+    //if f does not depends on x, then f1=f0=f
+    g1, g0 = cofactor(x, g)
+    //idem for g
+    //but either f or g has to depend on x
+    r1 = AND(f1, g1)
+    r0 = AND(f0, g0)
+    r = CONS(x, r1, r0)
+    insert {key = (f, g); value = r} in memoization
+    return r
+    }
+}
+\end{lstlisting}
+
+NB: computing $NOT(f)$ can be done in linear time and space in the number of node in the representation of $f$.
+
+\paragraph{Operator XOR}
+Very similar to AND with some differences in terminal case:\begin{itemize}
+\item $XOR(0, f) = XOR(f, 0) = f$
+\item $XOR(1, f) = XOR(f, 1) = NOT(f)$
+\item $XOR(f, f) = 0$
+\end{itemize}
+
+\section{Complemented Arcs Compression}
+\begin{figure}
+\centering
+%\caption{BDD with Complemented Arcs reduction}
+\includeframe{2}{1}{}{draws.pdf}
+\caption{Same BDD as in Figure~\ref{draws1}, when introducing complemented arcs (represented by an with a small circle) and maintaining the reduction rule that then arcss (represented by full arrows) can't be complemented arcs.}
+\label{draws2}
+\end{figure}
+
+\subsection{Motivation}
+We may notice that the respective representations of $f$ and $\lnot f$ are very similar. 
+The only difference being the values of the leaves that interchanged.
+This suggest the possibility of actually using the same sub-graph to represent both $f$ and $\lnot f$.
+
+
+Suppose we have a BDD representing $f$, then in order to represent $\lnot f$ we just have to remember that the function we have in the multi-rooted graph is complement of $f$.
+This can be performed by attaching a new attribute $comp$ (standing for complemented) on the arc pointing to the top node of $f$.
+This attribute can have two meaning: $x \rightarrow x$ or $x \rightarrow \lnot x$.
+Arcs with $comp$ set to $x \rightarrow x$ are called regular arcs.
+Arcs with $comp$ set to $x \rightarrow \lnot x$ are called complemented arcs.
+
+
+The use of Complemented arcs slightly complexify (e.g. we have to add a forth reduction rule) the manipulation of BDDs, but has three advantages:\begin{itemize}
+\item reduce memory usage (optimally by a factor 2).
+\item negation can be performed in constant time.
+\item checking $g = \lnot f$ when having $g$ and $f$ can be performed in constant time.
+\end{itemize}
+
+\subsection{Change in representation}
+We add a $comp$ (standing for complemented) field on arcs with value in Boolean.
+We add a new reduction rule (4) : $\forall v\in V, v.then.comp = 1$.
+We slightly change the definition of semantics:\begin{itemize}
+  \item $\psi(e) =\mathtt{~if~}e.comp = 1\mathtt{~then~}\phi(e.node)\mathtt{~else~}\lnot \phi(e.node)$
+\end{itemize}
+We remove the terminal node 1.
+The constant function 0 is represented by an arc with its $comp$ field set to $true$ and its $node$ field set to terminal node $0$.
+The constant function 1 is represented by an arc with its $comp$ field set to $false$ and its $node$ field set to terminal node $0$.
+
+
+\subsection{Canonicity}
+
+The proof is not very different from the previous one on regular BDDs but still has minor changes:\begin{itemize}
+\item In the initialization paragraph we to distinguish fewer cases as their is only one terminal node 0.
+\item In the recurrence step: we need to distinguish the case in which the outgoing arc of the function node for $f[x_n=1]$ is regular from the case in which it is complemented.
+Suppose the arc is regular.
+Then the representation of $f$ must consist of a regular arc pointing to a node labeled $x_n$ with children representing $f[x_n=1]$ and $f[x_n=0]$.
+Suppose the arc is complemented.
+Then the representation of $f$ must consist of a complement arc pointing to a node labeled $x_n$ with children representing $\lnot f[x_n=1]$ and $\lnot f[x_n=1]$.
+Hence, in both cases it is unique by the induction hypothesis and the first condition of the theorem.
+\end{itemize}
+
+%also some changes in introduction
+
+
+
+\subsection{More complex manipulations}
+\subsubsection{Effective reduction}
+
+\paragraph{Operator \texttt{CONS}\\}
+
+Pseudo-code for dynamic construction of unique nodes.
+
+\begin{lstlisting}
+CONS(var, then, else){
+  if(then.node = else.node & then.comp = else.comp){
+    return then
+  }else{
+    then' = arc(comp = true, node = then.node)
+    else' = arc(comp = (then.comp = else.comp), node = else.node)
+    id = if (mynode = node(var, then', else') in unique table){
+      return mynode's identifier
+    }else{
+      return new identifier
+    }
+  	return arc(comp = then.comp, node = id)
+  }
+}
+\end{lstlisting}
+
+\subsubsection{Operator computation}
+\paragraph{Operator NOT}
+Computing $NOT$ is reduced to turn an regular (respectively complemented) arc into a complemented (respectively regular) one.
+Which can be performed in constant time.
+
+\paragraph{Operator AND}
+We can add a new terminal case:\begin{itemize}
+\item $AND(f, \lnot f) = AND(\lnot f, f) = 0$
+\end{itemize}
+
+\paragraph{Operator XOR}
+Computing $NOT$ in constant time improve the practical run time of $XOR$ but does not change its complexity class.
+Moreover, using the property : $XOR(\lnot x, y) = \lnot XOR(x, y)$, we can save some constants.
+
+
+\section{Introduction of Reduced Decision Tree (RDT) and Canonical Shared Forest (CSF)}
+\subsection{Motivation}
+Adding attribute on arcs allowed us to (slightly) reduce computation time and space.
+In order to go further in this direction we have to introduce more formalism.
+In order to simplify reasoning we will split the current structure in two:\begin{itemize}
+\item the Canonical Shared Forest (CSF), which job is to ensure structural canonicity (i.e. attribute an identifier to every sub-trees and ensure that any identical sub-trees have the same identifier).
+\item the Reduced Decision Tree (RDT), which job is to ensure semantic canonicity (i.e. ensure that the semantic of operation is correct and that a function has exactly one representation)
+\end{itemize}
+In the following sections we describe the role of both these structures and how they work together.
+
+\subsection{From the \texttt{unique table} to the Canonical Shared Forest (CSF)}
+The Canonical Shared Forest (CSF) encapsulates the \texttt{unique table} and the \texttt{CONS} operator in one structure.
+Its job is to hide from the RDT the whole memory management.
+In its basic implementation interactions are reduced to two methods:\begin{itemize}
+\item \texttt{push} (previously called \texttt{CONS}) that takes a node and returns a unique identifier.
+\item \texttt{pull} that take an identifier and return the associated node.
+\end{itemize}
+A more complex implementation could use some commands in order to specify when a node is no longer required in order to save memory.
+In order to save time and extend memory we can think about using distributed memory units, efficiently using of the memory hierarchy or allow concurrent/parallel accesses.
+However such implementation details fall out of the scope of this lecture.
+
+NB: Implementing the CSF can lead to theoretical issues (especially when dealing with distributed, concurrent or parallel versions) but they are not specific to our problem.
+
+\subsection{From Shannon's Decision Tree to Reduced Decision Tree (RDT)}
+The Reduced Decision Tree (RDT) is the theoretical (and computational) core of the compression system.
+The basic is to represent sets of somehow related functions by a common graph instead of distinct ones.
+
+\subsubsection{Change in representation}
+
+\paragraph*{Definition : Syntax\\}
+
+We define a Compressed BDD by a graph $G = (V\cup T, \Psi\cup E)$ where:\begin{itemize}
+  \item there are two sets of vertices:\begin{itemize}
+    \item $V$, the set of internal nodes. Internal nodes have an out-degree of two : its sons are called $then$ and $else$.
+    \item $T$, the set of terminal nodes. Terminal nodes have an out-degree of zero.
+  \end{itemize}
+  \item there are two set of arcs:\begin{itemize}
+      \item $E$ the set of internal arcs which have a source node called $source$.
+    \item $\Psi$ the set of root arcs which has no source node.
+  \end{itemize} arcs in both sets have a destination called $node$ and carry some data called $coreduce$.
+\end{itemize}
+%put a beautiful draw with \psi arcs (no source)$
+
+\paragraph*{Definition : Semantic\\}
+
+We denote $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
+\item $\forall node\in T$, $\phi(node) = f_{node}$ (usually $\phi(0) = () \rightarrow 0 \in \B^0 \rightarrow \B$)
+\item $\phi(node) = \psi(node.then)\star_i\psi(node.else)$
+\item $\psi(arc) = \rho(arc.coreduce)(\phi(arc.node))$ for some function $\rho$ such that $\rho(arc.coreduce) : (\B^k \rightarrow \B) \rightarrow (\B^n \rightarrow \B)$ with $k\leq n$. $k$ (respectively $n$) is called the in-arity (respective out-arity) of $arc.coreduce$.
+\end{itemize}
+
+\paragraph{Reduction Rules}
+
+A CBDD is said syntactically reduced if it satisfies (1) some local property $P$ on nodes (and their two outgoing arcs) (2) there is no identical (up to isomorphism) sub-graph.
+
+
+A CBDD is said semantically reduced if $\forall v_1, v_2 \in V\cup T, \phi(v_1)=\phi(v_2) \Rightarrow v_1 = v_2$.
+
+\paragraph{Canonicity}
+
+
+We say that the local property $P$ ensures pseudo-canonicity if any syntactically reduced CBDD is semantically reduced.
+
+
+We say that the local property $P$ ensure full-canonicity (or the canonicity) if for all functions $f$, every representations of $f$ are equal up to graph isomorphism.
+
+
+\subsubsection{Reduction in constructor}
+
+\texttt{RDT.CONS}'s goal is to ensure that $P$ is verified when building a new internal node.
+We may notice that it has three distinct behaviors:\begin{enumerate}
+  \item the result can be build only with constant nodes and the two available nodes.
+  \item the result needs a node that has already been build.
+  \item the result needs a new node.
+\end{enumerate}
+In both cases 2 and 3, an access to CSF is needed.
+
+\begin{lstlisting}
+RDT.CONS(arc1, arc0){
+  match RDT-consensus(then, else, cmp) with
+    | Solved result $\longrightarrow$ result
+    | Partial (coreduce, reduce) $\longrightarrow$
+      arc(coreduce, CSF.PUSH(reduce))
+}
+\end{lstlisting}
+
+\texttt{RDT.SPLIT} performs the reverse operation of \texttt{RDT.CONS}. We may notice that it has two distinct behaviors:\begin{itemize}
+  \item the result can be computed without accessing to CSF
+  \item the result is computed accessing CSF.
+\end{itemize}
+
+\begin{lstlisting}
+RDT.SPLIT(arc)
+  if(terminal case){
+    return result
+  }else{
+    reduce = CSF.PULL(arc.reduce-ident)
+    arc1 = compose(arc.coreduce, reduce.then)
+    arc0 = compose(arc.coreduce, reduce.else)
+    return (arc1, arc0)
+  }
+}
+\end{lstlisting}
+\subsubsection{Reduction in operators}
+
+In order to compute $AND$, there are cases:\begin{itemize}
+  \item its a terminal case, so we can solve it immediately
+  \item its a memoized case, so we can return the result from memory
+  \item We can split the problem into two sub-problems (which can be solved inductively).
+\end{itemize}
+We slightly "rotate" these choices in order to abstract the memoization process
+
+\begin{lstlisting}
+AND-SOLVE(reduced-problem){
+  arcX, arcY = and-unpack(reduced-problem)
+  arcX1, arcX0 = RDT.SPLIT(arcX)
+  arcY1, arcY0 = RDT.SPLIT(arcY)
+  arc1 = match and-solver(arcX1, arcY1) with
+    | Solved result $\longrightarrow$ result
+    | Partial (coreduce, subproblem) $\longrightarrow$
+    	compose(coreduce, AND-SOLVE(subproblem))
+  arc0 = match and-solver(arcX0, arcY0) with
+    | Solved result $\longrightarrow$ result
+    | Partial (coreduce, subproblem) $\longrightarrow$
+    	compose(coreduce, AND-SOLVE(subproblem))
+  return RDT.CONS(arc1, arc0)
+}
+\end{lstlisting}
+\texttt{AND-SOLVE} is a recursive memoized algorithm (i.e. when AND-SOLVE(problem) returns value, we store an entry into a dictionary and when calling AND-SOLVE, we first look into the dictionary to know if the result is already available and if so return it).
+\begin{lstlisting}
+RDT.AND(arcX, arcY){
+  match and-solver(arcX, arcY) with
+    | Solved result $\longrightarrow$ result
+    | Partial (coreduce, subproblem) $\longrightarrow$
+    	compose(coreduce, AND-SOLVE(subproblem))
+}
+\end{lstlisting}
+
+
+
+\section{Pattern extraction : useless variables}
+\begin{figure}
+\centering
+%\caption{BDD with Extraction of useless variables}
+\includeframe{3}{1}{}{draws.pdf}
+\caption{Same BDD as in Figure~\ref{draws1}, when detecting and removing useless variables. Each red rectangle contain the support set of each arc's function.}
+\label{draws3}
+\end{figure}
+
+
+\begin{figure}
+\centering
+%\caption{BDD with Complemented Arcs reduction \& Extraction of useless variables}
+\includeframe{4}{1}{}{draws.pdf}
+\caption{Same BDD as in Figure~\ref{draws2} and~\ref{draws3}, with both additional reduction rules : complemented arcs and extraction of useless variables.}
+\label{draws4}
+\end{figure}
+
+\subsection{Motivation}
+We may notice that the respective representations of $f_1 = f(x_{i_1}, ..., x_{i_n})$ ($i_1 < ... < i_n$) and $f_2 = f(x_{j_1}, ..., x_{j_n})$ ($j_1 < ... < j_n$) are very similar.
+The only difference being the values of the $var$ field of each nodes within the representation of $f$.
+This suggest the possibility of actually using the same sub-graph to represent $f$, $f_1$ and $f_2$.
+
+
+Suppose we have a BDD representing $f$, then in order to represent $f_1$ we just have to remember which variable are in the support of $f$ (the relative order of variables in the support does not change).
+In this attribute, we will store the support set in the $coreduce$ field of arcs.
+
+Removing useless variables slightly complexify (e.g. we have to add an other reduction rule) the manipulation of BDDs, but has three advantages:\begin{itemize}
+\item reduce memory usage (in some cases there is an exponential gain, but on most cases its less significant).
+\item copying a function (if relative order of variables is unchanged) can be performed in constant time.
+\item checking $g = f$ modulo their useless variables -when having $g$ and $f$- can be performed in constant time (not very useful).
+\end{itemize}
+
+\subsection{Proof of Canonicity}
+
+We define the following reductions rules:\begin{itemize}
+  \item $\forall v\in V, v.then.coreduce \cup v.else.coreduce = \{0, ..., n\}$
+  \item $\forall v\in V\cup T, \phi(v)$ has no useless variable
+\end{itemize}
+
+For every function $f$, we denote $\tilde{f}$ the restriction of $f$ to its support (maintaining the relative order of the remaining variables).
+
+\paragraph{Existence}
+Let $f\in\B^n\rightarrow\B$ be a Boolean Function. We recursively build a valid representation $R(f)$ of $f$ which verify the reduction rules:\begin{itemize}
+  \item $R((x_1, ..., x_n) \rightarrow b) = arc(coreduce = \emptyset, node = 1)$, where $b\in\B$
+  \item $R(f) = $\begin{itemize}
+    \item We denote $S=\{i_1 < ... < i_k\}$ the support set of $f$.
+    \item $R(f) = arc(coreduce = S, node = node(then = R(\tilde{f}[0\leftarrow 1]), else = R(\tilde{f}[0\leftarrow 0])))$
+  \end{itemize}
+\end{itemize}
+
+\paragraph{Uniqueness}
+We prove canonicity by induction on $n$ the arity of the represented function.
+\subparagraph{Initialization}
+Let $R$ be a representative of a function of arity 0. We consider the root arc $a$, so $a.coreduce = \emptyset$ (the only set of cardinality lower than zero). However the \texttt{in-arity} of $\emptyset$ is 0, so $a.node$ represent a constant function. Hence either $R = arc(coreduce = \emptyset, node = 0)$ representative of the constant function 0 or $R = arc(coreduce = \emptyset, node = 1)$ representative of the constant function 1.
+\subparagraph{Induction}
+Assuming that the hypothesis holds for every $0\leq k\leq n$.
+Let $R$ be a representative of $f$, we denote $a$ its root arc.
+\begin{itemize}
+  \item We assume that $a.coreduce \neq \{0, ..., n\}$. Then the arity of $g = \phi(a.node)$ is lower strictly lower than $n$. However $g$ has a unique representation (recurrence hypothesis) and $g$ has no useless variable (because of the reduction rules on applied on node $a.node$). So the only useless variable in $f$ are the one that does not appear in $a.coreduce$. Therefore $R$ is unique.
+  \item We assume that $a.coreduce = \{0, ..., n\}$. We denote $a_1$ (respectively $a_0$) the root arc of the representation (unique by recurrence hypothesis) of $f_1 = f[0\leftarrow 1] = \psi(a.node.then)$ (respectively $f_0 = f[0\leftarrow 0] = \psi(a.node.else)$).\begin{itemize}
+    \item We assume that $f_1 = f_0$ then $a_1 = a_0$ then either induce that $0\not\in a.coreduce$ (which induce a contradiction with $S=\{0, ..., n\}$) or R does not satisfies the reduction rules.
+    \item Therefore $f_1\neq f_0$.\begin{itemize}
+      \item We assume that $a_1.coreduce~\cup~a_0.coreduce \neq \{0, ..., n-1\}$. Then it exist $0\leq i\leq n-1$ such that $x_i$ is useless for both $f_1$ and $f_0$. Hence $i+1$ is useless for $f$. So R does not satisfies the reduction rules.
+      \item Therefore $a_1.coreduce~\cup~a_0.coreduce = \{0, ..., n-1\}$. Then $a = arc ( coreduce = \{0, ..., n\},~node = node(then = a_1,~else = a_0)$. Therefore $R$ is unique.
+    \end{itemize}
+  \end{itemize}
+\end{itemize}
+
+\subsection{Reduction in construction}
+Moreover, as we already define the main algorithm for construction, we just have to write the specific sub-routines:
+\begin{lstlisting}
+RDT-consensus($then$, $else$, cmp){
+  if (cmp = 0) & $then.coreduce$ = $else.coreduce$ then{
+    we denote $\{i_1 < ... < i_k\} = then.coreduce$
+    Solved arc(then = $\{i_1+1 < ... < i_k+1\}$, node = then.node)
+  }else{
+    we denote $U = \{i_1 < ... < i_k\} = then.coreduce \cup else.coreduce$
+    we denote $A = \{a_1 < ... < a_l\}$ the indexes of $then.coreduce$ in $U$.
+    we denote $B = \{b_1 < ... < b_m\}$ the indexes of $else.coreduce$ in $U$.
+    Partial (coreduce = $\{0, i_1+1, ..., i_k+1\}$, reduce = node(then = arc(coreduce = $A$, node = $then.node$), else = arc(coreduce = $B$, node = $else.node$) ) )
+  }
+}  
+\end{lstlisting}
+\begin{lstlisting}
+compose$(\{i_1 < ... < i_n\}$, arc(coreduce = $\{j_1 < ... < j_k\}$, node = node){
+  return arc(coreduce = $\{i_{j_1} < ... < i_{j_k}\}$, node = node)
+}
+\end{lstlisting}
+
+\subsection{Reduction in operators}
+Moreover, as we already define the main algorithm for computing AND, we just have to write the specific sub-routines:
+\begin{lstlisting}
+and-unpack(reduced-problem){
+  return (reduced-problem.arcX, reduced-problem.arcY)
+}
+\end{lstlisting}
+\begin{lstlisting}
+and-solver(arcX, arcY){
+  if (terminal cases){
+    return result //removing useless variables does not add terminal cases
+  }else{
+    we denote $U = \{i_1 < ... < i_k\} = then.coreduce \cup else.coreduce$
+    we denote $A = \{a_1 < ... < a_l\}$ the indexes of $then.coreduce$ in $U$.
+    we denote $B = \{b_1 < ... < b_m\}$ the indexes of $else.coreduce$ in $U$.
+    if arcX $\leq$ arcY
+    then{
+      Partial (coreduce = U, subproblem = (arcX = arc(coreduce = A, node = arcX.node), arcY = arc(coreduce = B, node = arcY.node)))
+    }else{
+      Partial (coreduce = U, subproblem = (arcY = arc(coreduce = A, node = arcX.node), arcX = arc(coreduce = B, node = arcY.node)))
+    }
+  }
+}
+\end{lstlisting}
+
+\section{Conclusion}
+
+In this lecture, we introduced a formal definition of BDDs and explained how to manipulate it.
+As mentioned in introduction these manipulations can be used to solve any Boolean function related problem especially the problem of satisfying a quantified Boolean formula which is known to PSPACE-Complete.
+
+
+Then, we explained how to use complemented arcs in order to slightly reduce the memory usage, while increasing the complexity of the structure.
+However, this compression scheme is very interesting because it allow to compute the NOT operator in constant time without accessing to the unique table.
+
+
+Then, we introduced a new formalism in order to more strictly separate memory accesses and syntactical canonicity (called the Canonical Shared Forest) from node computation and semantic canonicity (called Reduced Decision Tree).
+
+\newpage
+\bibliography{biblio}{}
+\bibliographystyle{plain}
+\end{document}
