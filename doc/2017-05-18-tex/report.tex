@@ -42,13 +42,13 @@ However, BDDs suffer from to main issues: (1) their representation is memory exp
 Various variations of ROBDD exists such as Zero-suppressed Decision Diagram (ZDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output inverter"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
 
 
-In this report, we introduce a new generalization of the standard reduction rules that we call the "extraction of useless variables" or "U-extraction" for short.
+In this report, we introduce a new generalization of the standard reduction rules that we call the "extraction of useless variables" or "extract U" for short.
 Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and to extract them from the local variable order.
 This generalization allows to add/remove useless variables in linear time (in the number of variables), reduces the number of node and tends to reduce the overall memory cost.
 However, several drawback arise: no in-place sifting (permutation of adjacent variables), bigger nodes of variable size and it slightly complexify the manipulation.
 
 
-We implemented both the "U-extraction" and the "output negation" variants in an OCaml program and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
+We implemented both the "extract U" and the "output negation" variants in an OCaml program and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
 We observe an average of 25\% less nodes and 32\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
 \end{abstract}
 
@@ -60,19 +60,19 @@ We observe an average of 25\% less nodes and 32\% less memory when representing 
 \newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
 
 \section{Introduction}
-Finite Algebrae are widely used in computer science.
-In various fields such as computer aided design, artificial intelligence, combinatorics.
-In these fields, many problems can be formulated as a sequence of operations over finite set functions. Hence, efficiently manipulating them allow to solve problems that would stay intractable with any naive approach without the need to write (and think/prove/optimize/implement) specific algorithm for each new problem.
-A particular case is made of Boolean Functions which can be used to represent any other functions over finite sets.
-Finding a true (or false) assignment to a function represented by a formula/circuit (or constraints) is become feasible even for large instances (more than thousands of variables) with breakthrough in SAT-solvers and constraint-solvers.
-However, other problems such has circuit optimization, counting problems, or solving quantified formulas are still pretty intractable (around hundreds of variables).
-This lecture will focus on one of the available solutions : manipulation of Reduced Ordered Binary Decision Diagrams also called (RO)BDDs.
 
-The interest of BDDs is due to their canonicity witch allow to compute the equivalence between Boolean functions in constant time (instead of exponential time usually).
-An other interest is that for each binary operators you apply ($\land, \lor, +$) on two BDDs of respective size $n$ and $m$ then the resulting graph has size smaller than $n\times m$.
-A similar result is available for quantifiers $\exists$ and $\forall$ which has an output of size at most quadratic in its input's size.
-Computing $\lnot$ can be performed in linear time and space when the resulting BDD has exactly the same size than the original one.
-These results (that we won't demonstrate) that the structure wont have an unpredictable size blow up when applying operators (which might happen for other representation such has the Sum Of Product normal form).
+Checking if two logic circuits (i.e. a Directed Acyclic Graph which nodes represent binary operators) are equivalent (i.e. implement the same Boolean function) is known to be a NP-complete problem.
+This problem arises when checking that a circuit has been properly optimized (i.e. the circuit is better according to some metric, but the function is unchanged).
+In order to solve this problem, a possible approach is to translate it into a CNF formula (performed in linear time in the number of nodes in both circuits by introduction new variables) and then use a SAT-solver.
+Alternatively, one can compile both circuits into ROBDDs (a structure which has been proven by Bryant et al. to be canonical in 1986) then check that the two representative are identical.
+If the structure was build using hash-consing, the identity test can be performed in constant time, however the compilation might cost exponential time.
+A (RO)BDD (Reduced Ordered Decision Diagram) is a Directed Acyclic Graph, is similar to Shannon's Decision Tree, except that (1) identical sub-trees are merged and (2) nodes with both edges leading to the same node are removed.
+BDDs can be used to efficiently solve the Circuit SATisfiability problem (CSAT), the Quantified SAT (QSAT), and counting problems such as \#{}SAT, \#{}CSAT, \#{}QSAT, \#{}QCSAT.
+Thus, BDDs have many applications: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking, Combinatorial Interaction Testing, etc.
+
+However, BDDs are memory expansive as their size tends to grow exponentially with the number of variables.
+The size of a BDD is highly dependent on the variable's order.
+For example the function
 
 
 This lecture will be organized as follow : first we will introduce and define BDDs, then we will focus on how to compress them using additional reduction rules.
