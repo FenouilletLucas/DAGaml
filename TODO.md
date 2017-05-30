@@ -25,17 +25,15 @@
 - add a binary dump to UBDAG
 - NEXT: implement SUBDAG as an upgraded special case of taggedSUBDAG
 	-- NB: ( taggedSUBDAG --> SUBDAG ) and ( SUBDAG --> notagSUBDAG )
-- NEXT: implement a version of (S)UBDAG which does not uses Ephemeron
 
 #Tools
 - add binary tree
 - add tree iterator
 
 #GroBdd
-- implement the CPX (non-significant variables + 1-predictions) version of GroBdd
-	-- TO THINK: 1-preduction + polarity-phase invariant version
+- implement the NUA-X (non-significant variables + anti-variables + 1-predictions) version of GroBdd
+	-- TO THINK: NNI-X (polarity-phase invariant + 1-predictions)
+	-- TO THINK: NU-X+ (NU-X + left fatctorisation), NNI+ (NNI + left factorisation), NNI-X+ (NNI-X + left factorisation), etc.
+- implement reordering, exhaustive + heuristics
 - TO THINK: last variables packing
 	-- profile: hit count vs arity in AND/XOR.manager
-
-##EVALUATION
-- compare \*-{tc, n}queens under CP-X vs ZDD 

@@ -25,7 +25,7 @@
   numberfirstline=true
 	}
 
-\title{BDD Compression}
+\title{A Generalized Reduction of Ordered Binary Decision Diagram}
 \author{Joan Thibault}
 
 \newcommand{\includeframe}[4]{\makebox[#2\linewidth]{\includegraphics[page=#1,width=#2\linewidth,trim=0cm 0cm 0cm 0cm,clip=true,#3]{#4}}}
@@ -39,13 +39,13 @@ They are used in various fields such as logic synthesis, artificial intelligence
 However, BDDs suffer from to main issues: (1) their representation is memory expansive and (2) their manipulation is memory intensive as it induces many random memory accesses.
 
 
-Various variations of ROBDD exists such as Zero-suppressed Decision Diagram (ZDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output inverter"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
+Various variations of ROBDD exist such as Zero-suppressed Decision Diagram (ZDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output inverter"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
 
 
 In this report, we introduce a new generalization of the standard reduction rules that we call the "extraction of useless variables" or "extract U" for short.
-Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and to extract them from the local variable order.
-This generalization allows to add/remove useless variables in linear time (in the number of variables), reduces the number of node and tends to reduce the overall memory cost.
-However, several drawback arise: no in-place sifting (permutation of adjacent variables), bigger nodes of variable size and it slightly complexify the manipulation.
+Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and extracts them from the local variable order.
+This generalization allows to add/remove useless variables in linear time (in the number of variables), reduces the number of nodes and tends to reduce the overall memory cost.
+However, several drawbacks arise: no in-place sifting (permutation of adjacent variables), bigger nodes of variable size and it slightly complexifies manipulations.
 
 
 We implemented both the "extract U" and the "output negation" variants in an OCaml program and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
@@ -58,26 +58,53 @@ We observe an average of 25\% less nodes and 32\% less memory when representing 
 \newpage
 \newcommand{\shannon}[3]{#1 \longrightarrow_S #2, #3}
 \newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
+\newcommand{\F}{\mathbb{F}}%{\{0, 1\}}
 
 \section{Introduction}
 
-Checking if two logic circuits (i.e. a Directed Acyclic Graph which nodes represent binary operators) are equivalent (i.e. implement the same Boolean function) is known to be a NP-complete problem.
-This problem arises when checking that a circuit has been properly optimized (i.e. the circuit is better according to some metric, but the function is unchanged).
-In order to solve this problem, a possible approach is to translate it into a CNF formula (performed in linear time in the number of nodes in both circuits by introduction new variables) and then use a SAT-solver.
-Alternatively, one can compile both circuits into ROBDDs (a structure which has been proven by Bryant et al. to be canonical in 1986) then check that the two representative are identical.
-If the structure was build using hash-consing, the identity test can be performed in constant time, however the compilation might cost exponential time.
-A (RO)BDD (Reduced Ordered Decision Diagram) is a Directed Acyclic Graph, is similar to Shannon's Decision Tree, except that (1) identical sub-trees are merged and (2) nodes with both edges leading to the same node are removed.
-BDDs can be used to efficiently solve the Circuit SATisfiability problem (CSAT), the Quantified SAT (QSAT), and counting problems such as \#{}SAT, \#{}CSAT, \#{}QSAT, \#{}QCSAT.
-Thus, BDDs have many applications: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking, Combinatorial Interaction Testing, etc.
+Nowadays, it exists many critical systems which rely on digital circuits: in transportation (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
+One way of minimizing risks in digital parts of these systems is to provide a formal proof that they respect their specification.
+On the other hand, we want to minimize costs and energy consumption while maximizing performances of these digital circuits.
+In order to efficiently optimize digital circuits we rely on complex programs.
+However, these programs are rarely proven themselves, thus, circuits optimized using them might not be equivalent to the initial design, therefore, might not respect the specification.
+The obvious solution would be to prove optimizing programs, however two majors issues arise : these programs are complex  (thus, proving them would be expansive) and might be proprietary (thus, one cannot check that the proof is correct).
+A simpler alternative is to design a program which check that two digital circuits are equivalent.
+With this alternative, the only piece of software which needs to be proven is the "equivalence checker".
+
+
+In order to prove that two digital circuits are equivalent, their is two main algorithmic solutions:
+Firstly, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
+This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation}, early conflict detection or \textit{conflict driven clause learning}.
+Secondly, the compilation of both circuits into Reduced Ordered Binary Decision Diagrams (ROBDDs).
+A ROBDD is a canonical structure which represent a function, thus, once compiled, the identity test can be performed in constant time.
+However, the compilation might take an exponential time in the number of variable.
+In this report we will focus on ROBDDs.
+
+
+ROBDD have various other applications such as : Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking, Combinatorial Interaction Testing, etc.
+
+%\begin{figure}
+%\[f_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = (x_0 \land x_1) \lor \dots \lor (x_{2n} \land x_{2n+1})\]
+%\[g_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = f_n(x_0, x_{n+1}, \dots, x_n, x_{2n+1})\]
+%\caption{The ROBDD representing the function $f_n$ has a linear size in $n$, the one representing $g_n$ has a an exponential size in $n$.}
+%\label{OrderExplosion}
+%\end{figure}
+
 
 However, BDDs are memory expansive as their size tends to grow exponentially with the number of variables.
-The size of a BDD is highly dependent on the variable's order.
-For example the function
+Various variants have been invented in order to capture some semantic properties of the function and reduce the memory consumption.
+For example, Zero suppressed binary Decision Diagram (ZDD) are better suited for representing sparse functions.
+In this report we will use the "output inverter" variant\cite{BryantVariantN}, which extends the reduction rules in order to guarantee canonicity under negation.
+Thus, in addition to reduce the size of the structure, allows to negate a function in constant time (reducing the set of useful binary operators to XOR and AND).
+Other extensions of the reduction rules exist such as: "input negation"\cite{MinatoVariants} (each edge can complement the first locally first input), "shifting variables"\cite{MinatoVariants} (each edge store the number of useless variables before the next significant variables) or "dual edge"\cite{RolfVariantDual} (we define the dual of a function $f$ by $\bar{f} = X \longrightarrow \bar{f}(\bar{X})$, therefore the reduction works similarly to the "output inversion").
 
 
-This lecture will be organized as follow : first we will introduce and define BDDs, then we will focus on how to compress them using additional reduction rules.
-We will make a first attempt to formalize these reduction rules.
-After what, we will use this formalism to introduce a new compression scheme in order to detect and remove useless variables.
+In addition to use the "output inverter" variant, we introduce a new variant which allows to extract useless variables (a.k.a non-support variables).
+A useless variables, is a variable which does not change the results such as $x_1$ in $f(x_0, x_1, x_2) = x_0 \land x_2$ or $x_0$ in $g(x_0) = x_0 \land \lnot x_0$.
+We call this new variant "extraction useless variables" or "U-extract" for short.
+
+
+This report will be organized as follows. In Section~1 we formally introduce Boolean functions, useless variable and ROBDDs. In Section~2, we prove that "U-extract" maintains the canonicity. In Section~3, we expose an estimations of improvements on three different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
 \section{Preliminaries}
 
