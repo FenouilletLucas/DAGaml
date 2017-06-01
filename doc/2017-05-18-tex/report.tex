@@ -57,6 +57,7 @@ We observe an average of 25\% less nodes and 32\% less memory when representing 
 \tableofcontents
 \newpage
 \newcommand{\shannon}[3]{#1 \longrightarrow_S #2, #3}
+\newcommand{\N}{\mathbb{N}}%{\{0, 1\}}
 \newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
 \newcommand{\F}{\mathbb{F}}%{\{0, 1\}}
 
@@ -104,54 +105,76 @@ A useless variables, is a variable which does not change the results such as $x_
 We call this new variant "extraction useless variables" or "U-extract" for short.
 
 
-This report will be organized as follows. In Section~1 we formally introduce Boolean functions, useless variable and ROBDDs. In Section~2, we prove that "U-extract" maintains the canonicity. In Section~3, we expose an estimations of improvements on three different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
+This report will be organized as follows. In Section~1, we formally introduce Boolean functions and useless variable. In Section~2, we introduce ROBDDs. In Section~3, we introduce the "U-extract" variant and prove that it maintains the canonicity. In Section~4, we expose an estimations of improvements on three different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
-\section{Preliminaries}
+\section{Notations}
 
-Binary Decision Diagrams represent Boolean functions. In this section we introduce the notation we use for Boolean formulas and recall the basic results that we need for manipulating BDD manipulation.  We denote conjunction by $\land$, disjunction by $\lor$, negation by $\lnot$. We denote $\shannon{}{}{}$ the Shannon operator (n.b. $\shannon{x}{y}{z} = (x \land y) \lor (\lnot x \land z)$).
+Reduced Ordered Binary Decision Diagrams represent Boolean functions.
+In this section we introduce notations necessary to their manipulation.
 
-\paragraph{Restrictions\\}
+
+We denote the set of Booleans $\B = \{0, 1\}$.
+The set of Boolean vector of size $n\in\N$ is denoted $\B^n$.
+The set of Boolean functions of arity $n\in\N$ is denoted $\F_n = \B^n \longrightarrow \B$.
+
+
+We denote conjunction by $\land$, disjunction by $\lor$, negation by $\lnot$.
+We denote $\shannon{}{}{}$ the Shannon operator (n.b. $\shannon{x}{y}{z} = (\lnot x \land y) \lor (x \land z)$).
+
+\paragraph{Restriction\\}
+
+Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$, $i~(0\leq i < n+1)$ be an integer and $b\in\B$ be a Boolean.
+We denote $f[i\leftarrow b]$ the Boolean function of arity $n$ defined by $f[i\leftarrow b](x_1, \dots, x_n) = f(x_0, \dots, x_{i-1}, b, x_i, \dots, x_n)$.
+$f[i\leftarrow 0]$ (respectively $f[i\leftarrow 1]$) is called the $i$-th negative (respectively positive) restriction.
 
 For each Boolean function $f$ of arity $n+1$, we denote $f[i\leftarrow b] = (x_1, ..., x_n) \rightarrow f(x_1, .., x_{i-1}, b, x_i, ..., x_n)$ the function of arity n called the i-th positive restriction of $f$ if $b=1$, the negative one otherwise.
 
 
-For each Boolean function $f, g$ of arity $n$, we denote $f\star_i g  = (x_0, x_1, ..., x_n) \rightarrow \shannon{x_0}{f(x_1, ..., x_n)}{g(x_1, ..., x_n)}$. Nb : $ (f\star_i g)[i\leftarrow 1] = f$ and $ (f\star_i g)[i\leftarrow 0] = g$.
+Let $f$ be a function of arity $n+1$, we denote $f_0 = f[0\leftarrow 0]$ (respectively $f_1 = f[0\leftarrow 1]$) the function of arity $n$.
 
-\paragraph{Expansion Theorem (for restrictions)\\}
-Let $f$ be a function of arity $n$, then $f = f[i\leftarrow 1]\star_i f[i\leftarrow 0]$
+\paragraph{Construction\\}
 
-\paragraph{Cofactors\\}
+Let $f, g \in F_n$ be Boolean functions of arity $n$ and $i~(0\leq i < n+1)$ be an integer.
+We denote $f\star_ig$ the Boolean function of arity $n+1$ defined by $(f\star_ig)(x_0, \dots, x_{i-1}, y, x_i, \dots, x_n) = \shannon{y}{f(x_0, \dots, x_n)}{g(x_0, \dots, x_n)}$.
 
-For every Boolean function $f$ of arity $n$, we denote $f[x_i = b] = (x_1, ..., x_n) \rightarrow f(x_1, .., x_{i-1}, b, x_{i+1}, ..., x_n)$ the function of arity $n$ called the i-th positive cofactor of $f$ if $b=1$, the negative one otherwise (n.b. $f[x_i = b]$ does not depend on $x_i$).
+We denote $\star = \star_0$
 
+Nb: $(f\star_i g)[i\leftarrow 0] = f$ and $ (f\star_i g)[i\leftarrow 1] = g$ ($(f\star g)_0 = f$ and $ (f\star g)_1 = g)$.
 
-For every Boolean function $f[i\leftarrow 0] \neq f[i \leftarrow 1]$ then $f$ depends on its i-th variable. We define the \textit{support} of $f$ the set of variable on which $f$ depends.
+\paragraph{Expansion Theorem\\}
+Let $f$ be a function of arity $n$, then $\forall i, 0\leq i < n \Rightarrow f = f[i\leftarrow 0]\star_i f[i\leftarrow 1]$ (in particular $f = f_0 \star f_1$)
 
-Cofactors have the following properties:\begin{itemize}
-\item $(\lnot f)[x_i = b] = \lnot f[x_i = b]$
-\item $(f\land g)[x_i = b] = f[x_i = b] \land g[x_i = b]$
-\item $(f\lor g)[x_i = b] = f[x_i = b] \lor g[x_i = b]$
+\paragraph{Restriction Distributivity\\}
+
+\begin{itemize}
+\item $(\lnot f)[i\leftarrow b] = \lnot f[i\leftarrow b]$
+\item $(f\land g)[i\leftarrow b] = f[i\leftarrow b] \land g[i\leftarrow b]$
+\item $(f\lor g)[i\leftarrow b] = f[i\leftarrow b] \lor g[i\leftarrow b]$
 \end{itemize}
-Nb : restrictions have similar properties
 
-\paragraph{Expansion Theorem (for cofactors)\\}
-Let $f$ be a function of arity $n$, then $f = \shannon{x_i}{f[x_i=1]}{f[x_i=0]}$
+\paragraph{Useless Variables\\}
 
-\section{Binary Decision Diagram (BDD) and Canonicity}
+Let $f$ be a function of arity $n$, and $i$ be an integer ($0\leq i < n$).
+The $i$-th variable of $f$ is said useless iff $f[i\leftarrow 0] = f[i\leftarrow 1]$
 
-\paragraph{Definition of BDD\\}
+\section{Reduced Ordered Binary Decision Diagram (ROBDD) and Canonicity}
 
-A Binary Decision Diagram is a directed acyclic graph $(V\cup \B, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$.
-The nodes are partitioned into two sets : $V$ is the set of internal nodes.
-Each node $v\in V$ has an $var$ identifying a variable, and two outgoing arcs (in $E$): $then$ and $else$. $\B$ are terminal nodes.
-The arcs are partitioned into two sets : $E$ is the set of arcs which has both a $source$ and a $node$ (or $destination$) field and $\Psi$ the set of arcs (which has a cardinality of $k$) that has only a $node$ (or $destination$) field (no $source$ field).
+\paragraph{Definition of ROBDD\\}
+
+A Reduced Ordered Binary Decision Diagram is a directed acyclic graph $(V\cup T, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$.
+Nodes are partitioned into two sets : the set of internal nodes $V$ and the set of terminal nodes $T$.
+Every internal node $v\in V$ has one field $var$, which represent the index of a variable and two outgoing edges respectively denoted $then$ and $else$.
+When using the "output inverter" variant, there is only one terminal called 0, which represent the functions which always return 0.
+Arcs are partitioned into two sets : the set of root arcs $\Psi$ and the set of internal arcs $E$.
+There is exactly $k$ root arcs, a root arc is denoted $\Psi_i$ with $0\leq i < k$, informally, $\Phi_i$ is the root of the ROBDD representing $f_i$.
+Every arc has an inversion field $neg \in \B$ and a destination node denoted $node$.
 
 %add beautiful draw (with \psi arcs)$
 
 We denote $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
-\item $\phi(0) = 0$, $\phi(1) = 1$
-\item $\psi(arc) = \phi(arc.node)$
-\item $\phi(node) = \shannon{node.var}{\psi(node.then)}{\psi(node.else)}$
+\item $\phi(0 \in T) = 0$
+\item $\psi(arc \in \Psi \cup E) = arc.neg \oplus \phi(arc.node)$
+\item $\phi(node \in V) = \shannon{node.var}{\psi(node.then)}{\psi(node.else)}$
 \end{itemize}
 
 We set that $\forall i arc_i \in \Psi, \psi(arc_i) = f_i$.
