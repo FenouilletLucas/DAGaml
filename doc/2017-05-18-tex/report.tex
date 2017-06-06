@@ -293,6 +293,35 @@ Very similar to AND with some differences in terminal case:\begin{itemize}
 
 \subsection{Motivation}
 
+In one hand, a ROBDD can be understood as an automaton recognizing a language compose of binary words.
+On the other hand, a ROBDD can be understood as a logic circuit with limited conciseness.
+By limited conciseness, we mean that their is functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
+For example, the integer multiplication has a quadratic AIG representing it, however, it is proven \cite{Bryant1986} that a ROBDD representing it has at least an exponential number of nodes (thus, of gates).
+
+The "output inverter" variant, by adding expressiveness to edges, improves the conciseness.
+We want to go further in this approach by allowing more complex transformation on edges while maintaining canonicity.
+Such transformation can disturb variables' order of evaluation, allowing to represent "simple" decision processes in more concise way.
+Furthermore, some transformation (within the range of transformation allowed) could have their complexity drastically reduced.
+For example, using the "output inverter" variant, the complementation's time and space complexity which goes from linear in the number of node to constant.
+
+Three set of transformation that would be of great interest are the "useless variable extraction" (or "U extract" for short), the "inputs inverters" and "1-predictions extraction" (or "X extract" for short).
+
+
+The "U extract" variant allows to introduce useless variables, thus ensure that the function represented by any node, does not have useless variable.
+Therefore, it sets an upper bound on the number of node of arity $n$ to $2^{2^n}$ (this upper bound is not reached).
+Furthermore, it allows to "copy" functions at (almost) no cost as the expression $f(x_1, x_3, x_5, x_7)$ and $f(x_0, x_1, x_3, x_5)$ are represented using the same structure.
+
+
+The "inputs inverters" variant would allow to complement inputs on any edge.
+The reduction rules would ensure that there is at most $2^{2^n-n}$ nodes of arity $n$ (this upper bound is not reached).
+However, introducing this variant breaks the canonicity, therefore, while working on a generalization of it, we do not discuss it further in this report.
+
+We define a 1-prediction as follow:
+Let $f$ be a Boolean function of arity $n$, $i$ be an integer ($0\leq i < n$), $x$ and $y$ be Booleans, we say that the function $f$ admit a 1-prediction $(i, x, y)$ iff $f[i\leftarrow x] = y$.
+The "X extract" variant, by allowing to extract 1-predictions, represents a generalization of ZBDD (Zero Suppressed Binary Decision Diagram), thus, allows to efficiently represent sparse function.
+This variant is compatible with the "output inverter" variant, however it over-complexifies the reduction rules, therefore, while reformulating reduction rules in a simpler way, we do not discuss it further in this report.
+
+
 \subsection{Definition of GroBdd}
 
 A GroBdd is very similar to an actual ROBDD, the two main differences being that (1) it represents a vector of Boolean functions with a finite number of variables possibly of different arity and (2) on every edge their is a transformation.
