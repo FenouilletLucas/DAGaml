@@ -60,6 +60,9 @@ We observe an average of 25\% less nodes and 32\% less memory when representing 
 \newcommand{\N}{\mathbb{N}}%{\{0, 1\}}
 \newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
 \newcommand{\F}{\mathbb{F}}%{\{0, 1\}}
+\newcommand{\Y}{\mathbb{Y}}%{\{0, 1\}}
+\newcommand{\I}{\mathbb{I}}%{\{0, 1\}}
+\newcommand{\Ynode}{\Y\mathtt{-node}}
 
 \section{Introduction}
 
@@ -191,11 +194,7 @@ Let consider a ROBDD $G$ representing $F=(f_1, ..., f_n)$ over a set of n variab
 
 A proof a proof of this theorem, is available in the review of Somenzi et al.\cite{Somenzi1999}.
 
-\subsection{Basic Manipulation of Binary Decision Diagram (BDD)}
-
-
-
-\subsubsection{Effective construction}
+\subsection{Effective construction}
 In practice one does not build the decision tree and then reduces it.
 Rather, BDDs are created starting from the BDDs for the constants and the variables by application of the usual Boolean connectives and are kept reduced at all times.
 At the same time several functions are represented by one multi-rooted diagram.
@@ -234,61 +233,6 @@ let cons var if0(*else arc*) if1(*then arc*) =
   )
 \end{lstlisting}
 
-
-\subsubsection{Operators}
-
-\newcommand{\op}{~op~}
-
-The usual way of generating new BDDs is to combine existing BDDs using operators such as conjunction $AND$, symmetric difference $XOR$ and negation $NOT$ (this one is performed in constant time by complementing the $neg$ field of the root arc representing the function).
-One starts with simple BDDs for the function $f_i = x_i$, for all the variables in the functions of interest.
-Starting with BDDs representing $f$ and $g$, we inductively compute $f\op g$, by applying the expansion theorem and the distributivity rules.
-\[f\op g = (f\op g)_0 \star (f\op g)_1 = (f_0\op g_0)\star(f_1 \op g_1)\]
-
-Bryant \cite{Bryant1986} proved that, if the inductive process is memoized (i.e. we store intermediary results) the asymptotic complexity of the inductive algorithm if $O(N_f \times N_g)$ (with for all Boolean function $f$, $N_f$ is the number of node in the ROBDD representing it).
-
-\paragraph{Example : operator AND\\}
-The terminal cases for this operator are:\begin{itemize}
-\item $AND(f, 0) = AND(0, f) = 0$
-\item $AND(f, 1) = AND(1, f) = f$
-\item $AND(f, f) = f$
-\item $AND(f, \lnot f) = 0$
-\end{itemize}
-
-These conditions can be computed in constant time, then we use the \texttt{memoization table} to check if the result has already been computed, and if not we apply the \texttt{expansion theorem} and solve the problem inductively.
-
-\begin{lstlisting}
-AND(f, g){
-  if f > g{
-    return AND(g, f)
-  }else if "terminal case" {
-    return terminal(f, g)
-  }else if "memoization table has entry (f, g)" {
-    return memoization((f, g))
-  }else{
-    let x be the top variable of {f, g}
-    f1, f0 = cofactor(x, f)
-    //if f does not depends on x, then f1=f0=f
-    g1, g0 = cofactor(x, g)
-    //idem for g
-    //but either f or g has to depend on x
-    r1 = AND(f1, g1)
-    r0 = AND(f0, g0)
-    r = CONS(x, r1, r0)
-    insert {key = (f, g); value = r} in memoization
-    return r
-    }
-}
-\end{lstlisting}
-
-n.b.: computing $NOT(f)$ can be done in constant time because of the "output inverter" variant.
-
-\paragraph{Operator XOR}
-Very similar to AND with some differences in terminal case:\begin{itemize}
-\item $XOR(0, f) = XOR(f, 0) = f$
-\item $XOR(1, f) = XOR(f, 1) = NOT(f)$
-\item $XOR(f, f) = 0$
-\end{itemize}
-
 \section{Introduction of Generalized Reduction of Ordered Binary Decision Diagram (GroBdd)}
 
 \subsection{Motivation}
@@ -322,166 +266,273 @@ The "X extract" variant, by allowing to extract 1-predictions, represents a gene
 This variant is compatible with the "output inverter" variant, however it over-complexifies the reduction rules, therefore, while reformulating reduction rules in a simpler way, we do not discuss it further in this report.
 
 
-\subsection{Definition of GroBdd}
+The Generalized Reduction of Ordered Binary Decision Diagram (GroBdd) is a framework that aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
+The remaining of this Section is organized as follows. First, we formally define GroBdds, then we present a set of properties that the transformation must have and some implications.
 
-A GroBdd is very similar to an actual ROBDD, the two main differences being that (1) it represents a vector of Boolean functions with a finite number of variables possibly of different arity and (2) on every edge their is a transformation.
+\subsection{Initial definition of GroBdd}
+
+A GroBdd is very similar to an actual ROBDD, the two main differences being that (1) it represents a vector of Boolean functions with a finite number of variables possibly of different arity and (2) on every edge their is a transformation (the "output inverter" is an example of such transformations").
 
 A Reduced Ordered Binary Decision Diagram is a directed acyclic graph $(V\cup T, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$.
 Nodes are partitioned into two sets : the set of internal nodes $V$ and the set of terminal nodes $T$.
 Every internal node $v\in V$ has two outgoing edges respectively denoted $if0$ and $if1$.
+Every internal node $v\in V$ has a field $index$ which represent a unique identifier associated to each node.
 Arcs are partitioned into two sets : the set of root arcs $\Psi$ and the set of internal arcs $E$.
 There is exactly $k$ root arcs, a root arc is denoted $\Psi_i$ with $0\leq i < k$, informally, $\Psi_i$ is the root of the GroBdd representing $f_i$.
-Every arc has a transformation descriptor field $\delta$ and a destination node denoted $node$.
+Every arc has a transformation descriptor field $\gamma$ and a destination node denoted $node$.
 
 %add beautiful draw (with \psi arcs)$
-
-We denote $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
+We denote $\rho(\gamma) : \F_n \longrightarrow F_m$ the semantic interpretation of the transformation descriptor $\gamma$.
+We define $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
 \item $\forall i, f_i = \psi(\Psi_i)$
-\item $\forall arc \in \Psi \cup E, \psi(arc) = \rho(arc.\delta)(\phi(arc.node))$
-\item $\phi(0 \in T) = 0$
+\item $\forall arc \in \Psi \cup E, \psi(arc) = \rho(arc.\gamma)(\phi(arc.node))$
 \item $\forall node \in V, \phi(node) = \psi(node.if0) \star \psi(node.if1)$
 \end{itemize}
+We assume the function $\phi$ defined on all terminals $T$ (we always assume, all terminal to have a different interpretation through $\phi$).
 
+\subsection{Transformation Descriptor Set (TDS)}
 
-\section{Introduction of Reduced Decision Tree (RDT) and Canonical Shared Forest (CSF)}
-\subsection{Motivation}
-Adding attribute on arcs allowed us to (slightly) reduce computation time and space.
-In order to go further in this direction we have to introduce more formalism.
-In order to simplify reasoning we will split the current structure in two:\begin{itemize}
-\item the Canonical Shared Forest (CSF), which job is to ensure structural canonicity (i.e. attribute an identifier to every sub-trees and ensure that any identical sub-trees have the same identifier).
-\item the Reduced Decision Tree (RDT), which job is to ensure semantic canonicity (i.e. ensure that the semantic of operation is correct and that a function has exactly one representation)
+We denote $\Y$ the set of all transformation descriptor.
+We assumme defined $\rho$ the semantical interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
+In this section, we make the list of properties that the TDS must ensure to be correct.
+
+\subsubsection{Canonical}
+\[\forall \gamma, \gamma' \in \Y, \left( \gamma = \gamma' \right) \Leftrightarrow \left( \rho(\gamma) = \rho(\gamma') \right) \]
+We denote $\Y_{n, m} = \{ \gamma \in \Y ~|~ \rho(\gamma) \in \F_n \longrightarrow \F_m \}$, and $\Y_{n,*} = \bigcup_{m\leq n} \Y_{n, m}$ and $\Y_{*, m} = \bigcup_{n \geq m} \Y_{n, m}$.
+
+\subsubsection{Separable}
+\[\forall \gamma \in \Y_{n, m}, \exists! \vartriangle_\gamma \in \B^m \rightarrow \B^n, \triangledown_\gamma \in \B^m \rightarrow \B \rightarrow \B,\]
+\[\forall f\in \F_n, \forall x \in \B^m, \rho(\gamma)(f)(x) = \triangledown(x, f(\vartriangle x))\]
+This constraint allows any transformation to be represented as circuit which can be wrapped around the function.
+This constraint enforces transformations to be local.
+The function $\vartriangle$ is called the pre-process, and the function $\triangledown$ is called the post-process.
+
+\subsubsection{Composable (definition of \texttt{C})}
+\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \exists \gamma'' \in \Y_{n, l}, \rho(\gamma') \circ 
+\rho(\gamma) = \rho(\gamma'')\]
+This constraint enforces $\Y_{n, n}$ to be stable by composition.
+Furthermore, it exists an algorithm $\mathtt{C} : \Y_{n, m} \rightarrow \Y_{m, l} \rightarrow \Y_{n, l}$, such that:
+\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\mathtt{C}(\gamma, \gamma'))\]
+For convenience, we denote $\gamma' \circ \gamma = \mathtt{C}(\gamma, \gamma')$.
+
+\subsubsection{Decomposable (definition of \texttt{A} and \texttt{S})}
+
+For all $n\in\N$, we define $A_n = \Y_{n, n}$ the set of asymmetric transformations.
+For all $n, m\in\N$, it exists $S_{n, m} \subset \Y_{n, m}$ a set of transformations such that $\forall \gamma \in \Y_{n, m}, \exists a \in A_m, \exists! s \in S_{n, m},  \gamma = a \circ s$.
+The set $S_{n, m}$ is called the set of symmetric transformation.
+%Consequence : $S_{n, n} = \{ Id_n = \F_n \rightarrow \F_n \}$.
+
+\paragraph{definition : S-free\\}
+A Boolean function $f\in\F_m$ is said S-free, iff
+\[\forall s \in S_{n, m}, \forall g \in \F_n, f = \rho(s)(g) \Rightarrow \rho(s) = Id\]
+
+\paragraph{constraint : S-uniqueness\\}
+\[\forall f\in\F_n, f'\in\F_{n'}, s\in S_{n, m}, s'\in S_{n', m}, \rho(s)(f) = \rho(s')(f') \Rightarrow (s = s') \land (f = f')\]
+
+\paragraph{definition : A-equivalent\\}
+Two Boolean functions $f, g\in\F_n$ are said A-equivalent, iff $\exists a\in A_n, f = \rho(a)(g)$.
+This relation is an equivalence relation (i.e. reflexive, symmetric, transitive) denote $\sim_A$.
+
+\paragraph{definition : A-invariant free\\}
+A Boolean function $f\in\F_n$ is said A-invariant free, iff $\forall a, a'\in A_n, \rho(a)(f) \neq \rho(a')(f)$.
+
+\paragraph{constraint : S-free implies A-invariant free\\}
+For all function $f$, if $f$ is S-free, then $f$ is A-invariant free.
+
+\paragraph{definition : A-reduced set of function\\}
+Let $X = \{x_1, x_2, \dots, x_n\}$ be a set of Boolean functions.
+The set $X$ is said A-reduced iff $\forall x_i, x_j \in X, (x_i \sim_A x_j) \Rightarrow (x_i = x_j)$.
+
+\paragraph{definition : $\I_n$\\}
+For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
+
+\paragraph{definition : $\Ynode$\\}
+A $\Ynode_{l, m, n}$ is a quadruple $(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{l, n} \times \I_l \times \Y_{m, n} \times \I_m$. Let $v$ be a $\Ynode$, we denote $v.\gamma_0$ (respectively $v.I_0$, $v.\gamma_1$ and $v.I_1$) the first (respectively second, third and fourth) component of $v$.
+\begin{itemize}
+\item For all $\Ynode$ $v$, we always assume that functions $\phi(v.I_0)$ and $\phi(v.I_1)$ are \texttt{S}-free.
+\item We always assume the set $X = \{\phi(v.I_0) ~|~ v \in\Ynode\} \cup \{\phi(v.I_1) ~|~ v\in\Ynode\}$ to be \texttt{A-reduced}
 \end{itemize}
-In the following sections we describe the role of both these structures and how they work together.
+We extend the definition of $\phi$, with : for all $\Ynode$ $v$, $\phi(v) = \rho(v.\gamma_0)(\phi(v.I_0)) \star \rho(v.\gamma_1)(\phi(v.I_1))$.
 
-\subsection{From the \texttt{unique table} to the Canonical Shared Forest (CSF)}
-The Canonical Shared Forest (CSF) encapsulates the \texttt{unique table} and the \texttt{CONS} operator in one structure.
-Its job is to hide from the RDT the whole memory management.
-In its basic implementation interactions are reduced to two methods:\begin{itemize}
-\item \texttt{push} (previously called \texttt{CONS}) that takes a node and returns a unique identifier.
-\item \texttt{pull} that take an identifier and return the associated node.
-\end{itemize}
-A more complex implementation could use some commands in order to specify when a node is no longer required in order to save memory.
-In order to save time and extend memory we can think about using distributed memory units, efficiently using of the memory hierarchy or allow concurrent/parallel accesses.
-However such implementation details fall out of the scope of this lecture.
-
-NB: Implementing the CSF can lead to theoretical issues (especially when dealing with distributed, concurrent or parallel versions) but they are not specific to our problem.
-
-\subsection{From Shannon's Decision Tree to Reduced Decision Tree (RDT)}
-The Reduced Decision Tree (RDT) is the theoretical (and computational) core of the compression system.
-The basic is to represent sets of somehow related functions by a common graph instead of distinct ones.
-
-\subsubsection{Change in representation}
-
-\paragraph*{Definition : Syntax\\}
-
-We define a Compressed BDD by a graph $G = (V\cup T, \Psi\cup E)$ where:\begin{itemize}
-  \item there are two sets of vertices:\begin{itemize}
-    \item $V$, the set of internal nodes. Internal nodes have an out-degree of two : its sons are called $then$ and $else$.
-    \item $T$, the set of terminal nodes. Terminal nodes have an out-degree of zero.
-  \end{itemize}
-  \item there are two set of arcs:\begin{itemize}
-      \item $E$ the set of internal arcs which have a source node called $source$.
-    \item $\Psi$ the set of root arcs which has no source node.
-  \end{itemize} arcs in both sets have a destination called $node$ and carry some data called $coreduce$.
-\end{itemize}
-%put a beautiful draw with \psi arcs (no source)$
-
-\paragraph*{Definition : Semantic\\}
-
-We denote $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the semantic of the arc $arc$ as follow:\begin{itemize}
-\item $\forall node\in T$, $\phi(node) = f_{node}$ (usually $\phi(0) = () \rightarrow 0 \in \B^0 \rightarrow \B$)
-\item $\phi(node) = \psi(node.then)\star_i\psi(node.else)$
-\item $\psi(arc) = \rho(arc.coreduce)(\phi(arc.node))$ for some function $\rho$ such that $\rho(arc.coreduce) : (\B^k \rightarrow \B) \rightarrow (\B^n \rightarrow \B)$ with $k\leq n$. $k$ (respectively $n$) is called the in-arity (respective out-arity) of $arc.coreduce$.
-\end{itemize}
-
-\paragraph{Reduction Rules}
-
-A CBDD is said syntactically reduced if it satisfies (1) some local property $P$ on nodes (and their two outgoing arcs) (2) there is no identical (up to isomorphism) sub-graph.
+\paragraph{constraint : terminal nodes are S-free and A-reduced (definition of $\mathtt{E}_0$)}
+For all terminal node $t \in T$, $t$ is S-free.
+Furthermore, the set $\{\phi(t) ~|~ t\in T\}$ is A-reduced.
+Moreover, we define the function $\mathtt{E}_0$ such $\forall b\in\F_0, \exists \gamma\in\Y_{0, 0}, \exists t\in T, \mathtt{E}_0(b) = \{\gamma = \gamma, node = I_t\}$ and $\psi(\mathtt{E}_0(b)) = b$.
 
 
-A CBDD is said semantically reduced if $\forall v_1, v_2 \in V\cup T, \phi(v_1)=\phi(v_2) \Rightarrow v_1 = v_2$.
+\subsubsection{Buildable (definition of \texttt{B})}
 
-\paragraph{Canonicity}
+Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
 
+We define \texttt{B} an algorithm over $\Y$ which respect the signature:
+\begin{lstlisting}
+$\mathtt{B} : \Y_{n_0, m} \times \I_{n_0} \longrightarrow \Y_{n_1, m} \times \I_{n_1} \longrightarrow$
+  | ConsNode $\Y_{n', m} \times (\Y_{n_x, n'} \times \I_{n_x}) \times (\Y_{n_y, n'} \times \I_{n_y})$
+  | Merge $\Y_{n_z, m} \times \I_{n_z}$
+\end{lstlisting}
+(with $x, y, z \in \{0, 1\}$) \\
+Furthermore, for all $(\gamma_g, I_g, \gamma_h, I_h) \in \Y_{n_0, m} \times \I_{n_0} \times \Y_{n_1, m} \times \I_{n_1}$, 
+\[ \texttt{B}(\gamma_g, I_g, \gamma_h, I_h) = \texttt{ConsNode} (\gamma, (\gamma', I_X), (\gamma'', I_Y)) \Rightarrow f = \rho\left(\gamma\right) \left(\rho\left(\gamma'\right)(X) \star \rho\left(\gamma''\right)(Y)\right)\]
+\[ \texttt{B}(\gamma_g, I_g, \gamma_h, I_h) = \texttt{Merge} (\gamma''', I_Z) \Rightarrow f = \rho(\gamma''')(Z) \]
+(with $X, Y, Z \in\{g, h\}$ and $f = \rho(\gamma_g)(g) \star \rho(\gamma_h)(y)$)
 
-We say that the local property $P$ ensures pseudo-canonicity if any syntactically reduced CBDD is semantically reduced.
+\paragraph{definition : a node is \texttt{B}-stable\\}
+Let $G$ be a GroBdd, we denote $v$ an internal node of $G$.
+We denote $\gamma_0 = v.if0.\gamma, I_0 = v.if0.node, \gamma_1 = v.if1.\gamma$ and $I_1 = v.if1.node$.
+The node $v$ is said B-stable iff $\mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) = \mathtt{ConsNode}(Id, (\gamma_0, I_0), (\gamma_1, I_1))$.
 
+\paragraph{constraint : \texttt{B} is \texttt{B}-stable\\}
+\[\forall \gamma_f, I_f, \gamma_g, I_g, \mathtt{B}(\gamma_f, I_f, \gamma_g, I_g) = \mathtt{ConsNode}(\gamma, (\gamma_0, I_0), (\gamma_1, I_1))\]
+\[\Rightarrow \mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) = \mathtt{ConsNode}(Id, (\gamma_0, I_0), (\gamma_1, I_1))\]
+Informally, when B returns a node, this node is \texttt{B}-stable.
 
-We say that the local property $P$ ensure full-canonicity (or the canonicity) if for all functions $f$, every representations of $f$ are equal up to graph isomorphism.
-
-
-\subsubsection{Reduction in constructor}
-
-\texttt{RDT.CONS}'s goal is to ensure that $P$ is verified when building a new internal node.
-We may notice that it has three distinct behaviors:\begin{enumerate}
-  \item the result can be build only with constant nodes and the two available nodes.
-  \item the result needs a node that has already been build.
-  \item the result needs a new node.
+\paragraph{constraint : $\Ynode$ are \texttt{B}-stable}
+\begin{enumerate}
+\item We assume all $\Ynode$ $v$ to be \texttt{B}-stable
+\[\mathtt{B}(v.\gamma_0, v.I_0, v.\gamma_1, v.I_1) = \mathtt{ConsNode}(Id, (v.\gamma_0, v.I_0), (v.\gamma_1, v.I_1))\]
 \end{enumerate}
-In both cases 2 and 3, an access to CSF is needed.
 
-\begin{lstlisting}
-RDT.CONS(arc1, arc0){
-  match RDT-consensus(then, else, cmp) with
-    | Solved result $\longrightarrow$ result
-    | Partial (coreduce, reduce) $\longrightarrow$
-      arc(coreduce, CSF.PUSH(reduce))
-}
-\end{lstlisting}
+\paragraph{constraint : B is S-free preserving\\}
+The algorithm \texttt{B} is said S-free preserving iff for all $\Ynode$ $v$, $\phi(v)$ is S-free.
 
-\texttt{RDT.SPLIT} performs the reverse operation of \texttt{RDT.CONS}. We may notice that it has two distinct behaviors:\begin{itemize}
-  \item the result can be computed without accessing to CSF
-  \item the result is computed accessing CSF.
+\paragraph{constraint : B is A-reduction preserving\\}
+The algorithm \texttt{B} is said A-reduction preserving iff
+\[\forall v, w \in\Ynode, \phi(v) \sim_A \phi(w) \Rightarrow v = w\]
+
+\subsection{Reduction Rules}
+We define a GroBdd model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
+A valid model must satisfy all the previously mentioned constraints.
+
+In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
+\item The syntactical reduction : all sub-graphs are different up to graph-isomorphism (i.e. all identical sub-graphs are merged)
+\item The local semantic reduction : all internal node $v\in V$ is \texttt{B}-stable.
+\item All node has at least one incoming arc.
+A GroBdd is said reduced if it satisfies the reduction rules.
+\end{enumerate}
+In this section we prove:\begin{enumerate}
+\item For all vector of Boolean function $F$ it exists a reduced GroBdd $G$ representing it.
+\item A reduced GroBdd $G$ is semi-canonical, defined as :\begin{enumerate}
+\item For all node $v\in V$, $\phi(v)$ is S-free.
+\item The set $X = \{\phi(v_1), \dots, \phi(v_N)\}$ representing the set of the semantic interpretation of the set of internal nodes $V$ is A-reduced.
+\item $\forall (\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2, \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\}) \Rightarrow (\gamma, I) = (\gamma', I')$ (with $I$ and $I'$ being indexes of nodes in $G$).
+\end{enumerate}
+\item Between two reduced GroBdd $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
+\end{enumerate}
+
+\subsubsection{Additional procedures}
+
+\paragraph{The \texttt{Cons} procedure\\}
+We define the \texttt{Cons} procedure as follow.
+Let $G$ be a GroBdd and $F$ be its vector of root arcs of size $k$.\\
+Let $i$ and $j$ be indexes of this vector.
+We denote $\gamma_i = \Psi_i.\gamma$, $\gamma_j = \Psi_j.\gamma$ and $I_i = \Psi_i.node$, $I_j = \Psi_j.node$.
+\begin{itemize}
+\item If \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{ConsNode} ($\gamma$, ($\gamma'$, $I_X$), ($\gamma''$, $I_Y$)). We define the node $N = \{if0 = \{\gamma = \gamma', node = I_X\}, if1 = \{\gamma = \gamma'', nodes = I_Y\}\}$.\begin{itemize}
+\item If the node $N$ already exists in $G$, we retrieve its identifier $I$, we define $G'$ as a copy of $G$ with a new root arc $\Psi_k = \{\gamma = \gamma, node = I\}$
+\item Otherwise, we define $G'$ as a copy of $G$ with add $N$ to the list of nodes of $G'$ and create it a new identifier $I$, we add a new root arc $\Psi_k = \{\gamma = \gamma, node = I\}$.
+\end{itemize}
+\item Otherwise, \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{Merge} ($\gamma$, $I_Z$). We define $G'$ as a copy of $G$ with a new root arc $\Psi_k = \{\gamma = \gamma''', node = I_Z\}$.
 \end{itemize}
 
-\begin{lstlisting}
-RDT.SPLIT(arc)
-  if(terminal case){
-    return result
-  }else{
-    reduce = CSF.PULL(arc.reduce-ident)
-    arc1 = compose(arc.coreduce, reduce.then)
-    arc0 = compose(arc.coreduce, reduce.else)
-    return (arc1, arc0)
-  }
-}
-\end{lstlisting}
-\subsubsection{Reduction in operators}
+\paragraph{The \texttt{Remove} procedure\\}
+We define the \texttt{Remove} procedure as follow.
+Let $G$ be a GroBdd and $F$ be its vector of root arc of size $k$.\\
+Let $i$ be an index of this vector
+We define $G'$ as a copy of $G$ with its vector of root arc $F' = (\Psi_1, \dots, \Psi_{i-1}, \Psi_{i+1}, \dots, \Psi_n)$.
+In an iterative process, we remove nodes which have no incoming arc, until all nodes have at least one incoming arc (in order to satisfy the third reduction rule).
+As $G'$ is a subset of $G$, thus, $G'$ satisfies the first and second reduction rule.
 
-In order to compute $AND$, there are cases:\begin{itemize}
-  \item its a terminal case, so we can solve it immediately
-  \item its a memoized case, so we can return the result from memory
-  \item We can split the problem into two sub-problems (which can be solved inductively).
+\paragraph{The \texttt{Reduction} procedure\\}
+Let $G$ be a GroBdd and $F$ be its vector of root arcs $F$.
+Using an iterative process, we remove nodes which have no incoming arc, until all nodes have at least one incoming arc (satisfying the third reduction rules).
+The \texttt{Reduction} procedure consist in going through the GroBdd $G$ (starting with nodes with the smallest depth), applying the \texttt{Cons} procedure on each node creating a new GroBdd $G'$.
+The GroBdd $G'$ is by construction equivalent to $G$, however, the GroBdd $G'$ satisfies all three reduction rules.
+
+\paragraph{The \texttt{Merge} procedure\\}
+We define the \texttt{Merge} procedure as follow.
+Let $G$ and $G'$ be two GroBdds (based on the same GroBdd model).
+We define $G''$ a GroBdd which is the union of both GroBdd.
+We define $F'' = (\Psi_1, \dots, \Psi_n, \Psi'_1, \dots, \Psi'_{n'})$.
+Due to possible conflicts on identifiers, we re-generate identifiers of the nodes in $G''$.
+Finally, we apply the \texttt{Reduction} procedure on $G''$.
+
+\subsubsection{Existence}
+We inductively define the procedure \texttt{E} with:\begin{itemize}
+\item $\forall b\in\F_0, \texttt{E}(b) = \texttt{E}_0(b)$
+\item
+Let $f$ be a Boolean function of arity $n$ (with $n \geq 1$).
+Let $G$ be a GroBdd representing functions $f_0$ (the negative restriction of $f$ according to its first variable) and $f_1$ (the positive restriction of $f$ according to its first variable.) by using the procedure \texttt{E} on $f_0$ and $f_1$.
+Let $G'$ be the output of the \texttt{Cons} procedure on $G$, in order to create $f = f_0 \star f_1$ (expansion theorem).\\
+$E(f) = G'$
+The GroBdd $G'$ satisfies the reduction rules:\begin{itemize}
+\item If no node is created, the proof is straightforward.
+\item If a node is created, this node is syntactically unique by definition of \texttt{Cons} and is \texttt{B}-stable  (as \texttt{B} is \texttt{B}-stable)
 \end{itemize}
-We slightly "rotate" these choices in order to abstract the memoization process
+\end{itemize}
 
-\begin{lstlisting}
-AND-SOLVE(reduced-problem){
-  arcX, arcY = and-unpack(reduced-problem)
-  arcX1, arcX0 = RDT.SPLIT(arcX)
-  arcY1, arcY0 = RDT.SPLIT(arcY)
-  arc1 = match and-solver(arcX1, arcY1) with
-    | Solved result $\longrightarrow$ result
-    | Partial (coreduce, subproblem) $\longrightarrow$
-    	compose(coreduce, AND-SOLVE(subproblem))
-  arc0 = match and-solver(arcX0, arcY0) with
-    | Solved result $\longrightarrow$ result
-    | Partial (coreduce, subproblem) $\longrightarrow$
-    	compose(coreduce, AND-SOLVE(subproblem))
-  return RDT.CONS(arc1, arc0)
-}
-\end{lstlisting}
-\texttt{AND-SOLVE} is a recursive memoized algorithm (i.e. when AND-SOLVE(problem) returns value, we store an entry into a dictionary and when calling AND-SOLVE, we first look into the dictionary to know if the result is already available and if so return it).
-\begin{lstlisting}
-RDT.AND(arcX, arcY){
-  match and-solver(arcX, arcY) with
-    | Solved result $\longrightarrow$ result
-    | Partial (coreduce, subproblem) $\longrightarrow$
-    	compose(coreduce, AND-SOLVE(subproblem))
-}
-\end{lstlisting}
+By construction, the procedure \texttt{E} (generalized to accept a vector of function as input) returns a GroBdd satisfying the reduction rules.
+
+\subsubsection{Semi-Canonical}
+
+Let $G$ be a reduced GroBdd.
+
+\paragraph{S-free and A-reduced}
+For all node $v\in V$, we denote $h(v) = max(h(v.if0.node), h(v.if1.node))$ with $\forall t\in T, h(t) = 0$.
+For all $n\in\N$, we define $V_n = \{v\in V ~|~ h(v) \leq n\}$
+For all $n\in\N$, we define the recurrence hypothesis $H(n)$ :\begin{itemize}
+\item For all $v\in V_n$, $\phi(v)$ is S-free.
+\item The set of Boolean function $X = \{\phi(v) ~|~ v\in V_n\}$ is A-reduced.
+\end{itemize}
+
+\subparagraph{Initialization}
+We prove $H(0)$ using the constraints that (1) terminals are S-free and (2) the set of terminal nodes is A-reduced.
+
+\subparagraph{Induction}
+Let $n\in\N$, we assume $\forall k\leq n H(k)$.
+Let $v$ be a node of depth $n+1$, thus the depth of $v.if0.node$ and $v.if1.node$ is lower than $n$ (we can apply the recurrence hypothesis).
+Therefore, the quadruple $\bar{v} = (v.if0.\gamma, v.if0.node, v.if1.\gamma, v.if1.node)$ is a $\Ynode$.
+Thus, using the constraints that \texttt{B} is S-free preserving, we prove that $\phi(v) = \phi(\bar{v})$ is S-free.
+Let $v'$ be a node of depth $k\leq n+1$, we can prove that the quadruple $\bar{v'} = (v'.if0.\gamma, v'.if0.node, v'.if1.\gamma, v'.if1.node)$ is a $\Ynode$.
+Therefore, we can use the constraint that \texttt{B} is A-reduction preserving to prove that $\phi(\bar{v}) \sim_A \phi(\bar{v'}) \Rightarrow \phi(\bar{v}) = \phi(\bar{v'})$
+However, $\phi(v) = \phi(\bar{v})$ and $\phi(v') = \phi(\bar{v'})$
+Thus, $\forall v, w \in V_{n+1}, \phi(v) \sim_A \phi(v') \Rightarrow \phi(v) = \phi(v')$.
+Thus, the set of Boolean function $X = \{\phi(v) ~|~ v\in V_{n+1}\}$ is A-reduced.
+Therefore $(land_{k\leq n} H(k) \Rightarrow H(n+1)$.
+
+Using the strong recurrence theorem, we prove that $\forall n\in\N, H(n)$.
+Therefore proving properties (2.a) "all nodes are S-free" and (2.b) "the set $X = \{\phi(v_1), \dots, \phi(v_N)\}$ is A-reduced".
+
+\paragraph{Semantic Reduction}
+We prove the property "$\forall (\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2, \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\}) \Rightarrow (\gamma, I) = (\gamma', I')$ (with $I$ and $I'$ being indexes of nodes in $G$)" by induction on $n\in\N$ the arity of $f = \psi(\{\gamma = \gamma, node = I\})$.
+
+\subparagraph{Initialization}
+The induction property holds for $n = 0$:\\
+Let $f\in\F_0$, we assume it exists a quadruple $(\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2$ such that $f = \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\})$.
+We decompose $\gamma$ and $\gamma'$ to their symmetric and asymmetric components: $\gamma = s \circ a$ and $\gamma' = s' \circ a'$.
+Using the S-uniqueness constraint, on $f = \rho(s)(\rho(a)(\phi(I))) = \rho(s')(\rho(a')(\phi(I')))$, we have $s = s'$ and $\rho(a)(\phi(I)) = \rho(a')(\phi(I'))$.
+Therefore, $\phi(I) \sim_A \phi(I')$, however, we proved that the set of the semantic interpretations of the nodes is A-reduced, thus $\phi(I) = \phi(I')$
+However, the only node representing function of arity 0 are terminal nodes, therefore $I = I'$.
+
+\subparagraph{Induction}
+Let $k\in\N$, we assume the induction property holds for all $n\leq k$, let prove it holds for $n = k+1$.
+Let $f$ be a Boolean function, we assume it exists a quadruple $(\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2$ such that $f = \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\})$.
+We decompose $\gamma$ and $\gamma'$ to their symmetric and asymmetric components: $\gamma = s \circ a$ and $\gamma' = s' \circ a'$.
+Using the S-uniqueness constraint, on $f = \rho(s)(\rho(a)(\phi(I))) = \rho(s')(\rho(a')(\phi(I')))$, we have $s = s'$ and $\rho(a)(\phi(I)) = \rho(a')(\phi(I'))$.
+Therefore, $\phi(I) \sim_A \phi(I')$, however, we proved that the set of the semantic interpretations of the nodes is A-reduced, thus $\phi(I) = \phi(I')$
+Using the induction hypothesis (as $\phi(I)$ as an arity strictly smaller than $k+1$, thus smaller than $k$), we deduce that $I = I'$.
+
+Therefore, applying the strong induction theorem, we prove the property (2.c).
+
+\subsubsection{Canonical modulo graph-isomorphism and A-equivalence}
+In order to prove that "Between two reduced GroBdd $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$", we start by (1) proving that within the \texttt{Merge} procedure, each node is replace by an A-equivalent one then (2) using the \texttt{Merge} procedure without re-generating the identifiers of the nodes of $G$ and using the property (2.c), we prove that the nodes of $G'$ collapse on the nodes of $G$ during the \texttt{Reduction} procedure, providing a one-to-one mapping.
+Details of this proof are cumbersome and not of great interest.
 
 
+\subsection{Conclusion}
+
+In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
+In the remaining of this report (if not mentioned otherwise), a GroBdd is to be assumed reduced.
+In the next section, we will introduce the "useless variable extraction" variant (or "U-extract" for short) as being a simple model (called "U") in the GroBdd formalism that we just introduced.
 
 \section{Pattern extraction : useless variables}
 \begin{figure}
