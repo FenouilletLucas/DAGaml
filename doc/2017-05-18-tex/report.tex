@@ -109,9 +109,9 @@ We call this new variant "Useless variable extraction" or "U-extract" for short.
 
 The remainder of this repport will be organised as follows.
 In Section~2, we formally introduce Boolean functions, useless variable and some notations.
-In Section~3, we formally introduce Reducec Ordered Binary Decision Diagrams (ROBDD).
+In Section~3, we formally introduce Reduced Ordered Binary Decision Diagrams (ROBDD).
 In Section~4, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd).
-In Section~5, we introduce the "U-extract" variant as part of the GroBdd framework, before to expose results against three  different benchmqrks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
+In Section~5, we introduce the "U-extract" variant as part of the GroBdd framework, before to expose results against three  different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
 \section{Notations}
 
@@ -276,13 +276,13 @@ We assume the function $\phi$ defined on all terminals $T$ (we always assume, al
 
 \subsubsection{Definition and Constraints}
 
-We refer the reader to Annexes (subsections 1 and 2) for a more formal approach of the problem.
+We refer the reader to Annexes (sections~\ref{grobdd-def} and~\ref{grobdd-reduction}) for a more formal approach of the problem.
 We denote $\T$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
 Transformations are composable (i.e. $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
 We define the set of asymmetric transformations by $A_n = \T_{n, n}$.
 We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.
 The set of symmetric transformation is stable by composition: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
-We denote $\F^S_m = \{f\in\F_m~|~\forall n \leq m, \forall t\in\T_{n, m}, f'\in\F_n, t(f') = f\}$ the set of S-free Boolean functions or arity n
+We denote $\F^S_m = \{f\in\F_m~|~\forall n \leq m, \forall t\in\T_{n, m}, f'\in\F_n, t(f') = f\}$ the set of S-free Boolean functions or arity n.
 Boolean functions are uniquely S-extractable: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
 Two Boolean functions $f, f'\in\F_n$ are A-equivalent iff $\exists a\in A_n, f=a(f')$.
 N.B.: Several sets $S_{*, *}$ may fit this definition, furthermore, if two functions are not A-equivalent, they are A-distinct.
@@ -312,13 +312,10 @@ The node $v$ is said B-stable iff $\mathtt{B}(t_0, I_0, t_1, I_1) = \mathtt{Cons
 
 
 \subsection{Reduction Rules}
-We define a GroBdd model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
-A valid model must satisfy all the previously mentioned constraints.
-
 In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
 \item The syntactical reduction : all sub-graphs are different up to graph-isomorphism (i.e. all identical sub-graphs are merged)
 \item The local semantic reduction : all internal node $v\in V$ is \texttt{B}-stable.
-\item All node has at least one incoming arc.
+\item All node have at least one incoming arc.
 A GroBdd is said reduced if it satisfies the reduction rules.
 \end{enumerate}
 In this section we prove:\begin{enumerate}
@@ -331,12 +328,12 @@ In this section we prove:\begin{enumerate}
 \item Between two reduced GroBdd $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
 \end{enumerate}
 
-We refer the reader to Annexes, subsection~2, for a proof that under the constraint of the previous subsection (formally defined in Annexes, subsection~1), these statements are correct.
+We refer the reader to Annexes (cf. Section~\ref{grobdd-reduction}) for a proof that under the constraint of the previous subsection (formally defined in Annexes, Section~\ref{grobdd-def}), these statements are correct.
 
 \subsection{Conclusion}
 
 In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
-In the remaining of this report (if not mentioned otherwise), a GroBdd is to be assumed reduced.
+In the remaining of this report, a GroBdd is to be assumed reduced.
 In the next section, we will introduce the "useless variable extraction" variant (or "U-extract" for short) as being a simple model (called "U") in the GroBdd formalism that we just introduced.
 
 \section{Useless Variable Extraction : GroBdd model NU}
@@ -373,7 +370,7 @@ For convenience reasons, we allow ourselves to define the $\gamma.sub$ component
 
   
 \paragraph{The GroBdd model NU is semi-canonical}
-We can prove (cf. Annexes, subsection~2) that the model "NU" satisfies all constraints formulated in Section~4 (Introduction of GroBdd).
+We can prove (cf. Annexes, Section~\ref{grobdd-model-nu}) that the model "NU" satisfies all constraints formulated in Section~4 (Introduction of GroBdd).
 Therefore, we proved that a GroBdd which uses the "NU" model is semi-canonical.
 Actually, as the building algorithm \texttt{B} only uses the equality test between node's identifier, we can prove that the structure is canonical (up to graph isomorphism).
 In the next section, we compare representations generated by this new variant and regular ROBDD (with just the "output negation" variant) on three different benchmarks in terms of number of nodes and estimated memory cost.
@@ -490,7 +487,7 @@ Furthermore, we estimated the memory cost of this variant, in average, we observ
 
 
 Future work will be focus on merging the "input Negation and output Negation Invariant extraction" ("NNI extract") variant and "1-prediction extraction" (X extract) variant into the "NNI-X extract" variant.
-Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement a heuristics to improve the compilation of CNF formulas, test on other benchmarks such as the Boolean component of SMT problems.
+Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement a heuristics to improve the compilation of CNF formulas.
 
 
 \newpage
@@ -504,7 +501,7 @@ Moreover, we will prove the correctness of "NNI extract" and "X extract" variant
 
 \section{Annexes}
 
-\subsection{GroBdd: Definitions, Notations, Constraints}
+\subsection{GroBdd: Definitions, Notations, Constraints\label{grobdd-def}}
 
 We denote $\Y$ the set of all transformation descriptor.
 We assume defined $\rho$ the semantic interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
@@ -618,7 +615,7 @@ The algorithm \texttt{B} is said S-free preserving iff for all $\Ynode$ $v$, $\p
 The algorithm \texttt{B} is said A-reduction preserving iff
 \[\forall v, w \in\Ynode, \phi(v) \sim_A \phi(w) \Rightarrow v = w\]
 
-\subsection{GroBdd: Reduction Rules \& Semi-Canonicity Theorem}
+\subsection{GroBdd: Reduction Rules and Semi-Canonicity Theorem\label{grobdd-reduction}}
 We define a GroBdd model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
 A valid model must satisfy all the previously mentioned constraints.
 
@@ -748,7 +745,7 @@ In order to prove that "Between two reduced GroBdd $G$ and $G'$ representing the
 Secondly, using the \texttt{Merge} procedure without re-generating the identifiers of the nodes of $G$ and using the property (2.c), we prove that the nodes of $G'$ collapse on the nodes of $G$ during the \texttt{Reduction} procedure, providing a one-to-one mapping.
 Details of this proof are cumbersome and not of great interest.
 
-\subsection{Model NU: proof of semi-canonicity}
+\subsection{Model NU: proof of semi-canonicity\label{grobdd-model-nu}}
 
 \paragraph{transformations are canonical\\}
 Let $\gamma', \gamma''\in\Y_{n, m}$ be a pair of transformation descriptors, such that for all function $f\in\F_n$, $\rho(\gamma')(f) = \rho(\gamma'')(f)$.
