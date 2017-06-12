@@ -25,8 +25,8 @@
   numberfirstline=true
 	}
 
-\title{A Generalized Reduction of Ordered Binary Decision Diagram}
-\author{Joan Thibault}
+\title{A Generalized Reduction of Ordered Binary Decision Diagram\\{\small Internship at DFKI (Bremen, Germany) from 15/03/2017 to 15/06/2017}}
+\author{Joan Thibault\\supervisor:~Rolf Drechsler}
 
 \newcommand{\includeframe}[4]{\makebox[#2\linewidth]{\includegraphics[page=#1,width=#2\linewidth,trim=0cm 0cm 0cm 0cm,clip=true,#3]{#4}}}
 
@@ -49,23 +49,22 @@ However, several drawbacks arise: no in-place sifting (permutation of adjacent v
 
 
 We implemented both the "extract U" and the "output negation" variants in an OCaml program and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
-We observe an average of 25\% less nodes and 32\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
+We observe an average of 25\% less nodes and 40\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
 \end{abstract}
 
+\newpage
 
-\newpage
-\tableofcontents
-\newpage
 \newcommand{\shannon}[3]{#1 \longrightarrow_S #2, #3}
 \newcommand{\N}{\mathbb{N}}%{\{0, 1\}}
-\newcommand{\B}{\mathbb{B}}%{\{0, 1\}}
-\newcommand{\F}{\mathbb{F}}%{\{0, 1\}}
-\newcommand{\Y}{\mathbb{Y}}%{\{0, 1\}}
-\newcommand{\I}{\mathbb{I}}%{\{0, 1\}}
+\newcommand{\B}{\mathbb{B}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\Y}{\mathbb{Y}}
+\newcommand{\I}{\mathbb{I}}
 \newcommand{\Ynode}{\Y\mathtt{-node}}
 \newcommand{\Ynodes}{\Y\mathtt{-nodes}}
+\newcommand{\T}{\mathbb{T}}
 
-\section*{Introduction}
+\section{Introduction}
 
 Nowadays, most critical systems rely on digital circuits: in transportation (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
 One way to minimize risks in digital parts of these systems is to provide a formal proof that they respect their specification.
@@ -109,10 +108,10 @@ A variable is said useless iff it does not change the results such as $x_1$ in $
 We call this new variant "Useless variable extraction" or "U-extract" for short.
 
 The remainder of this repport will be organised as follows.
-In Section~1, we formally introduce Boolean functions, useless variable and some notations.
-In Section~2, we formally introduce Reducec Ordered Binary Decision Diagrams (ROBDD).
-In Section~3, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd).
-In Section~4, we introduce the "U-extract" variant as part of the GroBdd framework, before to expose results against three  different benchmqrks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
+In Section~2, we formally introduce Boolean functions, useless variable and some notations.
+In Section~3, we formally introduce Reducec Ordered Binary Decision Diagrams (ROBDD).
+In Section~4, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd).
+In Section~5, we introduce the "U-extract" variant as part of the GroBdd framework, before to expose results against three  different benchmqrks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
 \section{Notations}
 
@@ -199,7 +198,7 @@ Let consider a ROBDD $G$ representing $F=(f_1, ..., f_n)$ over a set of n variab
 
 A proof of this theorem is available in the review of Somenzi et al.\cite{Somenzi1999}.
 
-\subsection{Effective construction}
+\paragraph{Effective construction\\}
 In practice, one does not build the decision tree and then reduces it.
 Rather, BDDs are created starting from the BDDs for constants and variables and by applying the usual Boolean connectives and are kept reduced at all times.
 At the same time several functions are represented by one multi-rooted diagram.
@@ -210,33 +209,8 @@ This approach makes equivalence check a constant-time operation.
 It is usually implemented using a dictionary which stores all BDD nodes that are alive (i.e. created and not deleted).
 This dictionary is called the \textit{unique table}.
 Operations that build BDDs start from the bottom (the constant nodes) and proceed up to the function nodes.
-If an operation needs to add a node $N = (v, f_1, f_0)$ to a BDD (which assumes that it has identifiers of the nodes representing $f_1$ and $f_2$), it first checks if $N$ already exists in the \textit{unique table} and if does not associate it to a new identifier and returns the latest.
-Doing so, the equivalence check is reduced to pointer comparison.
-
-\paragraph{Operator \texttt{CONS}\\}
-
-
-Pseudo-code for dynamic construction of unique nodes.
-
-\begin{lstlisting}
-let cons var if0(*else arc*) if1(*then arc*) =
-  if if0 = if1
-  then if0
-  else
-  (
-    if0' = {neg = 0; node = if0.node}
-    if1' = {neg = if0.neg $\oplus$ if1.neg; node = if1.node}
-    mynode = {var; then = if0'; else = if1'}
-    myid = if mynode in $\mathit{unique~table}$
-      then "mynode's identifier"
-      else
-      (
-        store mynode in $\mathtt{unique table}$;
-        "mynode's identifier"
-      )
-    {neg = if0.neg; node = myid}
-  )
-\end{lstlisting}
+If an operation needs to add a node $N = (v, f_1, f_0)$ to a BDD (which assumes that it has identifiers of the nodes representing $f_1$ and $f_2$), it first checks if $N$ already exists in the \textit{unique table} and if it does not, associate it to a new identifier and returns the latest.
+Doing so, the equivalence check is reduced to identifier (usually pointer) comparison.
 
 \section{Introduction of Generalized Reduction of Ordered Binary Decision Diagram (GroBdd)}
 
@@ -277,7 +251,7 @@ Due to the limited length of this report, we will not detail further the "NNI ex
 
 
 The Generalized Reduction of Ordered Binary Decision Diagram (GroBdd) is a framework that aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
-The remaining of this Section is organized as follows. First, we formally define GroBdds, then we present a set of properties that the transformation must have and some implications.
+The remaining of this section is organized as follows. First, we formally define GroBdds, then we present a set of properties that the transformation must have and some implications.
 
 \subsection{Initial definition of GroBdd}
 
@@ -300,10 +274,240 @@ We define $\phi(node)$ the semantic of the node $node$ and $\psi(arc)$ the seman
 \end{itemize}
 We assume the function $\phi$ defined on all terminals $T$ (we always assume, all terminal to have a different interpretation through $\phi$).
 
-\subsection{Transformation Descriptor Set (TDS)}
+\subsubsection{Definition and Constraints}
+
+We refer the reader to Annexes (subsections 1 and 2) for a more formal approach of the problem.
+We denote $\T$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
+Transformations are composable (i.e. $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
+We define the set of asymmetric transformations by $A_n = \T_{n, n}$.
+We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.
+The set of symmetric transformation is stable by composition: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
+We denote $\F^S_m = \{f\in\F_m~|~\forall n \leq m, \forall t\in\T_{n, m}, f'\in\F_n, t(f') = f\}$ the set of S-free Boolean functions or arity n
+Boolean functions are uniquely S-extractable: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
+Two Boolean functions $f, f'\in\F_n$ are A-equivalent iff $\exists a\in A_n, f=a(f')$.
+N.B.: Several sets $S_{*, *}$ may fit this definition, furthermore, if two functions are not A-equivalent, they are A-distinct.
+
+remark: A GroBdd should ensure by construction that (1) all nodes are S-free and (2) all nodes are A-distinct.
+
+\subsubsection{Buildable (definition of \texttt{B})}
+
+Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
+For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
+
+We define \texttt{B} an algorithm over $\Y$ which respect the signature:
+\begin{lstlisting}
+$\mathtt{B} : \Y_{n_0, m} \times \I_{n_0} \longrightarrow \Y_{n_1, m} \times \I_{n_1} \longrightarrow$
+  | ConsNode $\Y_{n', m} \times (\Y_{n_x, n'} \times \I_{n_x}) \times (\Y_{n_y, n'} \times \I_{n_y})$
+  | Merge $\Y_{n_z, m} \times \I_{n_z}$
+\end{lstlisting}
+(with $x, y, z \in \{0, 1\}$) \\
+Furthermore, for all $(t_g, I_g, t_h, I_h) \in \T_{n_0, m} \times \I_{n_0} \times \T_{n_1, m} \times \I_{n_1}$:
+$\texttt{B}(t_g, I_g, t_h, I_h) = \texttt{ConsNode} (t, (t'_X, I_X), (t'_Y, I_Y)) \Rightarrow f = t\left(t'_X(X) \star t'_Y(Y))\right)$
+and, $\texttt{B}(t_g, I_g, t_h, I_h) = \texttt{Merge} (t'_Z, I_Z) \Rightarrow f = t'_Z(Z)$ (with $X, Y, Z \in\{g, h\}$ and $f = t_g(g) \star t_h(h)$).
+
+\paragraph{definition : a node is \texttt{B}-stable\\}
+Let $G$ be a GroBdd, we denote $v$ an internal node of $G$.
+We denote $t_0 = v.if0.\gamma, I_0 = v.if0.node, t_1 = v.if1.\gamma$ and $I_1 = v.if1.node$.
+The node $v$ is said B-stable iff $\mathtt{B}(t_0, I_0, t_1, I_1) = \mathtt{ConsNode}(Id, (t_0, I_0), (t_1, I_1))$.
+
+
+\subsection{Reduction Rules}
+We define a GroBdd model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
+A valid model must satisfy all the previously mentioned constraints.
+
+In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
+\item The syntactical reduction : all sub-graphs are different up to graph-isomorphism (i.e. all identical sub-graphs are merged)
+\item The local semantic reduction : all internal node $v\in V$ is \texttt{B}-stable.
+\item All node has at least one incoming arc.
+A GroBdd is said reduced if it satisfies the reduction rules.
+\end{enumerate}
+In this section we prove:\begin{enumerate}
+\item For all vector of Boolean function $F$ it exists a reduced GroBdd $G$ representing it.
+\item A reduced GroBdd $G$ is semi-canonical, defined as :\begin{enumerate}
+\item For all node $v\in V$, $\phi(v)$ is S-free.
+\item For all pair of nodes $v, v'$, $\phi(v)$ and $\phi(v')$ are A-distinct.
+\item If two arcs $a$ and $a'$ represent the same function, then $a.\gamma = a'.\gamma \land a.node = a'.node$.
+\end{enumerate}
+\item Between two reduced GroBdd $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
+\end{enumerate}
+
+We refer the reader to Annexes, subsection~2, for a proof that under the constraint of the previous subsection (formally defined in Annexes, subsection~1), these statements are correct.
+
+\subsection{Conclusion}
+
+In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
+In the remaining of this report (if not mentioned otherwise), a GroBdd is to be assumed reduced.
+In the next section, we will introduce the "useless variable extraction" variant (or "U-extract" for short) as being a simple model (called "U") in the GroBdd formalism that we just introduced.
+
+\section{Useless Variable Extraction : GroBdd model NU}
+
+\subsection{Motivation}
+
+There are several interests in extracting useless variables, the more obvious one is that it tends to reduce the number of nodes (relatively to a regular ROBDD representing the same function with the same order).
+Here is a list of other interesting properties:\begin{itemize}
+\item When formalizing a problem it may appear that it exists a sub-problem that is present several times but on different variables with the same relative order, for example: in the n-queens problem : "there is exactly one queen per line" is a constraint that either you replicate or solve once and replicate the result.
+With the "U-extract" variant, you can solve the problem once and then, by creating the appropriate arc, replicating the solution without creating new nodes.
+\item Given a function, you can know which variables are useless, just by looking at the transformation descriptor, thus without going through the all structure.
+\end{itemize}
+
+\subsection{Definition}
+
+\paragraph{Definition of the Transformation Descriptor Set (TDS)}
+
+We define the Transformation Descriptor Set (TDS) of the "output Negation" + "Useless variable extraction" model (or "NU" model for short) by $\Y = \B \times \bigcup_{n\in\N} \B^n$.
+Let $\gamma$ be a transformation, we denote $\gamma.neg \in \B$ the first component of $\gamma$ and $\gamma.sub \in \bigcup_{n\in\N} \B^n$ the second component of $\gamma$.
+Furthermore, we denote $\gamma.sub_k \in\B$ the $k$-th component of the Boolean vector $\gamma.sub$.
+For all transformation descriptor $\gamma \in \B \times \B^m$, we define $m(\gamma) = m$ and $n(\gamma) = \sum_{0\leq k < m} \gamma.sub_k$.
+We define $\Y_{n, m} = \{\gamma\in\Y~|~n(\gamma) = n \land m(\gamma) = m\}$.
+For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $\rho(\gamma) \in \F_n \rightarrow \F_m$ its semantic interpretation.
+Informally, let $\gamma\in\Y_{n, m}$ be a transformation descriptor and $f\in\F_n$ be a function without useless variables, then the $k$-variable of the Boolean function $\rho(\gamma)(f)$ is useless iff $\gamma.sub_k$ is false.
+
+Additionally, we define the set of terminals $T=\{0\}$, we define $\phi(0)=()\longrightarrow{}0\in\F_0$ , we define $\forall b\in\B, E_0(()\longrightarrow b\in\F_0) = \{\gamma = \{neg = b, sub = ()\}, node = I_0\}$.
+
+\paragraph{Definition of the semantic interpretation}
+
+For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $S_\gamma = \left(i_1 < i_2 < \dots < i_n\right)$ the exhaustive list for which $\gamma.sub_k$ is true.
+Therefore, for all function $f\in\F_n$ we define $\rho(\gamma)(f) = (x_1, \dots, x_m) \longrightarrow \gamma.neg \oplus f(x_{i_1}, x_{i_2}, \dots, x_{i_n})$.
+For convenience reasons, we allow ourselves to define the $\gamma.sub$ component using the $S_\gamma$ notation instead of the Boolean vector one.
+
+
+  
+\paragraph{The GroBdd model NU is semi-canonical}
+We can prove (cf. Annexes, subsection~2) that the model "NU" satisfies all constraints formulated in Section~4 (Introduction of GroBdd).
+Therefore, we proved that a GroBdd which uses the "NU" model is semi-canonical.
+Actually, as the building algorithm \texttt{B} only uses the equality test between node's identifier, we can prove that the structure is canonical (up to graph isomorphism).
+In the next section, we compare representations generated by this new variant and regular ROBDD (with just the "output negation" variant) on three different benchmarks in terms of number of nodes and estimated memory cost.
+
+\subsection{Results}
+In this section, we start by quickly presenting our implementation of previous concepts, then, average results of our approach on three different benchmarks (involving circuits and CNF formulas), finally, we show several examples for which the reduction is significant.
+
+\subsubsection{Implementation details}
+Our implementation in OCaml of the previous concepts is available on GitHub as part of the DAGaml framework within the \texttt{grobdd} branch \cite{DAGamlGitHub}.
+The core program, i.e. the GroBdd abstraction, is about 1~900 lines of code.
+Implementation details for models is about 6~100 lines of code, with 728 lines for the model "NU", the remaining lines implementing models "NNI" (1~181 lines, mentioned in Section~5, is a generalization of "inputs negation"), "NU-X" (2~587 lines, mentioned in Section~5, allows to extract "1-predictions"), but also regular ROBDD (318 lines) and ZBDD (201 lines).
+Various useful tools are implemented (about 4~300 lines).
+All in all, this project is about 12~400 lines long.
+The implementation is designed in order to maximize code reusing through several layers of abstraction.
+This choice was made in order to reduce the size of the source code and maximizing the chance of finding evidence of bugs if one was to be introduced.
+Additionally, a significant part of the source code and computation time is dedicated to self-checking the consistency of the operation, in order to further reduce the risk of undetected issue.
+During this project, we focused our efforts into finding and validating new generalizations ("NU", "NNI" and "NU-X" so far) which would reduce the number of nodes.
+However, we did not spent much time on minimizing the memory cost of our implementation, therefore, the estimated memory cost introduces in the next section should be considered as an indicator.
+Especially, because the nodes in a regular ROBDD are of constant size (e.g. 22 bytes in Minoto et al. implementation \cite{MinatoVariants}), however the model "NU" ("NNI" and "NU-X" as well) use a variable size encoding of the transformation descriptor, which should complexifies the memory management of an industrial-proof software using these concepts.
+
+\subsubsection{Results}
+
+
+
+\begin{table}
+\center
+\begin{tabular}{c | c | c | c | c | c | c }
+& \multicolumn{2}{c|}{\texttt{lgsynth91}} & \multicolumn{2}{c|}{\texttt{iscas99}} & \multicolumn{2}{c}{\texttt{satlib/uf20-91}} \\
+model         & \#node & \textbf{memo} & \#node & \textbf{memo} & \#node & \textbf{memo} \\
+\texttt{Z}    & +233\% & +203\%        & +162\% & +135\%        & -41\%  & -42\%         \\
+\texttt{NU}   & -25\%  & -42\%         & -25\%  & -41\%         & -3\%   & -3\%          \\
+\texttt{NNI}  & -60\%  & -64\%         & -57\%  & -61\%         & -29\%  & -14\%         \\
+\texttt{NU-X} & -64\%  & -68\%         & -55\%  & -58\%         & -93\%  & -95\%         \\
+\end{tabular}
+\caption{Average improvement in term of number of nodes and estimated memory cost. Results are given relatively to regular ROBDD(with the "output negation" variant"), \texttt{Z} represents regular Zero-Suppressed Binary Decision Diagram (ZBDD), and \texttt{NU}, \texttt{NNI} and \texttt{NU-X} represent GroBdd model briefly introduced in Section~4.1}
+\label{results}
+\end{table}
+
+We compare the number of nodes and the estimated memory cost for each one of the following model : \texttt{N} (regular ROBDD + "output negation" variant), \texttt{Z} (Zero-suppressed BDD), \texttt{NU} (GroBdd with "output negation" and "useless variable extraction"), \texttt{NNI} ("negation negation invariant", mentioned in Section~4, allows to complement inputs within transformation descriptors) and \texttt{NU-X} ("output negation", "useless variable" and "1-prediction", this variant allows to capture 'logical deductions' similar to what is done in SAT-solver with the unit propagation).
+The results with models \texttt{NNI} and \texttt{NU-X} are here, in order to prove that the GroBdd formalism can be used to define other models of significant interest.
+
+We tested our implementation on three different benchmarks : \texttt{lgsynth91}\cite{BenchLgsynth91}, \texttt{iscas99}\cite{BenchIscas99} and \texttt{satlib/uf20-91}\cite{BenchSatlib}.
+Benchmarks \texttt{lgsynth91} and \texttt{iscas99}, which represent various circuits, were pre-processed using the framework of logic synthesis ABC\cite{Abc}, in order to turn an arbitrary circuits into a simpler to parse Anf Inverter Graph (AIG).
+The benchmark \texttt{satlib/uf20-91} represents a set of 1~000 satisfiable CNF formulas with 20 variables and 91 clauses.
+Results are given relatively to the model \texttt{N}.
+In columns "\#node" we have the relative number of nodes and in columns "\textbf{memo}" the relative estimated memory cost.
+
+We can observe in Table~\ref{results}, that an average reduction of the number of nodes by 25\% when compiling circuits into GroBdd using the NU model (relatively to regular ROBDD with "output negation" variant), and a reduction of 40\% of the memory cost.
+When compiling CNF formulas, we observe an average reduction of 3\% for the number of nodes and the memory cost.
+
+\subsubsection{The N-Queens problem}
+
+\begin{figure}
+\center
+\includeframe{1}{0.9}{}{nqueens.pdf}
+\caption{Representation of the 5-queens, using the "NU" model ("output negation" and "useless variable extraction"), the "NNI" model ("input Negation and output Negation Invariant extraction"), finally the "NU-X" model ("NU" model and "1-prediction extraction").
+}
+\label{figure-nqueens}
+\end{figure}
+
+\begin{table}
+\center
+\begin{tabular}{|c | c | c | c | c |}
+\multicolumn{5}{|c|}{quadratic version} \\
+& & \multicolumn{3}{|c|}{\#node} \\
+$N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
+1   & 1              & 1           & 0            & 0             \\
+2   & 0              & 0           & 0            & 0             \\
+3   & 0              & 0           & 0            & 0             \\
+4   & 2              & 29          & 14           & 1             \\
+5   & 10             & 166         & 26           & 6             \\
+6   & 4              & 129         & 36           & 3             \\
+7   & 40             & 1098        & 106          & 30            \\
+8   & 92             & 2450        & 262          & 70            \\
+\end{tabular}
+\begin{tabular}{|c | c | c | c | c |}
+\multicolumn{5}{|c|}{pseudo-linear version} \\
+& & \multicolumn{3}{|c|}{\#node} \\
+$N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
+1   & 1              & 1           & 0            & 0             \\
+2   & 0              & 0           & 0            & 0             \\
+3   & 0              & 0           & 0            & 0             \\
+4   & 2              & 14          & 6            & 1             \\
+5   & 10             & 73          & 15           & 6             \\
+6   & 4              & 61          & 16           & 3             \\
+7   & 40             & 348         & 39           & 30            \\
+8   & 92             & 645         & 77           & 65            \\
+\end{tabular}
+\caption{}
+\label{table-nqueens}
+\end{table}
+
+The N-Queens problem, is the problem of positioning $N$ queens on an $N\times N$ chessboard, such that no queen threaten an other.
+This problem can easily be reformulated as a Boolean function (either using an AIG or a CNF formula) by representing each cell as Boolean representing the statement: "there is a queen in this cell" and then be compiled into a GroBdd.
+We call this representation the "quadratic version" with each cell is represented (starting in the top left corner of chessboard, and then, line by line, down to the bottom right corner)
+A slightly more complex formulation, use the fact that there is exactly one queen per colon of the chessboard, thus, we can used on integer ($\log n$ Booleans) to represent its position in the colon.
+We call this representation the "pseudo-linear version", with integer being represented as interleaved Boolean vectors starting from the most significant bits.
+Numbers of node for both version on each model are summarized in Table~\ref{table-nqueens}, we display a representation of the solutions the 5-queen problem (quadratic version) in Figure~\ref{figure-nqueens}.
+
+
+
+\section{Conclusion}
+
+ROBDD allows to efficiently manipulate functions appearing in various fields of computer science such as: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking or Combinatorial Interaction Testing.
+
+However, ROBDD manipulation is memory intensive and various variants exist (such as "output negation") in order to reduce the memory cost.
+
+In this report, we introduced a new class of variant called GroBdd (Generalized Reduction of Ordered Binary Decision Diagram). We presented a set of constraints which ensure a GroBdd to be semi-canonical (i.e. canonical up to graph-isomorphism and A-equivalence, introduced in Section~4).
+Moreover, we defined a GroBdd model called "NU" ("output Negation" and "Useless variable extraction") which allows to significantly reduce the number of nodes (relatively to a regular ROBDD with the "output negation" variant).
+
+
+Using our implementation in OCaml against several benchmarks, we observed an average reduction of 25\% when representing circuits, and 3\% when representing generated CNF formula.
+Furthermore, we estimated the memory cost of this variant, in average, we observed a 40\% reduction when representing circuits and 3\% when representing CNF formulas.
+
+
+Future work will be focus on merging the "input Negation and output Negation Invariant extraction" ("NNI extract") variant and "1-prediction extraction" (X extract) variant into the "NNI-X extract" variant.
+Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement a heuristics to improve the compilation of CNF formulas, test on other benchmarks such as the Boolean component of SMT problems.
+
+
+\newpage
+\bibliography{biblio}{}
+\bibliographystyle{plain}
+
+\newpage
+\tableofcontents
+
+\newpage
+
+\section{Annexes}
+
+\subsection{GroBdd: Definitions, Notations, Constraints}
 
 We denote $\Y$ the set of all transformation descriptor.
-We assume defined $\rho$ the semantical interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
+We assume defined $\rho$ the semantic interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
 In this section, we make the list of properties that the TDS must ensure to be correct.
 
 \subsubsection{Canonical}
@@ -318,8 +522,7 @@ This constraint enforces transformations to be local.
 The function $\vartriangle$ is called the pre-process, and the function $\triangledown$ is called the post-process.
 
 \subsubsection{Composable (definition of \texttt{C})}
-\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \exists \gamma'' \in \Y_{n, l}, \rho(\gamma') \circ 
-\rho(\gamma) = \rho(\gamma'')\]
+\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \exists \gamma'' \in \Y_{n, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\gamma'')\]
 This constraint enforces $\Y_{n, n}$ to be stable by composition.
 Furthermore, it exists an algorithm $\mathtt{C} : \Y_{n, m} \rightarrow \Y_{m, l} \rightarrow \Y_{n, l}$, such that:
 \[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\mathtt{C}(\gamma, \gamma'))\]
@@ -415,7 +618,7 @@ The algorithm \texttt{B} is said S-free preserving iff for all $\Ynode$ $v$, $\p
 The algorithm \texttt{B} is said A-reduction preserving iff
 \[\forall v, w \in\Ynode, \phi(v) \sim_A \phi(w) \Rightarrow v = w\]
 
-\subsection{Reduction Rules}
+\subsection{GroBdd: Reduction Rules \& Semi-Canonicity Theorem}
 We define a GroBdd model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
 A valid model must satisfy all the previously mentioned constraints.
 
@@ -545,41 +748,7 @@ In order to prove that "Between two reduced GroBdd $G$ and $G'$ representing the
 Secondly, using the \texttt{Merge} procedure without re-generating the identifiers of the nodes of $G$ and using the property (2.c), we prove that the nodes of $G'$ collapse on the nodes of $G$ during the \texttt{Reduction} procedure, providing a one-to-one mapping.
 Details of this proof are cumbersome and not of great interest.
 
-
-\subsection{Conclusion}
-
-In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (GroBdd) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
-In the remaining of this report (if not mentioned otherwise), a GroBdd is to be assumed reduced.
-In the next section, we will introduce the "useless variable extraction" variant (or "U-extract" for short) as being a simple model (called "U") in the GroBdd formalism that we just introduced.
-
-\section{Useless Variable Extraction : GroBdd model NU}
-
-\subsection{Motivation}
-
-There are several interests in extracting useless variables, the more obvious one is that it tends to reduce the number of nodes (relatively to a regular ROBDD representing the same function with the same order).
-Here is a list of other interesting properties:\begin{itemize}
-\item When formalizing a problem it may appear that it exists a sub-problem that is present several times but on different variables with the same relative order, for example: in the n-queens problem : "there is exactly one queen per line" is a constraint that either you replicate or solve once and replicate the result.
-With the "U-extract" variant, you can solve the problem once and then, by creating the appropriate arc, replicating the solution without creating new nodes.
-\item Given a function, you can know which variables are useless, just by looking at the transformation descriptor, thus without going through the all structure.
-\end{itemize}
-
-\subsection{Definition of the Transformation Descriptor Set (TDS)}
-
-We define the Transformation Descriptor Set (TDS) of the "output Negation" + "Useless variable extraction" model (or "NU" model for short) by $\Y = \B \times \bigcup_{n\in\N} \B^n$.
-Let $\gamma$ be a transformation, we denote $\gamma.neg \in \B$ the first component of $\gamma$ and $\gamma.sub \in \bigcup_{n\in\N} \B^n$ the second component of $\gamma$.
-Furthermore, we denote $\gamma.sub_k \in\B$ the $k$-th component of the Boolean vector $\gamma.sub$.
-For all transformation descriptor $\gamma \in \B \times \B^m$, we define $m(\gamma) = m$ and $n(\gamma) = \sum_{0\leq k < m} \gamma.sub_k$.
-We define $\Y_{n, m} = \{\gamma\in\Y~|~n(\gamma) = n \land m(\gamma) = m\}$.
-For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $\rho(\gamma) \in \F_n \rightarrow \F_m$ its semantic interpretation.
-Informally, let $\gamma\in\Y_{n, m}$ be a transformation descriptor and $f\in\F_n$ be a function without useless variables, then the $k$-variable of the Boolean function $\rho(\gamma)(f)$ is useless iff $\gamma.sub_k$ is false.
-
-Additionally, we define the set of terminals $T=\{0\}$, we define $\phi(0)=()\longrightarrow{}0\in\F_0$ , we define $\forall b\in\B, E_0(()\longrightarrow b\in\F_0) = \{\gamma = \{neg = b, sub = ()\}, node = I_0\}$.
-
-\subsubsection{Definition of the semantic interpretation}
-
-For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $S_\gamma = \left(i_1 < i_2 < \dots < i_n\right)$ the exhaustive list for which $\gamma.sub_k$ is true.
-Therefore, for all function $f\in\F_n$ we define $\rho(\gamma)(f) = (x_1, \dots, x_m) \longrightarrow \gamma.neg \oplus f(x_{i_1}, x_{i_2}, \dots, x_{i_n})$.
-For convenience reasons, we allow ourselves to define the $\gamma.sub$ component using the $S_\gamma$ notation instead of the Boolean vector one.
+\subsection{Model NU: proof of semi-canonicity}
 
 \paragraph{transformations are canonical\\}
 Let $\gamma', \gamma''\in\Y_{n, m}$ be a pair of transformation descriptors, such that for all function $f\in\F_n$, $\rho(\gamma')(f) = \rho(\gamma'')(f)$.
@@ -684,64 +853,5 @@ Therefore, $v'=(\gamma'_0, I_0, \gamma'_1, I_1)$.
 We proved that $\gamma_0 = a \circ \gamma'_0$, however, $v$ and $v'$ and \texttt{B}-stable, thus $\gamma_0.neg = \gamma'_0.neg = 0$, thus $a = Id$.
 Hence, $\gamma_1 = \gamma'_1$.
 We proved that $v = v'$.
-  
-\subsubsection{The GroBdd model NU is semi-canonical}
-In this section, we proved that the model "NU" ("output negation" and "useless variable extraction") satisfies all the constraints formulated in Section~4 (Introduction of GroBdd).
-Therefore, we proved that a GroBdd which uses the "NU" model is semi-canonical.
-Actually, as the building algorithm \texttt{B} only uses the equality test between node's identifier, we can prove that the structure is canonical (up to graph isomorphism).
-In the next section, we compare representations generated by this new variant and regular ROBDD (with just the "output negation" variant) on three different benchmarks in terms of number of nodes and estimated memory cost.
 
-\subsection{Results}
-In this section, we start by quickly presenting our implementation of previous concepts, then, average results of our approach on three different benchmarks (involving circuits and CNF formulas), finally, we show several examples for which the reduction is significant.
-
-\subsubsection{Implementation details}
-Our implementation in OCaml of the previous concepts is available on GitHub as part of the DAGaml framework within the \texttt{grobdd} branch \cite{DAGamlGitHub}.
-The core program, i.e. the GroBdd abstraction, is about 1~900 lines of code.
-Implementation details for models is about 6~100 lines of code, with 728 lines for the model "NU", the remaining lines implementing models "NNI" (1~181 lines, mentioned in Section~4, is a generalization of "inputs negation"), "NU-X" (2~587 lines, mentioned in Section~4, allows to extract "1-predictions"), but also regular ROBDD (318 lines) and ZBDD (201 lines).
-Various useful tools are implemented (about 4~300 lines).
-All in all, this project is about 12~400 lines long.
-The implementation is designed in order to maximize code reusing through several layers of abstraction.
-This choice was made in order to reduce the size of the source code and maximizing the chance of finding evidence of bugs if one was to be introduced.
-Additionally, a significant part of the source code and computation time is dedicated to self-checking the consistency of the operation, in order to further reduce the risk of undetected issue.
-During this project, we focused our efforts into finding and validating new generalizations ("NU", "NNI" and "NU-X" so far) which would reduce the number of nodes.
-However, we did not spent much time on minimizing the memory cost of our implementation, therefore, the estimated memory cost introduces in the next section should be considered as an indicator.
-Especially, because the nodes in a regular ROBDD are of constant size (e.g. 22 bytes in Minoto et al. implementation \cite{MinatoVariants}), however the model "NU" ("NNI" and "NU-X" as well) use a variable size encoding of the transformation descriptor, which should complexifies the memory management of an industrial-proof software using these concepts.
-
-\subsubsection{Results}
-We compare the number of nodes and the estimated memory cost for each one of the following model : \texttt{N} (regular ROBDD + "output negation" variant), \texttt{Z} (Zero-suppressed BDD), \texttt{NU} (GroBdd with "output negation" and "useless variable extraction"), \texttt{NNI} ("negation negation invariant", mentioned in Section~4, allows to complement inputs within transformation descriptors) and \texttt{NU-X} ("output negation", "useless variable" and "1-prediction", this variant allows to capture 'logical deductions' similar to what is done in SAT-solver with the unit propagation).
-The results with models \texttt{NNI} and \texttt{NU-X} are here, in order to prove that the GroBdd formalism can be used to define other models of significant interest.
-
-We tested out implementation on three different benchmarks : \texttt{lgsynth91}\cite{BenchLgsynth91}, \texttt{iscas99}\cite{BenchIscas99} and \texttt{satlib/uf20-91}\cite{BenchSatlib}.
-Benchmarks \texttt{lgsynth91} and \texttt{iscas99}, which represent various circuits, were pre-processed using the framework of logic synthesis ABC\cite{Abc}, in order to turn an arbitrary circuits into a simpler to parse Anf Inverter Graph (AIG).
-The benchmark \texttt{satlib/uf20-91} represents a set of 1~000 satisfiable CNF formulas with 20 variables and 91 clauses.
-Results are given relatively to the model \texttt{N}.
-In columns "\#node" we have the relative number of nodes and in columns "\textbf{memo}" the relative estimated memory cost.
-
-\begin{tabular}{c | c | c | c | c | c | c }
-& \multicolumn{2}{c|}{\texttt{lgsynth91}} & \multicolumn{2}{c|}{\texttt{iscas99}} & \multicolumn{2}{c}{\texttt{satlib/uf20-91}} \\
-model         & \#node & \textbf{memo} & \#node & \textbf{memo} & \#node & \textbf{memo} \\
-\texttt{Z}    & +233\% & +203\%        & +162\% & +135\%        & -41\%  & -42\%         \\
-\texttt{NU}   & -25\%  & -42\%         & -25\%  & -41\%         & -3\%   & -3\%          \\
-\texttt{NNI}  & -60\%  & -64\%         & -57\%  & -61\%         & -29\%  & -14\%         \\
-\texttt{NU-X} & -64\%  & -68\%         & -55\%  & -58\%         & -93\%  & -95\%         \\
-\end{tabular}
-
-
-\section*{Conclusion}
-
-ROBDD allows to efficiently manipulate functions appearing in various fields of computer science such as: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking or Combinatorial Interaction Testing.
-
-However, ROBDD manipulation is memory intensive and various variants exist (such as "output negation") in order to reduce the memory cost.
-
-In this report, we introduced a new class of variant called GroBdd (Generalized Reduction of Ordered Binary Decision Diagram). We presented a set of constraints which ensure a GroBdd to be semi-canonical (i.e. canonical up to graph-isomorphism and A-equivalence, introduced in Section~4).
-Moreover, we defined a GroBdd model called "NU" ("output Negation" and "Useless variable extraction") which allows to significantly reduce the number of nodes (relatively to a regular ROBDD with the "output negation" variant).
-
-
-Using our implementation in OCaml against several benchmarks, we observed an average reduction of 25\% when representing circuits, and 3\% when representing generated CNF formula.
-Furthermore, we estimated the memory cost of this variant, in average, we observed a 40\% reduction when representing circuits and 3\% when representing CNF formulas.
-
-
-\newpage
-\bibliography{biblio}{}
-\bibliographystyle{plain}
 \end{document}
