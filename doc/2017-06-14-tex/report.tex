@@ -1,0 +1,898 @@
+\documentclass[a4paper,10pt]{article}
+%\usepackage{fullpage}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+%\usepackage{mathabx}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+
+\usepackage{cite}
+
+\lstset{breaklines=true,
+  mathescape=true,
+	%language=caml,
+	numbers=left,
+  numberstyle=\tiny \bf, %\color{blue},
+  %stepnumber=2,
+  numbersep=10pt,
+  %firstnumber=11,
+  numberfirstline=true
+	}
+
+\title{A Generalized Reduction of Ordered Binary Decision Diagram\\{\small Internship at DFKI (Bremen, Germany) from 15/03/2017 to 15/06/2017}}
+\author{Joan Thibault\\Supervisor:~Rolf Drechsler}
+
+\newcommand{\includeframe}[4]{\makebox[#2\linewidth]{\includegraphics[page=#1,width=#2\linewidth,trim=0cm 0cm 0cm 0cm,clip=true,#3]{#4}}}
+
+
+\newcommand{\shannon}[3]{#1 \longrightarrow_S #2, #3}
+\newcommand{\N}{\mathbb{N}}%{\{0, 1\}}
+\newcommand{\B}{\mathbb{B}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\Y}{\mathbb{Y}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\Ynode}{\Y\mathtt{-node}}
+\newcommand{\Ynodes}{\Y\mathtt{-nodes}}
+\newcommand{\T}{\mathbb{T}}
+\newcommand{\Uextract}{"\texttt{U}seless variables extraction"}
+\newcommand{\uextract}{"\texttt{U} extract"}
+\newcommand{\NNIextract}{"input \texttt{N}egation and output \texttt{N}egation \texttt{I}nvariant extraction"}
+\newcommand{\nniextract}{"\texttt{NNI} extract"}
+\newcommand{\Xextract}{"1-prediction extraction"}
+\newcommand{\xextract}{"\texttt{X} extract"}
+\newcommand{\GroBdd}{\texttt{GROBDD}}
+\newcommand{\GroBdds}{\texttt{GROBDDs}}
+
+%\newtheoremstyle{plain}
+\newtheorem{newtheo}{Theorem}
+\newcommand{\theorem}[2]{\begin{newtheo}{\textsf{#1}\\} #2 \end{newtheo}}
+
+%\theoremstyle{definition}
+\newtheorem{newdef}{Definition}
+\newcommand{\definition}[2]{\begin{newdef}{#1\\}#2\end{newdef}}
+
+\newtheorem{newcons}{Constraint}
+\newcommand{\constraint}[2]{\begin{newcons}{#1\\}#2\end{newcons}}
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+The Reduced Ordered Binary Decision Diagram (ROBDD)\cite{Bryant1986, Somenzi1999} is the state-of-the-art representation for Boolean functions.
+They are used in various fields such as logic synthesis, artificial intelligence or combinatorics.
+However, ROBDDs suffer from two main issues: (1) their representation is memory expensive and (2) their manipulation is memory intensive as it induces many random memory accesses.
+
+
+Several variations of ROBDD exist such as Zero-suppressed Binary Decision Diagram (ZBDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output negation"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
+
+
+In this report, we introduce a new generalization of the standard reduction rules that we call the \Uextract{} or \uextract{} for short.
+Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and extracts them from the local variable order.
+This generalization allows the addition removal of useless variables in linear time (in the number of variables), reduces the number of nodes and tends to reduce the overall memory cost.
+However, several drawbacks arise: no in-place \textit{sifting} (permutation of adjacent variables), nodes tend to have a bigger representation in memory and are no longer of fixed size, furthermore, it slightly complexifies manipulations.
+
+
+We implemented both the \uextract{} and the "output negation" variants in an OCaml program\cite{DAGamlGitHub} and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
+We observe an average of 25\% less nodes and 40\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
+\end{abstract}
+
+\newpage
+
+
+
+\section{Introduction}
+
+Nowadays, most critical systems rely on digital circuits: in transportation (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
+One way to minimize risks in digital parts of these systems is to provide a formal proof that they respect their specification.
+On the other hand, we want to minimize costs and energy consumption while maximizing performances of these digital circuits.
+In order to efficiently optimize digital circuits we rely on complex programs.
+However, these programs are rarely proven themselves, thus, circuits optimized using them might not be equivalent to the initial design and therefore might not respect the specification.
+The obvious solution would be to prove optimizing programs, however two major issues arise : these programs are complex  (thus, proving them would be expensive) and might be proprietary (thus, one cannot check that the proof is correct).
+A simpler alternative is to design a program which checks that two digital circuits are equivalent.
+With this alternative, the only piece of software which needs to be proven is the "equivalence checker".
+
+
+In order to prove that two digital circuits are equivalent, there is two main algorithmic solutions:
+First, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
+This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation} (we simplify clauses in which a literal value is known), early conflict detection (we use the fact that some subsets of SAT are poly-time decidable, such as: 2SAT, Horn clauses, etc.) or \textit{conflict driven clause learning}.
+Secondly, the compilation of both circuits into Reduced Ordered Binary Decision Diagrams (ROBDDs).
+A ROBDD is a canonical structure which represent a vector of functions.
+Therefore, by using hash-consing techniques, we can perform the equality between two compiled functions in constant time.
+However, the compilation might take an exponential time in the number of variable.
+In this report we will focus on ROBDDs.
+
+
+ROBDDs have various other applications such as: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking or Combinatorial Interaction Testing.
+
+%\begin{figure}
+%\[f_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = (x_0 \land x_1) \lor \dots \lor (x_{2n} \land x_{2n+1})\]
+%\[g_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = f_n(x_0, x_{n+1}, \dots, x_n, x_{2n+1})\]
+%\caption{The ROBDD representing the function $f_n$ has a linear size in $n$, the one representing $g_n$ has a an exponential size in $n$.}
+%\label{OrderExplosion}
+%\end{figure}
+
+
+However, ROBDDs are memory expensive as their size tends to grow exponentially with the number of variables.
+Several variants have been invented in order to capture some semantic properties of the function and reduce the memory consumption.
+For example, Zero suppressed Binary Decision Diagram (ZBDD) are better suited for representing sparse functions.
+In this report we will use the "output negation" variant\cite{BryantVariantN}, which extends the reduction rules in order to guarantee canonicity under negation.
+Therefore, it allows (1) to reduce the size of the structure and (2) to negate a function in constant time (reducing the set of useful binary operators to XOR and AND).
+Other extensions of the reduction rules exist such as: "input negation"\cite{MinatoVariants} (each edge can complement the locally first input), "shifting variables"\cite{MinatoVariants} (each edge stores the number of useless variables before the next significant variables) or "dual edge"\cite{RolfVariantDual} (we define the dual of a function $f$ by $\bar{f} = (x_1, \dots, x_n) \longrightarrow \lnot f(\lnot x_1, \dots, \lnot x_n)$, therefore the reduction works similarly to the "output negation").
+
+
+In addition to use the "output negation" variant, we introduce a new variant which allows to extract useless variables (a.k.a non-support variables).
+A variable is said useless iff it does not change the results such as $x_1$ in $f(x_0, x_1, x_2) = x_0 \land x_2$ or $x_0$ in $g(x_0) = x_0 \land \lnot x_0$.
+We call this new variant \Uextract{} or \uextract{} for short.
+
+The remainder of this report will be organized as follows.
+In Section~2, we formally introduce Boolean functions, useless variables and some notations.
+In Section~3, we formally introduce Reduced Ordered Binary Decision Diagrams (ROBDD).
+In Section~4, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}).
+In Section~5, we introduce the \uextract{} variant as part of the \GroBdd{} framework, before exposing results against three  different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
+
+\section{Notations}
+
+Reduced Ordered Binary Decision Diagrams represent Boolean functions.
+In this section we introduce notations necessary to their manipulation.
+
+
+We denote the set of Booleans $\B = \{0, 1\}$.
+The set of Boolean vector of size $n\in\N$ is denoted $\B^n$.
+The set of Boolean functions of arity (i.e. the number of variables) $n\in\N$ is denoted $\F_n = \B^n \longrightarrow \B$.
+
+
+We denote the conjunction by $\land$ (AND), the disjunction by $\lor$ (OR), the negation by $\lnot$ (NOT) and the symmetric difference by $\oplus$ (XOR).
+We denote the Shannon operator by $\shannon{}{}{}$ defined by $\forall x, y, z\in\B, \shannon{x}{y}{z} = (\lnot x \land y) \lor (x \land z)$).
+
+\paragraph{Restriction\\}
+
+Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$, $i\in\llbracket 0, n \rrbracket$ be an integer and $b\in\B$ be a Boolean.
+We denote $f[i\leftarrow b]$ the Boolean function of arity $n$ defined by $f[i\leftarrow b](x_1, \dots, x_n) = f(x_1, \dots, x_{i-1}, b, x_i, \dots, x_n)$.
+$f[i\leftarrow 0]$ (respectively $f[i\leftarrow 1]$) is called the $i$-th negative (respectively positive) restriction.
+
+Let $f$ be a function of arity $n+1$, we denote $f_0$ (respectively $f_1$) the function of arity $n$ defined by $f_0 = f[0\leftarrow 0]$ (respectively $f_1 = f[0\leftarrow 1]$).
+
+\paragraph{Construction\\}
+
+Let $f, g \in \F_n$ be Boolean functions of arity $n$ and $i\in\llbracket 0, n \rrbracket$ be an integer.
+We denote $f\star_ig$ the Boolean function of arity $n+1$ defined by $(f\star_ig)(x_0, \dots, x_{i-1}, y, x_i, \dots, x_n) = \shannon{y}{f(x_0, \dots, x_n)}{g(x_0, \dots, x_n)}$.
+
+We denote $\star = \star_0$
+
+N.B.: $(f\star_i g)[i\leftarrow 0] = f$ and $ (f\star_i g)[i\leftarrow 1] = g$ (in particular: $(f\star g)_0 = f$ and $ (f\star g)_1 = g)$.
+
+
+
+
+\theorem{Expansion Theorem}{
+Let $f\in\F_n$ be a Boolean function, then $\forall i\in\llbracket{}0, n-1\rrbracket{}, f = f[i\leftarrow 0]\star_i f[i\leftarrow 1]$ (in particular: $f = f_0 \star f_1$)
+}
+
+%\paragraph{Expansion Theorem\\}
+
+\definition{Useless Variables}
+{
+Let $f\in\F_n$ be a Boolean function.
+We define the support set of $f$ as the set of variable index $i$ such that $f[i\leftarrow 0] \neq f[i\leftarrow 1]$.
+We define useless variables (or non-support variables) as variables which does not belong the support set.
+Thus, the $i$-th variable of $f$ is useless iff $f[i\leftarrow 0] = f[i\leftarrow 1]$.
+}
+
+\section{Reduced Ordered Binary Decision Diagram (ROBDD) and Canonicity}
+
+\paragraph{Definition of Binary Decision Diagram (BDD)\\}
+
+A Reduced Ordered Binary Decision Diagram is a directed acyclic graph $(V\cup T, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$ over an infinite set of variables (but with a finite support set).
+Nodes are partitioned into two sets : the set of internal nodes $V$ and the set of terminal nodes $T$.
+Every internal node $v\in V$ has one field $\mathit{var}$, which represents the index of a variable and two outgoing edges respectively denoted $\mathit{if0}$ and $\mathit{if1}$.
+When using the "output negation" variant, there is only one terminal called 0, which represents the constant function returning 0.
+edges are partitioned into two sets : the set of root edges $\Psi$ and the set of internal edges $E$.
+There is exactly $k$ root edges, a root edge is denoted $\Psi_i$ with $0\leq i < k$, informally, $\Psi_i$ is the root of the ROBDD representing $f_i$.
+Every edge has an inversion field $neg \in \B$ and a destination node denoted $\mathit{node}$.
+
+%add beautiful draw (with \psi edges)$
+
+We denote $\phi(node)$ the semantics of the node $node$ and $\psi(edge)$ the semantic of the edge $edge$ as follow:\begin{itemize}
+\item $\forall i, f_i = \psi(\Psi_i)$
+\item $\forall edge \in \Psi \cup E, \psi(edge) = edge.neg \oplus \phi(edge.\mathit{node})$
+\item $\phi(0 \in T) = 0$
+\item $\forall node \in V, \phi(node) = \shannon{node.\mathit{var}}{\psi(node.\mathit{if0})}{\psi(node.\mathit{if1})}$
+\end{itemize}
+
+\definition{Reduced Ordered Binary Decision Diagram (ROBDD)}
+{
+A ROBDD is said \texttt{Ordered} if (1) $\forall v\in V$, $v.\mathit{if1}.\mathit{node} \in V \Rightarrow v.\mathit{var} > v.\mathit{if1}.\mathit{node}.\mathit{var}$ and $v.\mathit{if0}.\mathit{node} \in V \Rightarrow v.\mathit{var} > v.\mathit{if0}.\mathit{node}.\mathit{var}$ (i.e. the $\mathit{var}$ field of any node is greater than the $\mathit{var}$ field of its children).
+%define an order over variables
+A ROBDD is said \texttt{Reduced} if (2) $\forall v\in V, v.if0 \neq v.if1$ and (3) every node has an in-degree strictly positive.
+}
+
+\theorem{ROBDDs are canonical}
+{
+Let us consider a ROBDD $G$ representing the vector of Boolean functions $F=(f_1, ..., f_n)$, then for every nodes $v_1, v_2 \in G$, $\phi(v_1) = \phi(v_2) \Leftrightarrow v_1 = v_2$.
+}
+A proof of this theorem is available in the review of Somenzi et al.\cite{Somenzi1999}.
+
+\paragraph{Effective construction\\}
+In practice, one does not build the decision tree and then reduces it.
+Rather, ROBDDs are created starting from the ROBDDs for constants and variables and by applying the usual Boolean connectives and are kept reduced at all times.
+At the same time several functions are represented by one multi-rooted diagram.
+Indeed, each node of a ROBDD has a function associated with it.
+If we have several functions, they will have subfunctions in common (e.g. $f(x_0, x_1, x_2, x_3) = \shannon{x_1}{x_2}{x_3}$ and $f(x_0, x_1, x_2, x_3) = \shannon{\lnot x_1}{x_2}{x_3})$.
+As a special case two equivalent functions are represented by the same ROBDD (not just two identical ROBDDs).
+This approach makes equivalence check a constant-time operation.
+It is usually implemented using a dictionary which stores all ROBDD nodes that are alive (i.e. created and not deleted).
+This dictionary is called the \textit{unique table}.
+Operations that build ROBDDs start from the bottom (the constant nodes) and proceed up to the function nodes.
+If an operation needs to add a node $N = (v, f_1, f_0)$ to a ROBDD (which assumes that it has identifiers of the nodes representing $f_1$ and $f_2$), it first checks if $N$ already exists in the \textit{unique table} and if it does not, associate it to a new identifier and returns the latest.
+Doing so, the equivalence check is reduced to identifier (usually pointer) comparison.
+
+\section{Introduction of Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{})}
+
+\subsection{Motivation}
+
+On one hand, a ROBDD can be understood as an automaton recognizing a language composed of binary words.
+On the other hand, a ROBDD can be understood as a logic circuit with limited conciseness.
+By limited conciseness, we mean that there are functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
+For example, it has been proven \cite{Bryant1986} that the integer multiplication has a quadratic AIG representation but no polynomial ROBDD representation (at least exponential).
+
+The "output negation" variant, by adding expressiveness to edges, improves the conciseness.
+We want to go further in this approach by allowing more complex transformations on edges while maintaining canonicity.
+Such transformations can disturb variables' order of evaluation, allowing to represent "simple" decision processes in a more concise way.
+Furthermore, some transformations (within the range of transformation allowed) could have their complexity drastically reduced.
+For example, using the "output negation" variant, the complementation's time and space complexity goes from linear in the number of nodes to constant.
+
+Three set of transformation that would be of great interest are the \Uextract{} (or \uextract{} for short), the "inputs inverters" and \Xextract{} (or \xextract{} for short).
+
+
+The \uextract{} variant ensures that the function represented by any node does not have useless variable.
+Therefore, it sets an upper bound on the number of nodes of arity $n$ to $2^{2^n}$ (this upper bound is not reached, because functions with useless variables cannot have a node to represent them).
+Furthermore, it allows to "copy" functions at (almost) no cost as the expression $f(x_1, x_3, x_5, x_7)$ and $f(x_0, x_1, x_3, x_5)$ are represented using the same structure.
+
+
+The "inputs negation" variant would allow to complement inputs on any edge.
+The reduction rules would ensure that there is at most $2^{2^n-n}$ nodes of arity $n$ (this upper bound is not reached).
+However, simply introducing such transformation breaks the canonicity, therefore, we introduce polarity-phase invariant detection: we compute for each encountered function the linear space of input/output negations which do not change the function.
+This variant is called \NNIextract{} (or \nniextract{} for short) and is a generalization of the work of Burch et al. \cite{BurchLong1992}.
+
+We define a 1-prediction as follow:
+Let $f\in\F_n$ be a Boolean function of arity $n$, $i$ be an integer ($0\leq i < n$), $x$ and $y$ be Booleans.
+We say that the function $f$ admits a 1-prediction $(i, x, y)$ iff $f[i\leftarrow x] = y \in\F_{n-1}$.
+The "X extract" variant, by allowing to extract 1-predictions, represents a generalization of ZBDD (Zero Suppressed Binary Decision Diagram), thus, allows to efficiently represent sparse functions.
+This variant is compatible with the "output negation" variant.
+
+
+Due to the limited length of this report, we will not detail further the "NNI extract" and "X extract" variant.
+
+
+The Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}) is a framework that aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
+The remaining of this section is organized as follows. First, we formally define \GroBdd{}s, then we present a set of properties which are sufficient to ensure the semi-canonicity of \GroBdd{}s.
+
+\subsection{Initial definition of \GroBdd{}}
+
+A \GroBdd{} is very similar to an actual ROBDD, the main difference is that on every edge there is a transformation  descriptor (the "output negation" is an example of such descriptor).
+
+A Reduced Ordered Binary Decision Diagram is a directed acyclic graph $(V\cup T, \Psi \cup E)$ representing a vector of Boolean functions $F=(f_1, ..., f_k)$.
+Nodes are partitioned into two sets : the set of internal nodes $V$ and the set of terminal nodes $T$.
+Every internal node $v\in V$ has two outgoing edges respectively denoted $\mathit{if0}$ and $\mathit{if1}$.
+Every internal node $v\in V$ has a field $\mathit{index}$ which represents a unique identifier associated to each node.
+edges are partitioned into two sets : the set of root edges $\Psi$ and the set of internal edges $E$.
+There is exactly $k$ root edges, a root edge is denoted $\Psi_i$ with $0\leq i < k$, informally, $\Psi_i$ is the root of the \GroBdd{} representing $f_i$.
+Every edge has a transformation descriptor field $\gamma$ and a destination node denoted $\mathit{node}$.
+
+%add beautiful draw (with \psi edges)$
+We denote $\rho(\gamma) : \F_n \longrightarrow \F_m$ the semantic interpretation of the transformation descriptor $\gamma$.
+We define $\phi(node)$ the semantic of the node $node$ and $\psi(edge)$ the semantic of the edge $edge$ as follow:\begin{itemize}
+\item $\forall i, f_i = \psi(\Psi_i)$
+\item $\forall edge \in \Psi \cup E, \psi(edge) = \rho(edge.\gamma)(\phi(edge.\mathit{node}))$
+\item $\forall node \in V, \phi(node) = \psi(node.\mathit{if0}) \star \psi(node.\mathit{if1})$
+\end{itemize}
+We assume the function $\phi$ defined on all terminals $T$ (we always assume, all terminals to have a different interpretation through $\phi$).
+
+\subsubsection{Definitions and Constraints}
+
+We refer the reader to Annexes (sections~\ref{grobdd-def} and~\ref{grobdd-reduction}) for a more formal approach of the problem.
+We denote $\T$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
+Transformations are composable (i.e. $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
+We define the set of asymmetric transformations by $A_n = \T_{n, n}$.
+We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.
+The set of symmetric transformation is stable by composition: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
+We denote $\F^S_m = \{f\in\F_m~|~\forall n \leq m, \forall t\in\T_{n, m}, f'\in\F_n, t(f') = f\}$ the set of S-free Boolean functions or arity n.
+Boolean functions are uniquely S-extractable: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
+Two Boolean functions $f, f'\in\F_n$ are A-equivalent iff $\exists a\in A_n, f=a(f')$.
+N.B.: Several sets $S_{*, *}$ may fit this definition.
+Furthermore, if two functions are not A-equivalent, they are A-distinct.
+
+remark: A \GroBdd{} should ensure by construction that (1) all nodes are S-free and (2) all nodes are A-distinct.
+
+\subsubsection{Buildable (definition of \texttt{B})}
+
+Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
+For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
+
+We define \texttt{B} an algorithm over $\Y$ which respect the signature:
+\begin{lstlisting}
+$\mathtt{B} : \Y_{n_0, m} \times \I_{n_0} \longrightarrow \Y_{n_1, m} \times \I_{n_1} \longrightarrow$
+  | ConsNode $\Y_{n', m} \times (\Y_{n_x, n'} \times \I_{n_x}) \times (\Y_{n_y, n'} \times \I_{n_y})$
+  | Merge $\Y_{n_z, m} \times \I_{n_z}$
+\end{lstlisting}
+(with $x, y, z \in \{0, 1\}$) \\
+Furthermore, for all $(t_g, I_g, t_h, I_h) \in \T_{n_0, m} \times \I_{n_0} \times \T_{n_1, m} \times \I_{n_1}$:
+$\texttt{B}(t_g, I_g, t_h, I_h) = \texttt{ConsNode} (t, (t'_X, I_X), (t'_Y, I_Y)) \Rightarrow f = t\left(t'_X(X) \star t'_Y(Y))\right)$
+and, $\texttt{B}(t_g, I_g, t_h, I_h) = \texttt{Merge} (t'_Z, I_Z) \Rightarrow f = t'_Z(Z)$ (with $X, Y, Z \in\{g, h\}$ and $f = t_g(g) \star t_h(h)$).
+
+\definition{a node is \texttt{B}-stable}
+{
+Let $G$ be a \GroBdd{}, we denote $v$ an internal node of $G$.
+We denote $t_0 = v.if0.\gamma, I_0 = v.if0.node, t_1 = v.if1.\gamma$ and $I_1 = v.if1.node$.
+The node $v$ is said B-stable iff $\mathtt{B}(t_0, I_0, t_1, I_1) = \mathtt{ConsNode}(Id, (t_0, I_0), (t_1, I_1))$.
+}
+
+
+\subsection{Reduction Rules}
+In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
+\item The syntactical reduction : all sub-graphs are different up to graph-isomorphism (i.e. all identical sub-graphs are merged)
+\item The local semantic reduction : all internal node $v\in V$ is \texttt{B}-stable.
+\item All node have at least one incoming edge.
+A \GroBdd{} is said reduced if it satisfies the reduction rules.
+\end{enumerate}
+In this section we prove:\begin{enumerate}
+\item For all vector of Boolean function $F$ it exists a reduced \GroBdd{} $G$ representing it.
+\item A reduced \GroBdd{} $G$ is semi-canonical, defined as :\begin{enumerate}
+\item For all node $v\in V$, $\phi(v)$ is S-free.
+\item For all pair of nodes $v, v'$, $\phi(v)$ and $\phi(v')$ are A-distinct.
+\item If two edges $a$ and $a'$ represent the same function, then $a.\gamma = a'.\gamma \land a.node = a'.node$.
+\end{enumerate}
+\item Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
+\end{enumerate}
+
+We refer the reader to Annexes (cf. Section~\ref{grobdd-reduction}) for a proof that under the constraint of the previous subsection (formally defined in Annexes, Section~\ref{grobdd-def}), these statements are correct.
+
+\subsection{Conclusion}
+
+In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
+In the remaining of this report, a \GroBdd{} is to be assumed reduced.
+In the next section, we will introduce the \Uextract{} variant (or \uextract{} for short) as being a simple model (called "U") in the \GroBdd{} formalism that we just introduced.
+
+\section{Useless Variable Extraction : \GroBdd{} model NU}
+
+\subsection{Motivation}
+
+There are several interests in extracting useless variables, the more obvious one is that it tends to reduce the number of nodes (relatively to a regular ROBDD representing the same function with the same order).
+Here is a list of other interesting properties:\begin{itemize}
+\item When formalizing a problem it may appear that it exists a sub-problem that is present several times but on different variables with the same relative order, for example: in the n-queens problem : "there is exactly one queen per line" is a constraint that either you replicate or solve once and replicate the result.
+With the \uextract{} variant, you can solve the problem once and then, by creating the appropriate edge, replicating the solution without creating new nodes.
+\item Given a function, you can know which variables are useless, just by looking at the transformation descriptor, thus without going through the all structure.
+\end{itemize}
+
+\subsection{Definition}
+
+\paragraph{Definition of the Transformation Descriptor Set (TDS)}
+
+We define the Transformation Descriptor Set (TDS) of the "output Negation" + "Useless variable extraction" model (or "NU" model for short) by $\Y = \B \times \bigcup_{n\in\N} \B^n$.
+Let $\gamma$ be a transformation, we denote $\gamma.neg \in \B$ the first component of $\gamma$ and $\gamma.sub \in \bigcup_{n\in\N} \B^n$ the second component of $\gamma$.
+Furthermore, we denote $\gamma.sub_k \in\B$ the $k$-th component of the Boolean vector $\gamma.sub$.
+For all transformation descriptor $\gamma \in \B \times \B^m$, we define $m(\gamma) = m$ and $n(\gamma) = \sum_{0\leq k < m} \gamma.sub_k$.
+We define $\Y_{n, m} = \{\gamma\in\Y~|~n(\gamma) = n \land m(\gamma) = m\}$.
+For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $\rho(\gamma) \in \F_n \rightarrow \F_m$ its semantic interpretation.
+Informally, let $\gamma\in\Y_{n, m}$ be a transformation descriptor and $f\in\F_n$ be a function without useless variables, then the $k$-variable of the Boolean function $\rho(\gamma)(f)$ is useless iff $\gamma.sub_k$ is false.
+
+Additionally, we define the set of terminals $T=\{0\}$, we define $\phi(0)=()\longrightarrow{}0\in\F_0$ , we define $\forall b\in\B, E_0(()\longrightarrow b\in\F_0) = \{\gamma = \{neg = b, sub = ()\}, node = I_0\}$.
+
+\paragraph{Definition of the semantic interpretation}
+
+For all transformation descriptor $\gamma\in\Y_{n, m}$, we denote $S_\gamma = \left(i_1 < i_2 < \dots < i_n\right)$ the exhaustive list for which $\gamma.sub_k$ is true.
+Therefore, for all function $f\in\F_n$ we define $\rho(\gamma)(f) = (x_1, \dots, x_m) \longrightarrow \gamma.neg \oplus f(x_{i_1}, x_{i_2}, \dots, x_{i_n})$.
+For convenience reasons, we allow ourselves to define the $\gamma.sub$ component using the $S_\gamma$ notation instead of the Boolean vector one.
+
+
+  
+\paragraph{The \GroBdd{} model NU is semi-canonical}
+We can prove (cf. Annexes, Section~\ref{grobdd-model-nu}) that the model "NU" satisfies all constraints formulated in Section~4 (Introduction of \GroBdd{}).
+Therefore, we proved that a \GroBdd{} which uses the "NU" model is semi-canonical.
+Actually, as the building algorithm \texttt{B} only uses the equality test between node's identifier, we can prove that the structure is canonical (up to graph isomorphism).
+In the next section, we compare representations generated by this new variant and regular ROBDD (with just the "output negation" variant) on three different benchmarks in terms of number of nodes and estimated memory cost.
+
+\subsection{Results}
+In this section, we start by quickly presenting our implementation of previous concepts, then, average results of our approach on three different benchmarks (involving circuits and CNF formulas), finally, we expose the impact on using different \GroBdd models to represent solutions of the N-Queens problem.
+
+\subsubsection{Implementation details}
+Our implementation in OCaml of the previous concepts is available on GitHub as part of the DAGaml framework within the \texttt{grobdd} branch \cite{DAGamlGitHub}.
+The core program, i.e. the \GroBdd{} abstraction, is about 1~900 lines of code.
+Implementation details for models is about 6~100 lines of code, with 728 lines for the model "NU", the remaining lines implementing models "NNI" (1~939 lines, mentioned in Section~4, is a generalization of "inputs negation"), "NU-X" (2~587 lines, mentioned in Section~4, allows to extract "1-predictions"), but also regular ROBDD (318 lines) and ZBDD (201 lines).
+Various useful tools are implemented (about 4~300 lines).
+All in all, this project is about 12~400 lines long.
+The implementation is designed in order to maximize code reusing through several layers of abstraction.
+This choice was made in order to reduce the size of the source code and maximizing the chance of finding evidence of bugs if one was to be introduced.
+Additionally, a significant part of the source code and computation time is dedicated to self-checking the consistency of the operation, in order to further reduce the risk of undetected issue.
+During this project, we focused our efforts into finding and validating new generalizations ("NU", "NNI" and "NU-X" so far) which would reduce the number of nodes.
+However, we did not spent much time on minimizing the memory cost of our implementation, therefore, the estimated memory cost introduces in the next section should be considered as an indicator.
+Especially, because the nodes in a regular ROBDD are of constant size (e.g. 22 bytes in Minoto et al. implementation \cite{MinatoVariants}), however the model "NU" ("NNI" and "NU-X" as well) use a variable size encoding of the transformation descriptor, which should complexifies the memory management of an industrial-proof software using these concepts.
+
+\subsubsection{Results}
+
+
+
+\begin{table}
+\center
+\begin{tabular}{c | c | c | c | c | c | c }
+& \multicolumn{2}{c|}{\texttt{lgsynth91}} & \multicolumn{2}{c|}{\texttt{iscas99}} & \multicolumn{2}{c}{\texttt{satlib/uf20-91}} \\
+model         & \#node & \textbf{memo} & \#node & \textbf{memo} & \#node & \textbf{memo} \\
+\texttt{Z}    & +233\% & +203\%        & +162\% & +135\%        & -41\%  & -42\%         \\
+\texttt{NU}   & -25\%  & -42\%         & -25\%  & -41\%         & -3\%   & -3\%          \\
+\texttt{NNI}  & -60\%  & -64\%         & -57\%  & -61\%         & -29\%  & -14\%         \\
+\texttt{NU-X} & -64\%  & -68\%         & -55\%  & -58\%         & -93\%  & -95\%         \\
+\end{tabular}
+\caption{Average improvement in term of number of nodes and estimated memory cost. Results are given relatively to regular ROBDD(with the "output negation" variant"), \texttt{Z} represents regular Zero Suppressed Binary Decision Diagram (ZBDD), and \texttt{NU}, \texttt{NNI} and \texttt{NU-X} represent \GroBdd{} model briefly introduced in Section~4.1}
+\label{results}
+\end{table}
+
+We compare the number of nodes and the estimated memory cost for each one of the following model : \texttt{N} (regular ROBDD + "output negation" variant), \texttt{Z} (ZBDD), \texttt{NU} (\GroBdd{} with "output negation" and "useless variable extraction"), \texttt{NNI} ("negation negation invariant", mentioned in Section~4, allows to complement inputs within transformation descriptors) and \texttt{NU-X} ("output negation", "useless variable" and "1-prediction", this variant allows to capture 'logical deductions' similar to what is done in SAT-solver with the unit propagation heuristic).
+The results with models \texttt{NNI} and \texttt{NU-X} are here, in order to prove that the \GroBdd{} formalism can be used to define other models of significant interest.
+
+We tested our implementation on three different benchmarks : \texttt{lgsynth91}\cite{BenchLgsynth91}, \texttt{iscas99}\cite{BenchIscas99} and \texttt{satlib/uf20-91}\cite{BenchSatlib}.
+Benchmarks \texttt{lgsynth91} and \texttt{iscas99}, which represent various circuits, were pre-processed using the framework of logic synthesis ABC\cite{Abc}, in order to turn an arbitrary circuits into a simpler to parse Anf Inverter Graph (AIG).
+The benchmark \texttt{satlib/uf20-91} represents a set of 1~000 satisfiable CNF formulas with 20 variables and 91 clauses.
+Results are given relatively to the model \texttt{N}.
+In columns "\#node" we have the relative number of nodes and in columns "\textbf{memo}" the relative estimated memory cost.
+
+We can observe in Table~\ref{results}, that an average reduction of the number of nodes by 25\% when compiling circuits into \GroBdd{} using the NU model (relatively to regular ROBDD with "output negation" variant), and a reduction of 40\% of the memory cost.
+When compiling CNF formulas, we observe an average reduction of 3\% for the number of nodes and the memory cost.
+
+\subsubsection{The N-Queens problem}
+
+
+
+\begin{table}[h]
+\center
+\begin{tabular}{|c | c | c | c | c |}
+\multicolumn{5}{|c|}{quadratic version} \\
+& & \multicolumn{3}{|c|}{\#node} \\
+$N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
+1   & 1              & 1           & 0            & 0             \\
+2   & 0              & 0           & 0            & 0             \\
+3   & 0              & 0           & 0            & 0             \\
+4   & 2              & 29          & 14           & 1             \\
+5   & 10             & 166         & 26           & 6             \\
+6   & 4              & 129         & 36           & 3             \\
+7   & 40             & 1098        & 106          & 30            \\
+8   & 92             & 2450        & 262          & 70            \\
+\end{tabular}
+\begin{tabular}{|c | c | c | c | c |}
+\multicolumn{5}{|c|}{pseudo-linear version} \\
+& & \multicolumn{3}{|c|}{\#node} \\
+$N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
+1   & 1              & 1           & 0            & 0             \\
+2   & 0              & 0           & 0            & 0             \\
+3   & 0              & 0           & 0            & 0             \\
+4   & 2              & 14          & 6            & 1             \\
+5   & 10             & 73          & 15           & 6             \\
+6   & 4              & 61          & 16           & 3             \\
+7   & 40             & 348         & 39           & 30            \\
+8   & 92             & 645         & 77           & 65            \\
+\end{tabular}
+\caption{Comparing models "NU", "NNI" and "NU-X" on the representation of the solutions of the N-Queens problems using a quadratic encoding (one variable per cell) or a pseudo-linear encoding (one integer or logarithmic size per queen).}
+\label{table-nqueens}
+\end{table}
+
+\begin{figure}
+\center
+\includeframe{1}{0.9}{}{nqueens.pdf}
+\caption{Representation of the 5-queens, using the "NU" model ("output negation" and \Uextract), the "NNI" model (\NNIextract), finally the "NU-X" model ("NU" model and \Xextract).}
+\label{figure-nqueens}
+\end{figure}
+
+The N-Queens problem, is the problem of positioning $N$ queens on an $N\times N$ chessboard, such that no queen threaten an other.
+This problem can easily be reformulated as a Boolean function (either using an AIG or a CNF formula) by representing each cell as Boolean representing the statement: "there is a queen in this cell" and then be compiled into a \GroBdd{}.
+We call this representation the "quadratic version" with each cell is represented (starting in the top left corner of chessboard, and then, line by line, down to the bottom right corner)
+A slightly more complex formulation, use the fact that there is exactly one queen per colon of the chessboard, thus, we can used an integer ($\log n$ Booleans) to represent its position in the colon.
+We call this representation the "pseudo-linear version", with integer being represented as interleaved Boolean vectors starting from the most significant bits.
+Numbers of node for both version on each model are summarized in Table~\ref{table-nqueens}, we display a representation of the solutions the 5-queen problem (quadratic version) in Figure~\ref{figure-nqueens}.
+
+
+
+\section{Conclusion}
+
+ROBDD allows to efficiently manipulate functions appearing in various fields of computer science such as: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking or Combinatorial Interaction Testing.
+
+However, ROBDD manipulation is memory intensive and several variants exist (such as "output negation") in order to reduce the memory cost.
+
+In this report, we introduced a new class of variant called \GroBdd{} (Generalized Reduction of Ordered Binary Decision Diagram). We presented a set of constraints which ensure a \GroBdd{} to be semi-canonical (i.e. canonical up to graph-isomorphism and A-equivalence, introduced in Section~4).
+Moreover, we defined a \GroBdd{} model called "NU" ("output Negation" and \Uextract) which allows to significantly reduce the number of nodes (relatively to a regular ROBDD with the "output negation" variant).
+
+
+Using our implementation in OCaml against several benchmarks, we observed an average reduction of 25\% when representing circuits, and 3\% when representing generated CNF formula.
+Furthermore, we estimated the memory cost to be reduced by 40\% when representing circuits and 3\% when representing CNF formulas.
+
+
+Future work will be focus on merging the \nniextract{} ("NNI extract") variant and \xextract{} (X extract) variant into the "NNI-X extract" variant.
+Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement heuristics to improve the compilation of CNF formulas.
+
+
+\newpage
+\bibliography{biblio}{}
+\bibliographystyle{plain}
+
+\newpage
+\tableofcontents
+
+\newpage
+
+\section{Annexes}
+
+\subsection{\GroBdd{}: Definitions, Notations, Constraints\label{grobdd-def}}
+
+We denote $\Y$ the set of all transformation descriptor.
+We assume defined $\rho$ the semantic interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
+In this section, we make the list of properties that the TDS must ensure to be correct.
+
+\constraint{Canonical}
+{
+\[\forall \gamma, \gamma' \in \Y, \left( \gamma = \gamma' \right) \Leftrightarrow \left( \rho(\gamma) = \rho(\gamma') \right) \]
+We denote $\Y_{n, m} = \{ \gamma \in \Y ~|~ \rho(\gamma) \in \F_n \longrightarrow \F_m \}$, and $\Y_{n,*} = \bigcup_{m\leq n} \Y_{n, m}$ and $\Y_{*, m} = \bigcup_{n \geq m} \Y_{n, m}$.
+}
+
+\constraint{Separable}
+{\[\forall \gamma \in \Y_{n, m}, \exists! \vartriangle_\gamma \in \B^m \rightarrow \B^n, \triangledown_\gamma \in \B^m \rightarrow \B \rightarrow \B,\]
+\[\forall f\in \F_n, \forall x \in \B^m, \rho(\gamma)(f)(x) = \triangledown(x, f(\vartriangle x))\]
+This constraint allows any transformation to be represented as circuit which can be wrapped around the function.
+This constraint enforces transformations to be local.
+The function $\vartriangle$ is called the pre-process, and the function $\triangledown$ is called the post-process.
+}
+
+\constraint{Composable (definition of \texttt{C})}
+{\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \exists \gamma'' \in \Y_{n, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\gamma'')\]
+This constraint enforces $\Y_{n, n}$ to be stable by composition.
+Furthermore, it exists an algorithm $\mathtt{C} : \Y_{n, m} \rightarrow \Y_{m, l} \rightarrow \Y_{n, l}$, such that:
+\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\mathtt{C}(\gamma, \gamma'))\]
+For convenience, we denote $\gamma' \circ \gamma = \mathtt{C}(\gamma, \gamma')$.
+}
+\subsubsection{Decomposable (definition of \texttt{A} and \texttt{S})}
+
+For all $n\in\N$, we define $A_n = \Y_{n, n}$ the set of asymmetric transformations.
+For all $n, m\in\N$, it exists $S_{n, m} \subset \Y_{n, m}$ a set of transformations such that $\forall \gamma \in \Y_{n, m}, \exists a \in A_m, \exists! s \in S_{n, m},  \gamma = a \circ s$.
+The set $S_{n, m}$ is called the set of symmetric transformations.
+We ensure that $\forall n\in\N, S_{n, n} = \{ Id_n = \F_n \rightarrow \F_n \}$.
+
+\definition{S-free}
+{
+A Boolean function $f\in\F_m$ is said S-free, iff
+\[\forall s \in S_{n, m}, \forall g \in \F_n, f = \rho(s)(g) \Rightarrow \rho(s) = Id_n\]
+We denote $\F^S_n$ the set of S-free Boolean function of arity $n$.
+}
+
+\constraint{S-uniqueness}
+{
+\[\forall f\in\F_n, f'\in\F_{n'}, s\in S_{n, m}, s'\in S_{n', m}, \rho(s)(f) = \rho(s')(f') \Rightarrow (s = s') \land (f = f')\]
+(with $f$ and $f'$ being S-free)
+}
+
+\constraint{S-uniqueness (equivalent definition)}
+{
+\[\forall f\in\F_m, \exists! (s, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = \rho(s)(\tilde{f})\]
+}
+
+\definition{A-equivalent}
+{
+Two Boolean functions $f, g\in\F_n$ are said A-equivalent, iff $\exists a\in A_n, f = \rho(a)(g)$.
+This relatioin is an equivalence relation (i.e. reflexive, symmetric, transitive) denoted $\sim_A$.
+Remark: Two Boolean functions are said A-distinct if they are not A-equivalent and a set of A-distinct function is said A-reduced.
+}
+
+\definition{A-invariant free}
+{
+A Boolean function $f\in\F_n$ is said A-invariant free, iff $\forall a, a'\in A_n, \rho(a)(f) \neq \rho(a')(f)$.
+}
+
+\constraint{S-free implies A-invariant free}
+{For all function $f$, if $f$ is S-free, then $f$ is A-invariant free.}
+
+
+\definition{$\I_n$}
+{
+For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
+}
+
+\definition{$\Ynode$}
+{A $\Ynode_{l, m, n}$ is a quadruple $(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{l, n} \times \I_l \times \Y_{m, n} \times \I_m$. Let $v$ be a $\Ynode$, we denote $v.\gamma_0$ (respectively $v.I_0$, $v.\gamma_1$ and $v.I_1$) the first (respectively second, third and fourth) component of $v$.
+\begin{itemize}
+\item For all $\Ynode$ $v$, we always assume that functions $\phi(v.I_0)$ and $\phi(v.I_1)$ are \texttt{S}-free.
+\item We always assume the set $X = \{\phi(v.I_0) ~|~ v \in\Ynode\} \cup \{\phi(v.I_1) ~|~ v\in\Ynode\}$ to be \texttt{A-reduced}
+\end{itemize}
+We extend the definition of $\phi$, with : for all $\Ynode$ $v$, $\phi(v) = \rho(v.\gamma_0)(\phi(v.I_0)) \star \rho(v.\gamma_1)(\phi(v.I_1))$.
+}
+
+\constraint{terminal nodes are S-free, canonical and A-distinct (definition of $\mathtt{E}_0$)}
+{For all terminal node $t \in T$, $\phi(t)$ is S-free (S-free).
+Moreover, $\forall t, t' \in T, \phi(t) = \phi(t') \Rightarrow t = t'$ (canonical).
+Furthermore, the set $\{\phi(t) ~|~ t\in T\}$ is A-reduced (A-reduced).
+Moreover, we define the function $\mathtt{E}_0$ such $\forall b\in\F_0, \exists \gamma\in\Y_{0, 0}, \exists t\in T, \mathtt{E}_0(b) = \{\gamma = \gamma, node = I_t\}$ and $\psi(\mathtt{E}_0(b)) = b$.
+}
+
+
+\subsubsection{Buildable (definition of \texttt{B})}
+
+Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
+
+We define \texttt{B} an algorithm over $\Y$ which respect the signature:
+\begin{lstlisting}
+$\mathtt{B} : \Y_{n_0, m} \times \I_{n_0} \longrightarrow \Y_{n_1, m} \times \I_{n_1} \longrightarrow$
+  | ConsNode $\Y_{n', m} \times (\Y_{n_x, n'} \times \I_{n_x}) \times (\Y_{n_y, n'} \times \I_{n_y})$
+  | Merge $\Y_{n_z, m} \times \I_{n_z}$
+\end{lstlisting}
+(with $x, y, z \in \{0, 1\}$) \\
+Furthermore, for all $(\gamma_g, I_g, \gamma_h, I_h) \in \Y_{n_0, m} \times \I_{n_0} \times \Y_{n_1, m} \times \I_{n_1}$, 
+\[ \texttt{B}(\gamma_g, I_g, \gamma_h, I_h) = \texttt{ConsNode} (\gamma, (\gamma', I_X), (\gamma'', I_Y)) \Rightarrow f = \rho\left(\gamma\right) \left(\rho\left(\gamma'\right)(X) \star \rho\left(\gamma''\right)(Y)\right)\]
+\[ \texttt{B}(\gamma_g, I_g, \gamma_h, I_h) = \texttt{Merge} (\gamma''', I_Z) \Rightarrow f = \rho(\gamma''')(Z) \]
+(with $X, Y, Z \in\{g, h\}$ and $f = \rho(\gamma_g)(g) \star \rho(\gamma_h)(y)$)
+
+\definition{a node is \texttt{B}-stable}
+{Let $G$ be a \GroBdd{}, we denote $v$ an internal node of $G$.
+We denote $\gamma_0 = v.if0.\gamma, I_0 = v.if0.node, \gamma_1 = v.if1.\gamma$ and $I_1 = v.if1.node$.
+The node $v$ is said B-stable iff $\mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) = \mathtt{ConsNode}(Id, (\gamma_0, I_0), (\gamma_1, I_1))$.
+}
+
+\constraint{\texttt{B} is \texttt{B}-stable}
+{\[\forall \gamma_f, I_f, \gamma_g, I_g, \mathtt{B}(\gamma_f, I_f, \gamma_g, I_g) = \mathtt{ConsNode}(\gamma, (\gamma_0, I_0), (\gamma_1, I_1))\]
+\[\Rightarrow \mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) = \mathtt{ConsNode}(Id, (\gamma_0, I_0), (\gamma_1, I_1))\]
+Informally, when B returns a node, this node is \texttt{B}-stable.
+}
+
+\constraint{$\Ynode$ are \texttt{B}-stable}
+{\begin{enumerate}
+\item We assume all $\Ynode$ $v$ to be \texttt{B}-stable
+\[\mathtt{B}(v.\gamma_0, v.I_0, v.\gamma_1, v.I_1) = \mathtt{ConsNode}(Id, (v.\gamma_0, v.I_0), (v.\gamma_1, v.I_1))\]
+\end{enumerate}
+}
+\constraint{\texttt{B} is S-free preserving}
+{The algorithm \texttt{B} is said S-free preserving iff for all $\Ynode$ $v$, $\phi(v)$ is S-free.}
+
+\constraint{\texttt{B} is A-reduction preserving}
+{The algorithm \texttt{B} is said A-reduction preserving iff
+\[\forall v, w \in\Ynode, \phi(v) \sim_A \phi(w) \Rightarrow v = w\]}
+
+\subsection{\GroBdd{}: Reduction Rules and Semi-Canonicity Theorem\label{grobdd-reduction}}
+We define a \GroBdd{} model as the triple $(\Y, \mathtt{C}, \mathtt{B})$.
+A valid model must satisfy all the previously mentioned constraints.
+
+In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
+\item The syntactical reduction : all sub-graphs are different up to graph-isomorphism (i.e. all identical sub-graphs are merged)
+\item The local semantic reduction : all internal node $v\in V$ is \texttt{B}-stable.
+\item All node has at least one incoming edge.
+\end{enumerate}
+A \GroBdd{} is said reduced if it satisfies the reduction rules.
+In this section we prove:\begin{enumerate}
+\item For all vector of Boolean function $F$ it exists a reduced \GroBdd{} $G$ representing it.
+\item A reduced \GroBdd{} $G$ is semi-canonical, defined as :\begin{enumerate}
+\item For all node $v\in V$, $\phi(v)$ is S-free.
+\item The set $X = \{\phi(v_1), \dots, \phi(v_N)\}$ representing the set of the semantic interpretation of the set of internal nodes $V$ is A-reduced.
+\item $\forall (\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2, \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\}) \Rightarrow (\gamma, I) = (\gamma', I')$ (with $I$ and $I'$ being indexes of nodes in $G$).
+\end{enumerate}
+\item Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
+\end{enumerate}
+
+\subsubsection{Additional procedures}
+
+\paragraph{The \texttt{Cons} procedure\\}
+We define the \texttt{Cons} procedure as follow.
+Let $G$ be a \GroBdd{} and $F$ be its vector of root edges of size $k$.\\
+Let $i$ and $j$ be indexes of this vector.
+We denote $\gamma_i = \Psi_i.\gamma$, $\gamma_j = \Psi_j.\gamma$ and $I_i = \Psi_i.node$, $I_j = \Psi_j.node$.
+\begin{itemize}
+\item If \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{ConsNode} ($\gamma$, ($\gamma'$, $I_X$), ($\gamma''$, $I_Y$)). We define the node $N = \{if0 = \{\gamma = \gamma', node = I_X\}, if1 = \{\gamma = \gamma'', nodes = I_Y\}\}$.\begin{itemize}
+\item If the node $N$ already exists in $G$, we retrieve its identifier $I$, we define $G'$ as a copy of $G$ with a new root edge $\Psi_k = \{\gamma = \gamma, node = I\}$
+\item Otherwise, we define $G'$ as a copy of $G$.
+We generate a new identifier, and associate it the node $N$ within the \textit{unique table} of $G'$.
+We add a new root edge $\Psi_k = \{\gamma = \gamma, node = I\}$ to $G'$.
+\end{itemize}
+\item Otherwise, \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{Merge} ($\gamma$, $I_Z$). We define $G'$ as a copy of $G$ with a new root edge $\Psi_k = \{\gamma = \gamma''', node = I_Z\}$.
+\end{itemize}
+
+\paragraph{The \texttt{Remove} procedure\\}
+We define the \texttt{Remove} procedure as follow.
+Let $G$ be a \GroBdd{} and $F$ be its vector of root edges of size $k$.
+Let $i$ be an index of this vector.\\
+We define $G'$ as a copy of $G$ with its vector of root edges $F' = (\Psi_1, \dots, \Psi_{i-1}, \Psi_{i+1}, \dots, \Psi_n)$.
+In an iterative process, we remove nodes which have no incoming edge, until all nodes have at least one incoming edge (in order to satisfy the third reduction rule).
+As $G'$ is a subset of $G$, thus, $G'$ satisfies the first and second reduction rule.
+
+\paragraph{The \texttt{Reduction} procedure\\}
+Let $G$ be a \GroBdd{} and $F$ be its vector of root edges $F$.
+Using an iterative process, we remove nodes which have no incoming edge, until all nodes have at least one incoming edge (satisfying the third reduction rules).
+The \texttt{Reduction} procedure consists in going through the \GroBdd{} $G$ (starting with nodes with the smallest depth), applying the \texttt{Cons} procedure on each node creating a new \GroBdd{} $G'$.
+The \GroBdd{} $G'$ is by construction equivalent to $G$, however, the \GroBdd{} $G'$ satisfies all three reduction rules.
+
+\paragraph{The \texttt{Merge} procedure\\}
+We define the \texttt{Merge} procedure as follow.
+Let $G$ and $G'$ be two \GroBdd{}s (based on the same \GroBdd{} model).
+We define $G''$ a \GroBdd{} which is the union of both \GroBdd{}s.
+We define $F'' = (\Psi_1, \dots, \Psi_n, \Psi'_1, \dots, \Psi'_{n'})$.
+Due to possible conflicts on identifiers, we re-generate identifiers of the nodes in $G''$.
+Finally, we apply the \texttt{Reduction} procedure on $G''$.
+
+\subsubsection{Existence}
+We inductively define the procedure \texttt{E} with:\begin{itemize}
+\item $\forall b\in\F_0, \texttt{E}(b) = \texttt{E}_0(b)$
+\item
+Let $f$ be a Boolean function of arity $n$ (with $n \geq 1$).
+Let $G$ be a \GroBdd{} representing functions $f_0$ (the negative restriction of $f$ according to its first variable) and $f_1$ (the positive restriction of $f$ according to its first variable.) by using the procedure \texttt{E} on $f_0$ and $f_1$.
+Let $G'$ be the output of the \texttt{Cons} procedure on $G$, in order to create $f = f_0 \star f_1$ (expansion theorem).\\
+$E(f) = G'$
+The \GroBdd{} $G'$ satisfies the reduction rules:\begin{itemize}
+\item If no node is created, the proof is straightforward.
+\item If a node is created, this node is syntactically unique by definition of \texttt{Cons} and is \texttt{B}-stable  (as \texttt{B} is \texttt{B}-stable)
+\end{itemize}
+\end{itemize}
+
+By construction, the procedure \texttt{E} (generalized to accept a vector of function as input) returns a \GroBdd{} satisfying the reduction rules.
+
+\subsubsection{Semi-Canonical}
+
+Let $G$ be a reduced \GroBdd{}.
+
+\paragraph{S-free and A-reduced}
+For all node $v\in V$, we denote $h(v) = max(h(v.if0.node), h(v.if1.node))$ with $\forall t\in T, h(t) = 0$.
+For all $n\in\N$, we define $V_n = \{v\in V ~|~ h(v) \leq n\}$
+For all $n\in\N$, we define the recurrence hypothesis $H(n)$ :\begin{itemize}
+\item For all $v\in V_n$, $\phi(v)$ is S-free.
+\item The set of Boolean functions $X = \{\phi(v) ~|~ v\in V_n\}$ is A-reduced.
+\end{itemize}
+
+\subparagraph{Initialization}
+We prove $H(0)$ using the constraints that (1) terminals are S-free and (2) the set of terminal nodes is A-reduced.
+
+\subparagraph{Induction}
+Let $n\in\N$, we assume $\forall k\leq n, H(k)$.
+Let $v$ be a node of depth $n+1$, thus the depth of $v.if0.node$ and $v.if1.node$ is lower than $n$ (we can apply the recurrence hypothesis).
+Therefore, the quadruple $\bar{v} = (v.if0.\gamma, v.if0.node, v.if1.\gamma, v.if1.node)$ is a $\Ynode$.
+Thus, using the constraints that \texttt{B} is S-free preserving, we prove that $\phi(v) = \phi(\bar{v})$ is S-free.
+Let $v'$ be a node of depth $k\leq n+1$, we can prove that the quadruple $\bar{v'} = (v'.if0.\gamma, v'.if0.node, v'.if1.\gamma, v'.if1.node)$ is a $\Ynode$.
+Therefore, we can use the constraint that \texttt{B} is A-reduction preserving to prove that $\phi(\bar{v}) \sim_A \phi(\bar{v'}) \Rightarrow \phi(\bar{v}) = \phi(\bar{v'})$
+However, $\phi(v) = \phi(\bar{v})$ and $\phi(v') = \phi(\bar{v'})$
+Thus, $\forall v, w \in V_{n+1}, \phi(v) \sim_A \phi(v') \Rightarrow \phi(v) = \phi(v')$.
+Thus, the set of Boolean function $X = \{\phi(v) ~|~ v\in V_{n+1}\}$ is A-reduced.
+Therefore $\left(\land_{k\leq n} H(k)\right) \Rightarrow H(n+1)$.
+
+Using the strong recurrence theorem, we prove that $\forall n\in\N, H(n)$.
+Therefore proving properties (2.a) "all nodes are S-free" and (2.b) "the set $X = \{\phi(v_1), \dots, \phi(v_N)\}$ is A-reduced".
+
+\paragraph{Semantic Reduction}
+We prove the property "$\forall (\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2, \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\}) \Rightarrow (\gamma, I) = (\gamma', I')$ (with $I$ and $I'$ being indexes of nodes in $G$)" by induction on $n\in\N$ the arity of $f = \psi(\{\gamma = \gamma, node = I\})$.
+
+\subparagraph{Initialization}
+The induction property holds for $n = 0$:\\
+Let $f\in\F_0$, we assume it exists a quadruple $(\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2$ such that $f = \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\})$.
+However, $\Y_{0, 0} = \{Id_0\}$, therefore, $\gamma$ and $\gamma'$ are asymmetric transformation descriptors.
+Hence, $\rho(a)(\phi(I)) = \rho(a')(\phi(I'))$, thus $\phi(I) \sim_A \phi(I')$.
+Using the constraint, that terminals are A-reduced and canonical, we have that $\phi(I) = \phi(I')$, thus $I = I'$.
+
+\subparagraph{Induction}
+Let $k\in\N$, we assume the induction property holds for all $n\leq k$, let prove it holds for $n = k+1$.
+Let $f$ be a Boolean function, we assume it exists a quadruple $(\gamma, I, \gamma', I') \in (\Y_{n, m} \times \I_n)^2$ such that $f = \psi(\{\gamma = \gamma, node = I\}) = \psi(\{\gamma = \gamma', node = I'\})$.
+We decompose $\gamma$ and $\gamma'$ to their symmetric and asymmetric components: $\gamma = s \circ a$ and $\gamma' = s' \circ a'$.
+Using the S-uniqueness constraint, on $f = \rho(s)(\rho(a)(\phi(I))) = \rho(s')(\rho(a')(\phi(I')))$, we have $s = s'$ and $\rho(a)(\phi(I)) = \rho(a')(\phi(I'))$.
+Therefore, $\phi(I) \sim_A \phi(I')$, however, we proved that the set of the semantic interpretations of the nodes is A-reduced, thus $\phi(I) = \phi(I')$
+Using the induction hypothesis (as $\phi(I)$ as an arity strictly smaller than $k+1$, thus smaller than $k$), we deduce that $I = I'$.
+
+Therefore, applying the strong induction theorem, we prove the property (2.c).
+
+\subsubsection{Canonical modulo graph-isomorphism and A-equivalence}
+In order to prove that "Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$", we start by proving that within the \texttt{Merge} procedure, each node is replaced by an A-equivalent one.
+Secondly, using the \texttt{Merge} procedure without re-generating the identifiers of the nodes of $G$ and using the property (2.c), we prove that the nodes of $G'$ collapse on the nodes of $G$ during the \texttt{Reduction} procedure, providing a one-to-one mapping.
+Details of this proof are cumbersome and not of great interest.
+
+\subsection{Model NU: proof of semi-canonicity\label{grobdd-model-nu}}
+
+\paragraph{transformations are canonical\\}
+Let $\gamma', \gamma''\in\Y_{n, m}$ be a pair of transformation descriptors, such that for all function $f\in\F_n$, $\rho(\gamma')(f) = \rho(\gamma'')(f)$.
+Let $f\in\F_n$ a function with no useless variable.
+We denote $S_{\gamma'} = (i'_1, \dots, i'_n)$ and $S_{\gamma''} = (i''_1, \dots, i''_n)$.
+We absurdly assume that it exists an index $k$ such that $i'_k \not\in S_{\gamma''}$.
+Therefore, in one hand, the $i'_k$-th variable of $\rho(\gamma')(f)$ is useless.
+In the other hand, the $i'_k$-th variable of $\rho(\gamma'')(f)$ is mapped to some variable of $f$ which by definition has no useless variable, therefore, the $i_k$-th variable of $\rho(\gamma'')(f)$ is not useless.
+Hence, it leads to a contradiction as $\rho(\gamma'')(f) = \rho(\gamma'')(f)$ and that useless and not useless are incompatible states.
+Therefore, it does not exist such an index $k$, thus, $\gamma'.sub = \gamma''.sub$.
+We absurdly assume that $\gamma'.neg \neq \gamma''.neg$, thus $\gamma'.neg = \lnot \gamma''.neg$.
+Hence, it leads to a contradiction as $\rho(\gamma')(f)(\vec{0}) = \rho(\gamma'')(f)(\vec{0})$ and $\rho(\gamma')(f)(\vec{0}) = \lnot \rho(\gamma'')(f)(\vec{0})$.
+Therefore, $\gamma'.neg = \gamma''.neg$.
+Hence, $\gamma' = \gamma''$.
+
+\paragraph{verified constraints on transformations}
+\begin{itemize}
+\item[Separable]
+Let $\gamma\in\Y_{n, m}$ be a transformation descriptor, we denote $S_{\gamma} = (i_1, \dots, i_n)$.
+We define the function $\vartriangle_\gamma : \B^m \longrightarrow \B^n$ by $\forall x\in\B^m, \vartriangle_\gamma(x_1, \dots, x_m) = (x_{i_1}, \dots, x_{i_n})$.
+And define the function $\triangledown_\gamma : \B^m \longrightarrow \B \longrightarrow \B$ by $\forall x\in\B^m, y\in\B, \triangledown_\gamma(x, y) = \gamma.neg \oplus y$.
+Hence, $\forall \gamma\in\Y_{n, m},\forall f\in\F_n, \forall x\in\B^m, \rho(\gamma)(f)(x) = \triangledown_\gamma(x, f(\vartriangle_\gamma(x)))$.
+\item[Composable]
+Let $\gamma\in\Y_{n, m}$ and $\gamma'\in\Y_{m, l}$, we denote $S_{\gamma} = (i_1, \dots, i_n)$ and we denote $S_{\gamma'} = (i'_1, \dots, i'_m)$.
+We define $C(\gamma, \gamma') = \gamma''$ with $\gamma'' = \{neg = \gamma.neg \oplus \gamma'.neg, sub = (i'_{i_1}, i'_{i_2}, \dots, i'_{i_n})\}$.
+We can prove that $\forall f\in\F_n, \rho(\gamma')(\rho(\gamma)(f)) = \rho(C(\gamma, \gamma'))(f)$.
+\item[Decomposable]
+We denote $A_n = \B\times\{1\}^n \subset\Y_{n, n}$ (with $n\in\N$) and $S_{n, m} = \{0\}\times\{x\in\B^m~|~\sum_k x_k = n\}$.
+We can prove that $\forall \gamma \in \Y_{n, m}, \exists a \in A_m, \exists! s \in S_{n, m},  \gamma = a \circ s$.
+We can notice that, for all $n\in\N$, $\rho(A_n) = \{Id, \lnot\}$.
+\end{itemize}
+
+
+\paragraph{an S-free function is A-invariant free\\}
+We absurdly assume that it exists a Boolean function $f\in\F_n$ without useless variable (i.e. S-free), and a pair of distinct asymmetric transformations $a, a'\in A$ such that $\rho(a)(f) = \rho(a')(f)$.
+As $A_n$ is of cardinal 2, we enumerate all cases, which lead to a contradiction as $f \neq \lnot f$.
+Therefore $f$ is A-invariant free.
+
+\paragraph{terminal nodes are S-free\\}
+The function $\phi(0) = () \longrightarrow 0$ has no variable therefore, no useless variable, thus is S-free.
+
+\paragraph{the set of semantic interpretation of terminal nodes is A-reduced\\}
+There is only one terminal node, therefore the set is A-reduced.
+
+\subsubsection{Definition of the building algorithm \texttt{B}}
+We define the building algorithm \texttt{B} as follow:
+\begin{lstlisting}
+B($\gamma_0, I_0, \gamma_1, I_1$){
+  if $(I_0 = I_1) \land \gamma_0 = \gamma_1$ then{
+    Merge $\{\gamma = \{neg = \gamma_0.neg, sub = (0, \gamma_0.sub_1, \dots, \gamma_0.sub_n)\}, node = I_0\}$
+  }else{
+    we define $\gamma, \gamma'_0, \gamma'_1$ by:
+      $\gamma.neg = \gamma_0$
+      $\gamma'_0.neg = 0$
+      $\gamma'_1.neg = \gamma_0 \oplus \gamma_1$
+      $S_\gamma = \{i_1 < ... < i_{m'}\}$ = $S_{\gamma_0} \cup S_{\gamma_1}$
+      $S_{\gamma'_0} = \{j_1 < ... < j_n\}$ the indexes of $S_{\gamma_0}$ in $S_{\gamma}$.
+      $S_{\gamma'_1} = \{k_1 < ... < k_{n'}\}$ the indexes of $S_{\gamma_1}$ in $S_{\gamma}$.
+    ConsNode $(\gamma, (\gamma'_0, I_0), (\gamma'_1, I_1))$
+  }
+}  
+\end{lstlisting}
+The proof that \texttt{B} is correct is left to the reader.
+Furthermore, we prove that $S_{\gamma'_0}\cup S_{\gamma'_1} = \{1, \dots, m'\}$.
+
+\paragraph{\texttt{B} is \texttt{B}-stable}
+We have to prove that
+\[\mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{n, m}) = \mathtt{ConsNode}(\gamma, (\gamma'_0, I'_0), (\gamma'_1, I'_1))\] \[\Rightarrow \mathtt{B}(\gamma'_0, I'_0, \gamma'_1, I'_1) = \mathtt{ConsNode}(Id, (\gamma'_0, I'_0), (\gamma'_1, I'_1))\]
+We absurdly assume that $\mathtt{B}(\gamma'_0, I'_0, \gamma'_1, I'_1) \neq \mathtt{ConsNode}(Id, (\gamma'_0, I'_0), (\gamma'_1, I'_1))$:\begin{itemize}
+\item We absurdly assume that $\mathtt{B}(\gamma'_0, I'_0, \gamma'_1, I'_1) = \mathtt{Merge}(\gamma, I)$.
+Therefore, by definition of \texttt{B}, $\gamma'_0 = \gamma'_1$ and $I'_0 = I'_1$, thus $\gamma_0 = \gamma_1$ and $I_0 = I_1$, hence it leads to a contradiction as $\mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{n, m}) = \mathtt{Merge} \dots$.
+\item Therefore, $\mathtt{B}(\gamma'_0, I'_0, \gamma'_1, I'_1) = \mathtt{ConsNode}(\gamma', (\gamma''_0, I''_0), (\gamma''_1, I''_1))$:\begin{itemize}
+\item We absurdly assume that $\gamma' \neq Id$.
+However, $\gamma'.neg = \gamma'_0.neg = 0$ (by definition of \texttt{B}, therefore $\gamma'.sub \neq (1, \dots, 1) \in\B^n$.
+Thus, it exists $i$ such that $\gamma'.sub_i = 0$, thus, it exists an index $k'$ such that $k'\not\in S_{\gamma'_0}\cup S_{\gamma'_1}$, which leads to a contradiction as $S_{\gamma'_0}\cup S_{\gamma'_1} = \{1, \dots, m'\}$.
+\item Therefore, $\gamma' = Id$.
+Thus, $\gamma''_0 = \gamma'_0$, $\gamma''_1 = \gamma'_1$, $I''_0 = I'_0$ and $I''_1 = I'_1$.
+Hence it leads to a contradiction as we assumed that $\mathtt{B}(\gamma'_0, I'_0, \gamma'_1, I'_1) \neq \mathtt{ConsNode}(Id, (\gamma'_0, I'_0), (\gamma'_1, I'_1))$.
+\end{itemize}
+\end{itemize}
+
+Therefore, \texttt{B} is \texttt{B}-stable.
+
+\paragraph{\texttt{B} is S-free preserving\\}
+Let $v=(\gamma_0, I_0, \gamma_1, i_1)$ be a $\Ynode$, therefore, the Boolean functions $\phi(I_0)$ and $\phi(I_1)$ are S-free and $\phi(I_0) \sim_A \phi(I_1) \Rightarrow I_0 = I_1$
+We absurdly assume that the Boolean function $\phi(v) = \rho(\gamma_0)(\phi(I_0)) \star \rho(\gamma_1)(\phi(I_1))$ is not S-free, thus, it exists an index $k$ such that the $k$-th variable of $\phi(v)$ is useless.
+\begin{itemize}
+\item If $k=0$, then, $\rho(\gamma_0)(\phi(I_0)) = \rho(\gamma_1)(\phi(I_1))$.
+Using the S-uniqueness constraint ($\phi(I_0)$ and $\phi(I_1)$ being S-free), we prove that $\phi(I_0) \sim_A \phi(I_1$, thus $I_0 = I_1$.
+Hence, leading to a contradiction as the $\Ynode$ $v$ is assumed to be \texttt{B}-stable.
+\item If $k>0$, then, the $(k-1)$-th variables of the Boolean functions $\rho(\gamma_0)(\phi(I_0))$ and $\rho(\gamma_1)(\phi(I_0))$ are useless.
+Using the S-uniqueness constraint ($\phi(I_0)$ and $\phi(I_1)$ being S-free), we prove that $\gamma_0.sub_{k-1} = \gamma_1.sub_{k-1} = 0$.
+Hence, leading to a contradiction as the $\Ynode$ $v$ is assumed to be \texttt{B}-stable.
+\end{itemize}
+
+\paragraph{\texttt{B} is A-reduction preserving\\}
+Let $v=(\gamma_0, I_0, \gamma_1, I_1)$ and $v'=(\gamma'_0, I'_0, \gamma'_1, I'_1)$ be $\Ynodes$, such that $\phi(v) \sim_A \phi(v')$.
+Thus, it exists an asymmetric transformation descriptor $a$ such that $\phi(v) = \rho(a)(\phi(v'))$
+Therefore, the Boolean functions $\phi(I_0), \phi(I_1), \phi(I'_0)$ and $\phi(I'_1)$ are S-free and the set of Boolean functions $\{\phi(I_0), \phi(I_1), \phi(I'_0), \phi(I'_1)\}$ is A-reduced.
+Thus, using the expansion theorem, $\rho(\gamma_0)(\phi(I_0)) = \rho(a \circ \gamma'_0)(\phi(I'_0))$ and $\rho(\gamma_1)(\phi(I_1)) = \rho(a \circ \gamma'_1)(\phi(I'_1))$.
+Using the S-uniqueness constraint, we prove that $\phi(I_0) \sim_A \phi(I'_0)$ and $\phi(I_1) \sim_A \phi(I'_1)$ (and $\gamma_0 = a \circ \gamma'_0$ and $\gamma_1 = a \circ \gamma'_1$), thus, using the A-reduction property, $I_0 = I'_0$ and $I_1 = I'_1$.
+
+Therefore, $v'=(\gamma'_0, I_0, \gamma'_1, I_1)$.
+We proved that $\gamma_0 = a \circ \gamma'_0$, however, $v$ and $v'$ and \texttt{B}-stable, thus $\gamma_0.neg = \gamma'_0.neg = 0$, thus $a = Id$.
+Hence, $\gamma_1 = \gamma'_1$.
+We proved that $v = v'$.
+
+\end{document}
