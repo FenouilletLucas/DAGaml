@@ -73,14 +73,17 @@ However, ROBDDs suffer from two main issues: (1) their representation is memory 
 Several variations of ROBDD exist such as Zero-suppressed Binary Decision Diagram (ZBDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output negation"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
 
 
-In this report, we introduce a new generalization of the standard reduction rules that we call the \Uextract{} or \uextract{} for short.
-Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and extracts them from the local variable order.
-This generalization allows the addition removal of useless variables in linear time (in the number of variables), reduces the number of nodes and tends to reduce the overall memory cost.
-However, several drawbacks arise: no in-place \textit{sifting} (permutation of adjacent variables), nodes tend to have a bigger representation in memory and are no longer of fixed size, furthermore, it slightly complexifies manipulations.
+In this report, we introduce a new class of variants called Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}).
+The main idea is to allow transformations on edges (such as "output negation") which maintain some kind of canonicity.
+We define a set of sufficient properties on these transformation which ensure a \GroBdd{} to be \texttt{semi-canonical}
 
+Within this framework, we introduce several models: \texttt{N}, \texttt{NU}, \texttt{NNI} and \texttt{NU-X}.
+The model \texttt{N} is equivalent to regular ROBDD with the "output negation" variant.
+The model \texttt{NU} allows to complement a function and extract non-support variables (i.e. variables which have no influence on the result of the function).
+The model \texttt{NNI} allows to complement both output and inputs. However, in order to ensure canonicity, it also computes polarity-phase invariants (a generalization of phase invariants \cite{BurchLong1992}).
+The model \texttt{NU-X} extends the model \texttt{NU} with the detection of 1-predictions (a generalization of Zero Suppressed Binary Decision Diagrams).
 
-We implemented both the \uextract{} and the "output negation" variants in an OCaml program\cite{DAGamlGitHub} and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
-We observe an average of 25\% less nodes and 40\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
+These models have been implemented using OCaml \cite{DAGamlGitHub} and tested against several set of circuits \cite{BenchSatlib, BenchLgsynth91} and CNF formulas \cite{BenchIscas99}.
 \end{abstract}
 
 \newpage
@@ -91,8 +94,8 @@ We observe an average of 25\% less nodes and 40\% less memory when representing 
 
 Nowadays, most critical systems rely on digital circuits: in transportation (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
 One way to minimize risks in digital parts of these systems is to provide a formal proof that they respect their specification.
-On the other hand, we want to minimize costs and energy consumption while maximizing performances of these digital circuits.
-In order to efficiently optimize digital circuits we rely on complex programs.
+On the other hand, we want to minimize costs and energy consumption while maximizing their performances.
+In order to efficiently optimize digital circuits we usually rely on complex programs.
 However, these programs are rarely proven themselves, thus, circuits optimized using them might not be equivalent to the initial design and therefore might not respect the specification.
 The obvious solution would be to prove optimizing programs, however two major issues arise : these programs are complex  (thus, proving them would be expensive) and might be proprietary (thus, one cannot check that the proof is correct).
 A simpler alternative is to design a program which checks that two digital circuits are equivalent.
@@ -101,10 +104,10 @@ With this alternative, the only piece of software which needs to be proven is th
 
 In order to prove that two digital circuits are equivalent, there is two main algorithmic solutions:
 First, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
-This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation} (we simplify clauses in which a literal value is known), early conflict detection (we use the fact that some subsets of SAT are poly-time decidable, such as: 2SAT, Horn clauses, etc.) or \textit{conflict driven clause learning}.
+This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation}, early conflict detection (we use the fact that some subsets of SAT are poly-time decidable, such as: 2SAT, Horn clauses, etc.) or \textit{conflict driven clause learning}.
 Secondly, the compilation of both circuits into Reduced Ordered Binary Decision Diagrams (ROBDDs).
 A ROBDD is a canonical structure which represent a vector of functions.
-Therefore, by using hash-consing techniques, we can perform the equality between two compiled functions in constant time.
+Therefore, by using hash-consing techniques, we can perform the equality test between two compiled functions in constant time.
 However, the compilation might take an exponential time in the number of variable.
 In this report we will focus on ROBDDs.
 
@@ -127,14 +130,41 @@ Therefore, it allows (1) to reduce the size of the structure and (2) to negate a
 Other extensions of the reduction rules exist such as: "input negation"\cite{MinatoVariants} (each edge can complement the locally first input), "shifting variables"\cite{MinatoVariants} (each edge stores the number of useless variables before the next significant variables) or "dual edge"\cite{RolfVariantDual} (we define the dual of a function $f$ by $\bar{f} = (x_1, \dots, x_n) \longrightarrow \lnot f(\lnot x_1, \dots, \lnot x_n)$, therefore the reduction works similarly to the "output negation").
 
 
-In addition to use the "output negation" variant, we introduce a new variant which allows to extract useless variables (a.k.a non-support variables).
-A variable is said useless iff it does not change the results such as $x_1$ in $f(x_0, x_1, x_2) = x_0 \land x_2$ or $x_0$ in $g(x_0) = x_0 \land \lnot x_0$.
-We call this new variant \Uextract{} or \uextract{} for short.
+On other problem that is usually raised when dealing with ROBDD is their lack of conciseness, i.e. there are functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
+For example, it has been proven \cite{Bryant1986} that the integer multiplication has a quadratic AIG representation but no polynomial ROBDD representation (at least exponential).
+
+The "output negation" variant, by adding expressiveness to edges, improves the conciseness.
+We want to go further in this approach by allowing more complex transformations on edges while maintaining canonicity.
+Such transformations can disturb variables' order of evaluation, allowing to represent "simple" decision processes in a more concise way.
+Furthermore, some transformations (within the range of transformation allowed) could have their complexity drastically reduced.
+For example, using the "output negation" variant, the complementation's time and space complexity goes from linear in the number of nodes to constant.
+
+
+In this report, we introduce three set of transformations: \Uextract{} (or \uextract{} for short), the \NNIextract{} (or \nniextract{} for short) and \Xextract{} (or \xextract{} for short).
+
+
+The \uextract{} variant ensures that the function represented by any node does not have useless variable.
+Therefore, it sets an upper bound on the number of nodes of arity $n$ to $2^{2^n}$ (this upper bound is not reached, because functions with useless variables cannot have a node to represent them).
+Furthermore, it allows to "copy" functions at (almost) no cost as the expression $f(x_1, x_3, x_5, x_7)$ and $f(x_0, x_1, x_3, x_5)$ are share the same structure.
+
+
+The \nniextract variant would allow to complement inputs and output on any edge.
+The reduction rules would ensure that there is at most $2^{2^n-n}$ nodes of arity $n$ (this upper bound is not reached).
+However, simply introducing such transformation breaks the canonicity, therefore, we introduce polarity-phase invariant detection: we compute for each encountered function the linear space of input/output negations which do not change the function.
+This variant is called \NNIextract{} (or \nniextract{} for short) and is a generalization of the work of Burch et al. \cite{BurchLong1992}.
+
+We define a 1-prediction\footnote{As far as we know, their is no name in the literature for this property} as follow:
+Let $f$ be a Boolean function of arity $n+1$, $i\in\llbracket 0, n\rrbracket$ be an integer, $t$ and $r$ be Booleans.
+We say that the function $f$ admits a 1-prediction $(i, t, r)$ iff $\forall (x_1, \dots, x_n), f(x_1, \dots, x_{i-1}, t, x_i, \dots, x_n) = r$.
+The \xextract{} variant, by allowing to extract 1-predictions, represents a generalization of ZBDD (Zero Suppressed Binary Decision Diagram), thus, allows to efficiently represent sparse functions.
+This variant is compatible with the "output negation" variant.
+
+Due to the limited length of this report, we will not detail further the \nniextract{} and \xextract{} variants.
+The Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}) is a framework that aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
 
 The remainder of this report will be organized as follows.
 In Section~2, we formally introduce Boolean functions, useless variables and some notations.
-In Section~3, we formally introduce Reduced Ordered Binary Decision Diagrams (ROBDD).
-In Section~4, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}).
+Then, we introduce ROBDD in Section~3 and GROBDD in Section~4.
 In Section~5, we introduce the \uextract{} variant as part of the \GroBdd{} framework, before exposing results against three  different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
 \section{Notations}
@@ -151,38 +181,44 @@ The set of Boolean functions of arity (i.e. the number of variables) $n\in\N$ is
 We denote the conjunction by $\land$ (AND), the disjunction by $\lor$ (OR), the negation by $\lnot$ (NOT) and the symmetric difference by $\oplus$ (XOR).
 We denote the Shannon operator by $\shannon{}{}{}$ defined by $\forall x, y, z\in\B, \shannon{x}{y}{z} = (\lnot x \land y) \lor (x \land z)$).
 
-\paragraph{Restriction\\}
+\definition{Restriction}
+{
+	Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$ and $b\in\B$ be a Boolean.
+	We denote $f_b = (x_1, \dots, x_n) \longrightarrow f(b, x_1, \dots, x_n)$.
+	Remark: $f_0$ is called the negative restriction of $f$ and $f_1$ is called the positive restriction of $f$
+}
 
-Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$, $i\in\llbracket 0, n \rrbracket$ be an integer and $b\in\B$ be a Boolean.
-We denote $f[i\leftarrow b]$ the Boolean function of arity $n$ defined by $f[i\leftarrow b](x_1, \dots, x_n) = f(x_1, \dots, x_{i-1}, b, x_i, \dots, x_n)$.
-$f[i\leftarrow 0]$ (respectively $f[i\leftarrow 1]$) is called the $i$-th negative (respectively positive) restriction.
-
-Let $f$ be a function of arity $n+1$, we denote $f_0$ (respectively $f_1$) the function of arity $n$ defined by $f_0 = f[0\leftarrow 0]$ (respectively $f_1 = f[0\leftarrow 1]$).
-
-\paragraph{Construction\\}
-
-Let $f, g \in \F_n$ be Boolean functions of arity $n$ and $i\in\llbracket 0, n \rrbracket$ be an integer.
-We denote $f\star_ig$ the Boolean function of arity $n+1$ defined by $(f\star_ig)(x_0, \dots, x_{i-1}, y, x_i, \dots, x_n) = \shannon{y}{f(x_0, \dots, x_n)}{g(x_0, \dots, x_n)}$.
-
-We denote $\star = \star_0$
-
-N.B.: $(f\star_i g)[i\leftarrow 0] = f$ and $ (f\star_i g)[i\leftarrow 1] = g$ (in particular: $(f\star g)_0 = f$ and $ (f\star g)_1 = g)$.
-
-
-
+\definition{Construction}
+{
+	Let $f, g\in\F_n$ be a pair of Boolean function of arity $n$.
+	We denote $f\star{}g$ the Boolean function of arity $n+1$ defined by $ f\star{}g = (x_0, x_1, \dots, x_n) = \shannon{x_0}{f(x_1, \dots, x_n)}{g(x_1, \dots, x_n)}$.
+	N.B.:$(f\star g)_0 = f$ and $ (f\star g)_1 = g)$.
+}
 
 \theorem{Expansion Theorem}{
-Let $f\in\F_n$ be a Boolean function, then $\forall i\in\llbracket{}0, n-1\rrbracket{}, f = f[i\leftarrow 0]\star_i f[i\leftarrow 1]$ (in particular: $f = f_0 \star f_1$)
+Let $f\in\F_{n+1}$ be a Boolean function, then $f = f_0 \star f_1$.
 }
 
 %\paragraph{Expansion Theorem\\}
 
 \definition{Useless Variables}
 {
-Let $f\in\F_n$ be a Boolean function.
-We define the support set of $f$ as the set of variable index $i$ such that $f[i\leftarrow 0] \neq f[i\leftarrow 1]$.
-We define useless variables (or non-support variables) as variables which does not belong the support set.
-Thus, the $i$-th variable of $f$ is useless iff $f[i\leftarrow 0] = f[i\leftarrow 1]$.
+Let $f\in\F_{n+1}$ be a Boolean function and $i\in\llbracket 0, n \rrbracket$ be an integer.
+We say that the $i$-th variable of $f$ is useless, iff $\forall (x_1, \dots, x_n)\in\B^n, f(x_1, \dots, x_{i-1}, 0, x_i, \dots, x_n) = f(x_1, \dots, x_{i-1}, 1, x_i, \dots, x_n)$
+}
+
+\definition{1-Prediction}
+{
+Let $f$ be a Boolean function of arity $n+1$, $i\in\llbracket 0, n\rrbracket$ be an integer, $t$ and $r$ be Booleans.
+We say that the function $f$ admits a 1-prediction $(i, t, r)$ iff $\forall (x_1, \dots, x_n), f(x_1, \dots, x_{i-1}, t, x_i, \dots, x_n) = r$.
+}
+
+\definition{Polarity-Phase Invariant}
+{
+Let $f$ be a Boolean function of arity $n$, and $X=(y, z_1, \dots, z_n)\in\B^{n+1}$ be a vector of $n+1$ Booleans.
+We say that $X$ is a polarity-phase invariant of $f$, iff $\forall (x_1, \dots, x_n)\in\B^n, f(x_1, \dots, x_n) = y\oplus{}f(x_1\oplus{}z_1, \dots, x_n\oplus{}z_n)$.
+Similarly to Burch and Long \cite{BurchLong1992}, we can prove that the set of polarity-phase invariant of a function is a linear space.
+Such a linear space can be represented as row-echelon matrix of Booleans.
 }
 
 \section{Reduced Ordered Binary Decision Diagram (ROBDD) and Canonicity}
@@ -193,8 +229,8 @@ A Reduced Ordered Binary Decision Diagram is a directed acyclic graph $(V\cup T,
 Nodes are partitioned into two sets : the set of internal nodes $V$ and the set of terminal nodes $T$.
 Every internal node $v\in V$ has one field $\mathit{var}$, which represents the index of a variable and two outgoing edges respectively denoted $\mathit{if0}$ and $\mathit{if1}$.
 When using the "output negation" variant, there is only one terminal called 0, which represents the constant function returning 0.
-edges are partitioned into two sets : the set of root edges $\Psi$ and the set of internal edges $E$.
-There is exactly $k$ root edges, a root edge is denoted $\Psi_i$ with $0\leq i < k$, informally, $\Psi_i$ is the root of the ROBDD representing $f_i$.
+Edges are partitioned into two sets : the set of root edges $\Psi$ and the set of internal edges $E$.
+There is exactly $k$ root edges, a root edge is denoted $\Psi_i$ (with $i\in\llbracket 1, k \rrbracket$, informally, $\Psi_i$ is the root of the ROBDD representing $f_i$.
 Every edge has an inversion field $neg \in \B$ and a destination node denoted $\mathit{node}$.
 
 %add beautiful draw (with \psi edges)$
@@ -220,59 +256,18 @@ Let us consider a ROBDD $G$ representing the vector of Boolean functions $F=(f_1
 A proof of this theorem is available in the review of Somenzi et al.\cite{Somenzi1999}.
 
 \paragraph{Effective construction\\}
-In practice, one does not build the decision tree and then reduces it.
-Rather, ROBDDs are created starting from the ROBDDs for constants and variables and by applying the usual Boolean connectives and are kept reduced at all times.
-At the same time several functions are represented by one multi-rooted diagram.
-Indeed, each node of a ROBDD has a function associated with it.
-If we have several functions, they will have subfunctions in common (e.g. $f(x_0, x_1, x_2, x_3) = \shannon{x_1}{x_2}{x_3}$ and $f(x_0, x_1, x_2, x_3) = \shannon{\lnot x_1}{x_2}{x_3})$.
-As a special case two equivalent functions are represented by the same ROBDD (not just two identical ROBDDs).
-This approach makes equivalence check a constant-time operation.
-It is usually implemented using a dictionary which stores all ROBDD nodes that are alive (i.e. created and not deleted).
-This dictionary is called the \textit{unique table}.
-Operations that build ROBDDs start from the bottom (the constant nodes) and proceed up to the function nodes.
-If an operation needs to add a node $N = (v, f_1, f_0)$ to a ROBDD (which assumes that it has identifiers of the nodes representing $f_1$ and $f_2$), it first checks if $N$ already exists in the \textit{unique table} and if it does not, associate it to a new identifier and returns the latest.
-Doing so, the equivalence check is reduced to identifier (usually pointer) comparison.
+In practice, ROBDDs are created starting from the ROBDDs for constants and variables and by applying operators (e.g. NOT, AND, XOR, quantification operators, restriction, etc.) and are kept reduced at all times.
+A ROBDD is a multi-rooted diagram which represent a vector of Boolean function, the equality test between two of this function is a constant time operation.
+Canonicity is ensured by using a association map (usually a hash table), which maps all nodes to an identifier (usually a pointer to the node itself).
+Therefore, before to create a new node, all procedure must first check that it does not already exists. If it does, the procedure retrieve its identifier, otherwise, generate a new identifier and add the pair node-identifier into the association table.
+The association table is usually called \textit{unique table}.
 
 \section{Introduction of Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{})}
 
-\subsection{Motivation}
-
-On one hand, a ROBDD can be understood as an automaton recognizing a language composed of binary words.
-On the other hand, a ROBDD can be understood as a logic circuit with limited conciseness.
-By limited conciseness, we mean that there are functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
-For example, it has been proven \cite{Bryant1986} that the integer multiplication has a quadratic AIG representation but no polynomial ROBDD representation (at least exponential).
-
-The "output negation" variant, by adding expressiveness to edges, improves the conciseness.
-We want to go further in this approach by allowing more complex transformations on edges while maintaining canonicity.
-Such transformations can disturb variables' order of evaluation, allowing to represent "simple" decision processes in a more concise way.
-Furthermore, some transformations (within the range of transformation allowed) could have their complexity drastically reduced.
-For example, using the "output negation" variant, the complementation's time and space complexity goes from linear in the number of nodes to constant.
-
-Three set of transformation that would be of great interest are the \Uextract{} (or \uextract{} for short), the "inputs inverters" and \Xextract{} (or \xextract{} for short).
-
-
-The \uextract{} variant ensures that the function represented by any node does not have useless variable.
-Therefore, it sets an upper bound on the number of nodes of arity $n$ to $2^{2^n}$ (this upper bound is not reached, because functions with useless variables cannot have a node to represent them).
-Furthermore, it allows to "copy" functions at (almost) no cost as the expression $f(x_1, x_3, x_5, x_7)$ and $f(x_0, x_1, x_3, x_5)$ are represented using the same structure.
-
-
-The "inputs negation" variant would allow to complement inputs on any edge.
-The reduction rules would ensure that there is at most $2^{2^n-n}$ nodes of arity $n$ (this upper bound is not reached).
-However, simply introducing such transformation breaks the canonicity, therefore, we introduce polarity-phase invariant detection: we compute for each encountered function the linear space of input/output negations which do not change the function.
-This variant is called \NNIextract{} (or \nniextract{} for short) and is a generalization of the work of Burch et al. \cite{BurchLong1992}.
-
-We define a 1-prediction as follow:
-Let $f\in\F_n$ be a Boolean function of arity $n$, $i$ be an integer ($0\leq i < n$), $x$ and $y$ be Booleans.
-We say that the function $f$ admits a 1-prediction $(i, x, y)$ iff $f[i\leftarrow x] = y \in\F_{n-1}$.
-The "X extract" variant, by allowing to extract 1-predictions, represents a generalization of ZBDD (Zero Suppressed Binary Decision Diagram), thus, allows to efficiently represent sparse functions.
-This variant is compatible with the "output negation" variant.
-
-
-Due to the limited length of this report, we will not detail further the "NNI extract" and "X extract" variant.
-
-
 The Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}) is a framework that aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
-The remaining of this section is organized as follows. First, we formally define \GroBdd{}s, then we present a set of properties which are sufficient to ensure the semi-canonicity of \GroBdd{}s.
+In this Section, we formally define \GroBdd{}s, then we present a set of properties which are sufficient to ensure the semi-canonicity of \GroBdd{}s.
+
+
 
 \subsection{Initial definition of \GroBdd{}}
 
@@ -295,21 +290,29 @@ We define $\phi(node)$ the semantic of the node $node$ and $\psi(edge)$ the sema
 \end{itemize}
 We assume the function $\phi$ defined on all terminals $T$ (we always assume, all terminals to have a different interpretation through $\phi$).
 
-\subsubsection{Definitions and Constraints}
+\subsubsection{Constraints on Transformations}
 
-We refer the reader to Annexes (sections~\ref{grobdd-def} and~\ref{grobdd-reduction}) for a more formal approach of the problem.
-We denote $\T$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
-Transformations are composable (i.e. $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
+We denote $\Y$ the set of all transformation descriptors and $\T=\{\rho(\gamma)~|~\gamma\in\Y\}$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
+\underline{Transformation descriptors are canonical}: $\forall t\in\T, \exists! \gamma\in\T, \rho(\gamma)=t$.\\
+\underline{Transformations are composable}: $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
 We define the set of asymmetric transformations by $A_n = \T_{n, n}$.
-We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.
-The set of symmetric transformation is stable by composition: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
+We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.\\
+\underline{Symmetric transformations are composable}: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
 We denote $\F^S_m = \{f\in\F_m~|~\forall n \leq m, \forall t\in\T_{n, m}, f'\in\F_n, t(f') = f\}$ the set of S-free Boolean functions or arity n.
-Boolean functions are uniquely S-extractable: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
-Two Boolean functions $f, f'\in\F_n$ are A-equivalent iff $\exists a\in A_n, f=a(f')$.
+Boolean functions are uniquely \underline{S-extractable}: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
+Two Boolean functions $f, f'\in\F_n$ are \underline{A-equivalent} iff $\exists a\in A_n, f=a(f')$.
+Hence, if two functions are not A-equivalent, they are \underline{A-distinct}.
+Furthermore, we say that a Boolean function $f\in\F_n$ is \underline{A-invariant free} iff $\forall a\in A_n, f\neq a(f)$.
+We define $\F^A_n$ the subset of Boolean function $\F_n$ which are A-invariant free.
+Therefore, we define the constraint that $\forall n\in\N, \F^S_n \subset \F^A_n$ (i.e. a S-free Boolean function is also A-invariant free).
 N.B.: Several sets $S_{*, *}$ may fit this definition.
-Furthermore, if two functions are not A-equivalent, they are A-distinct.
 
-remark: A \GroBdd{} should ensure by construction that (1) all nodes are S-free and (2) all nodes are A-distinct.
+Remark: A \GroBdd{} should ensure by construction that (1) all nodes are S-free and (2) all nodes are A-distinct.
+
+\paragraph{Constraints on Terminals}
+Terminals are S-free ($\forall t\in T, \phi(t)\in\F^S_0$) and A-distinct ($\forall t, t'\in T, \phi(t) = \phi(t') \Rightarrow t = t'$).
+We assume defined the function $E_0 : \F_0 \longrightarrow \mathtt{edge}$, such that $\forall b\in\F_0, \psi(E_0(b)) = b$. 
+
 
 \subsubsection{Buildable (definition of \texttt{B})}
 
@@ -334,6 +337,8 @@ We denote $t_0 = v.if0.\gamma, I_0 = v.if0.node, t_1 = v.if1.\gamma$ and $I_1 = 
 The node $v$ is said B-stable iff $\mathtt{B}(t_0, I_0, t_1, I_1) = \mathtt{ConsNode}(Id, (t_0, I_0), (t_1, I_1))$.
 }
 
+The exhaustive list of sufficient constraints are list in Annexes~\ref{grobdd-B-constraints} (namely: \texttt{B} is \texttt{B}-stable, \texttt{B} is S-free preserving and \texttt{B} is A-distinct preserving).
+
 
 \subsection{Reduction Rules}
 In addition to the previous constraints, we define two reduction rules:\begin{enumerate}
@@ -356,7 +361,8 @@ We refer the reader to Annexes (cf. Section~\ref{grobdd-reduction}) for a proof 
 
 \subsection{Conclusion}
 
-In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
+In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}) and provided a set of conditions and reduction rules, which are sufficient to guarantee the reduced structure to be semi-canonical.
+This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
 In the remaining of this report, a \GroBdd{} is to be assumed reduced.
 In the next section, we will introduce the \Uextract{} variant (or \uextract{} for short) as being a simple model (called "U") in the \GroBdd{} formalism that we just introduced.
 
@@ -433,17 +439,13 @@ model         & \#node & \textbf{memo} & \#node & \textbf{memo} & \#node & \text
 \label{results}
 \end{table}
 
-We compare the number of nodes and the estimated memory cost for each one of the following model : \texttt{N} (regular ROBDD + "output negation" variant), \texttt{Z} (ZBDD), \texttt{NU} (\GroBdd{} with "output negation" and "useless variable extraction"), \texttt{NNI} ("negation negation invariant", mentioned in Section~4, allows to complement inputs within transformation descriptors) and \texttt{NU-X} ("output negation", "useless variable" and "1-prediction", this variant allows to capture 'logical deductions' similar to what is done in SAT-solver with the unit propagation heuristic).
-The results with models \texttt{NNI} and \texttt{NU-X} are here, in order to prove that the \GroBdd{} formalism can be used to define other models of significant interest.
+We compare the number of nodes and the estimated memory cost for each one of the following model : \texttt{N} (regular ROBDD + "output negation" variant), \texttt{Z} (ZBDD), \texttt{NU} (\GroBdd{} with "output negation" and \uextract{}), \texttt{NNI} (\GroBdd{} with \nniextract{}) and and \texttt{NU-X} ("output negation", \uextract{} and \xextract{}), this variant allows to capture 'logical deductions' similar to what is done in SAT-solver with the unit propagation heuristic).
 
 We tested our implementation on three different benchmarks : \texttt{lgsynth91}\cite{BenchLgsynth91}, \texttt{iscas99}\cite{BenchIscas99} and \texttt{satlib/uf20-91}\cite{BenchSatlib}.
-Benchmarks \texttt{lgsynth91} and \texttt{iscas99}, which represent various circuits, were pre-processed using the framework of logic synthesis ABC\cite{Abc}, in order to turn an arbitrary circuits into a simpler to parse Anf Inverter Graph (AIG).
+Benchmarks \texttt{lgsynth91} and \texttt{iscas99}, which represent various circuits, were pre-processed using the framework of logic synthesis ABC\cite{Abc}, in order to turn an arbitrary circuits into a simpler to parse And-Inverter-Graph (AIG).
 The benchmark \texttt{satlib/uf20-91} represents a set of 1~000 satisfiable CNF formulas with 20 variables and 91 clauses.
 Results are given relatively to the model \texttt{N}.
 In columns "\#node" we have the relative number of nodes and in columns "\textbf{memo}" the relative estimated memory cost.
-
-We can observe in Table~\ref{results}, that an average reduction of the number of nodes by 25\% when compiling circuits into \GroBdd{} using the NU model (relatively to regular ROBDD with "output negation" variant), and a reduction of 40\% of the memory cost.
-When compiling CNF formulas, we observe an average reduction of 3\% for the number of nodes and the memory cost.
 
 \subsubsection{The N-Queens problem}
 
@@ -503,15 +505,13 @@ ROBDD allows to efficiently manipulate functions appearing in various fields of 
 
 However, ROBDD manipulation is memory intensive and several variants exist (such as "output negation") in order to reduce the memory cost.
 
-In this report, we introduced a new class of variant called \GroBdd{} (Generalized Reduction of Ordered Binary Decision Diagram). We presented a set of constraints which ensure a \GroBdd{} to be semi-canonical (i.e. canonical up to graph-isomorphism and A-equivalence, introduced in Section~4).
-Moreover, we defined a \GroBdd{} model called "NU" ("output Negation" and \Uextract) which allows to significantly reduce the number of nodes (relatively to a regular ROBDD with the "output negation" variant).
+In this report, we introduced a new class of variant called \GroBdd{} (Generalized Reduction of Ordered Binary Decision Diagram).
+We presented a set of constraints which ensure a \GroBdd{} to be semi-canonical (i.e. canonical up to graph-isomorphism and A-equivalence, introduced in Section~4).
+Moreover, we defined five \GroBdd{} models called "N" (model equivalent to ROBDDs with the "output negation" variant), "Z" (equivalent to ZBDD), "NU", "NNI" and "NU-X".
+Models "NU", "NNI" and "NU-X" allow to significantly reduce the number of nodes (relatively to the model "N").
 
 
-Using our implementation in OCaml against several benchmarks, we observed an average reduction of 25\% when representing circuits, and 3\% when representing generated CNF formula.
-Furthermore, we estimated the memory cost to be reduced by 40\% when representing circuits and 3\% when representing CNF formulas.
-
-
-Future work will be focus on merging the \nniextract{} ("NNI extract") variant and \xextract{} (X extract) variant into the "NNI-X extract" variant.
+Future work will be focus on merging the "\nniextract{}" variant and "\xextract{}" variant into the "NNI-X extract" variant.
 Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement heuristics to improve the compilation of CNF formulas.
 
 
@@ -526,97 +526,7 @@ Moreover, we will prove the correctness of "NNI extract" and "X extract" variant
 
 \section{Annexes}
 
-\subsection{\GroBdd{}: Definitions, Notations, Constraints\label{grobdd-def}}
-
-We denote $\Y$ the set of all transformation descriptor.
-We assume defined $\rho$ the semantic interpretation of transformation descriptors, $\forall \gamma, \exists n, m \in\N, \rho(\gamma) \in \F_n \rightarrow \F_m$ (with $n\leq m$).
-In this section, we make the list of properties that the TDS must ensure to be correct.
-
-\constraint{Canonical}
-{
-\[\forall \gamma, \gamma' \in \Y, \left( \gamma = \gamma' \right) \Leftrightarrow \left( \rho(\gamma) = \rho(\gamma') \right) \]
-We denote $\Y_{n, m} = \{ \gamma \in \Y ~|~ \rho(\gamma) \in \F_n \longrightarrow \F_m \}$, and $\Y_{n,*} = \bigcup_{m\leq n} \Y_{n, m}$ and $\Y_{*, m} = \bigcup_{n \geq m} \Y_{n, m}$.
-}
-
-\constraint{Separable}
-{\[\forall \gamma \in \Y_{n, m}, \exists! \vartriangle_\gamma \in \B^m \rightarrow \B^n, \triangledown_\gamma \in \B^m \rightarrow \B \rightarrow \B,\]
-\[\forall f\in \F_n, \forall x \in \B^m, \rho(\gamma)(f)(x) = \triangledown(x, f(\vartriangle x))\]
-This constraint allows any transformation to be represented as circuit which can be wrapped around the function.
-This constraint enforces transformations to be local.
-The function $\vartriangle$ is called the pre-process, and the function $\triangledown$ is called the post-process.
-}
-
-\constraint{Composable (definition of \texttt{C})}
-{\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \exists \gamma'' \in \Y_{n, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\gamma'')\]
-This constraint enforces $\Y_{n, n}$ to be stable by composition.
-Furthermore, it exists an algorithm $\mathtt{C} : \Y_{n, m} \rightarrow \Y_{m, l} \rightarrow \Y_{n, l}$, such that:
-\[\forall \gamma \in \Y_{n, m}, \gamma' \in \Y_{m, l}, \rho(\gamma') \circ \rho(\gamma) = \rho(\mathtt{C}(\gamma, \gamma'))\]
-For convenience, we denote $\gamma' \circ \gamma = \mathtt{C}(\gamma, \gamma')$.
-}
-\subsubsection{Decomposable (definition of \texttt{A} and \texttt{S})}
-
-For all $n\in\N$, we define $A_n = \Y_{n, n}$ the set of asymmetric transformations.
-For all $n, m\in\N$, it exists $S_{n, m} \subset \Y_{n, m}$ a set of transformations such that $\forall \gamma \in \Y_{n, m}, \exists a \in A_m, \exists! s \in S_{n, m},  \gamma = a \circ s$.
-The set $S_{n, m}$ is called the set of symmetric transformations.
-We ensure that $\forall n\in\N, S_{n, n} = \{ Id_n = \F_n \rightarrow \F_n \}$.
-
-\definition{S-free}
-{
-A Boolean function $f\in\F_m$ is said S-free, iff
-\[\forall s \in S_{n, m}, \forall g \in \F_n, f = \rho(s)(g) \Rightarrow \rho(s) = Id_n\]
-We denote $\F^S_n$ the set of S-free Boolean function of arity $n$.
-}
-
-\constraint{S-uniqueness}
-{
-\[\forall f\in\F_n, f'\in\F_{n'}, s\in S_{n, m}, s'\in S_{n', m}, \rho(s)(f) = \rho(s')(f') \Rightarrow (s = s') \land (f = f')\]
-(with $f$ and $f'$ being S-free)
-}
-
-\constraint{S-uniqueness (equivalent definition)}
-{
-\[\forall f\in\F_m, \exists! (s, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = \rho(s)(\tilde{f})\]
-}
-
-\definition{A-equivalent}
-{
-Two Boolean functions $f, g\in\F_n$ are said A-equivalent, iff $\exists a\in A_n, f = \rho(a)(g)$.
-This relatioin is an equivalence relation (i.e. reflexive, symmetric, transitive) denoted $\sim_A$.
-Remark: Two Boolean functions are said A-distinct if they are not A-equivalent and a set of A-distinct function is said A-reduced.
-}
-
-\definition{A-invariant free}
-{
-A Boolean function $f\in\F_n$ is said A-invariant free, iff $\forall a, a'\in A_n, \rho(a)(f) \neq \rho(a')(f)$.
-}
-
-\constraint{S-free implies A-invariant free}
-{For all function $f$, if $f$ is S-free, then $f$ is A-invariant free.}
-
-
-\definition{$\I_n$}
-{
-For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
-}
-
-\definition{$\Ynode$}
-{A $\Ynode_{l, m, n}$ is a quadruple $(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{l, n} \times \I_l \times \Y_{m, n} \times \I_m$. Let $v$ be a $\Ynode$, we denote $v.\gamma_0$ (respectively $v.I_0$, $v.\gamma_1$ and $v.I_1$) the first (respectively second, third and fourth) component of $v$.
-\begin{itemize}
-\item For all $\Ynode$ $v$, we always assume that functions $\phi(v.I_0)$ and $\phi(v.I_1)$ are \texttt{S}-free.
-\item We always assume the set $X = \{\phi(v.I_0) ~|~ v \in\Ynode\} \cup \{\phi(v.I_1) ~|~ v\in\Ynode\}$ to be \texttt{A-reduced}
-\end{itemize}
-We extend the definition of $\phi$, with : for all $\Ynode$ $v$, $\phi(v) = \rho(v.\gamma_0)(\phi(v.I_0)) \star \rho(v.\gamma_1)(\phi(v.I_1))$.
-}
-
-\constraint{terminal nodes are S-free, canonical and A-distinct (definition of $\mathtt{E}_0$)}
-{For all terminal node $t \in T$, $\phi(t)$ is S-free (S-free).
-Moreover, $\forall t, t' \in T, \phi(t) = \phi(t') \Rightarrow t = t'$ (canonical).
-Furthermore, the set $\{\phi(t) ~|~ t\in T\}$ is A-reduced (A-reduced).
-Moreover, we define the function $\mathtt{E}_0$ such $\forall b\in\F_0, \exists \gamma\in\Y_{0, 0}, \exists t\in T, \mathtt{E}_0(b) = \{\gamma = \gamma, node = I_t\}$ and $\psi(\mathtt{E}_0(b)) = b$.
-}
-
-
-\subsubsection{Buildable (definition of \texttt{B})}
+\subsection{\GroBdd{}: Buildable (definition of \texttt{B})\label{grobdd-B-constraints}}
 
 Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
 
@@ -677,44 +587,6 @@ In this section we prove:\begin{enumerate}
 \item Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
 \end{enumerate}
 
-\subsubsection{Additional procedures}
-
-\paragraph{The \texttt{Cons} procedure\\}
-We define the \texttt{Cons} procedure as follow.
-Let $G$ be a \GroBdd{} and $F$ be its vector of root edges of size $k$.\\
-Let $i$ and $j$ be indexes of this vector.
-We denote $\gamma_i = \Psi_i.\gamma$, $\gamma_j = \Psi_j.\gamma$ and $I_i = \Psi_i.node$, $I_j = \Psi_j.node$.
-\begin{itemize}
-\item If \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{ConsNode} ($\gamma$, ($\gamma'$, $I_X$), ($\gamma''$, $I_Y$)). We define the node $N = \{if0 = \{\gamma = \gamma', node = I_X\}, if1 = \{\gamma = \gamma'', nodes = I_Y\}\}$.\begin{itemize}
-\item If the node $N$ already exists in $G$, we retrieve its identifier $I$, we define $G'$ as a copy of $G$ with a new root edge $\Psi_k = \{\gamma = \gamma, node = I\}$
-\item Otherwise, we define $G'$ as a copy of $G$.
-We generate a new identifier, and associate it the node $N$ within the \textit{unique table} of $G'$.
-We add a new root edge $\Psi_k = \{\gamma = \gamma, node = I\}$ to $G'$.
-\end{itemize}
-\item Otherwise, \texttt{B}($\gamma_g$, $I_g$, $\gamma_h$, $I_h$) = \texttt{Merge} ($\gamma$, $I_Z$). We define $G'$ as a copy of $G$ with a new root edge $\Psi_k = \{\gamma = \gamma''', node = I_Z\}$.
-\end{itemize}
-
-\paragraph{The \texttt{Remove} procedure\\}
-We define the \texttt{Remove} procedure as follow.
-Let $G$ be a \GroBdd{} and $F$ be its vector of root edges of size $k$.
-Let $i$ be an index of this vector.\\
-We define $G'$ as a copy of $G$ with its vector of root edges $F' = (\Psi_1, \dots, \Psi_{i-1}, \Psi_{i+1}, \dots, \Psi_n)$.
-In an iterative process, we remove nodes which have no incoming edge, until all nodes have at least one incoming edge (in order to satisfy the third reduction rule).
-As $G'$ is a subset of $G$, thus, $G'$ satisfies the first and second reduction rule.
-
-\paragraph{The \texttt{Reduction} procedure\\}
-Let $G$ be a \GroBdd{} and $F$ be its vector of root edges $F$.
-Using an iterative process, we remove nodes which have no incoming edge, until all nodes have at least one incoming edge (satisfying the third reduction rules).
-The \texttt{Reduction} procedure consists in going through the \GroBdd{} $G$ (starting with nodes with the smallest depth), applying the \texttt{Cons} procedure on each node creating a new \GroBdd{} $G'$.
-The \GroBdd{} $G'$ is by construction equivalent to $G$, however, the \GroBdd{} $G'$ satisfies all three reduction rules.
-
-\paragraph{The \texttt{Merge} procedure\\}
-We define the \texttt{Merge} procedure as follow.
-Let $G$ and $G'$ be two \GroBdd{}s (based on the same \GroBdd{} model).
-We define $G''$ a \GroBdd{} which is the union of both \GroBdd{}s.
-We define $F'' = (\Psi_1, \dots, \Psi_n, \Psi'_1, \dots, \Psi'_{n'})$.
-Due to possible conflicts on identifiers, we re-generate identifiers of the nodes in $G''$.
-Finally, we apply the \texttt{Reduction} procedure on $G''$.
 
 \subsubsection{Existence}
 We inductively define the procedure \texttt{E} with:\begin{itemize}
@@ -781,11 +653,6 @@ Therefore, $\phi(I) \sim_A \phi(I')$, however, we proved that the set of the sem
 Using the induction hypothesis (as $\phi(I)$ as an arity strictly smaller than $k+1$, thus smaller than $k$), we deduce that $I = I'$.
 
 Therefore, applying the strong induction theorem, we prove the property (2.c).
-
-\subsubsection{Canonical modulo graph-isomorphism and A-equivalence}
-In order to prove that "Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, it exists a one-to-one mapping $\sigma : V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$", we start by proving that within the \texttt{Merge} procedure, each node is replaced by an A-equivalent one.
-Secondly, using the \texttt{Merge} procedure without re-generating the identifiers of the nodes of $G$ and using the property (2.c), we prove that the nodes of $G'$ collapse on the nodes of $G$ during the \texttt{Reduction} procedure, providing a one-to-one mapping.
-Details of this proof are cumbersome and not of great interest.
 
 \subsection{Model NU: proof of semi-canonicity\label{grobdd-model-nu}}
 
