@@ -11,6 +11,7 @@
 \usepackage{listings}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{stmaryrd}
 
 \usepackage{cite}
 
@@ -26,7 +27,7 @@
 	}
 
 \title{A Generalized Reduction of Ordered Binary Decision Diagram\\{\small Internship at DFKI (Bremen, Germany) from 15/03/2017 to 15/06/2017}}
-\author{Joan Thibault\\supervisor:~Rolf Drechsler}
+\author{Joan Thibault\\Supervisor:~Rolf Drechsler}
 
 \newcommand{\includeframe}[4]{\makebox[#2\linewidth]{\includegraphics[page=#1,width=#2\linewidth,trim=0cm 0cm 0cm 0cm,clip=true,#3]{#4}}}
 
@@ -72,13 +73,13 @@ However, ROBDDs suffer from two main issues: (1) their representation is memory 
 Several variations of ROBDD exist such as Zero-suppressed Binary Decision Diagram (ZBDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output negation"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
 
 
-In this report, we introduce a new generalization of the standard reduction rules that we call the \Uextract or \uextract for short.
+In this report, we introduce a new generalization of the standard reduction rules that we call the \Uextract{} or \uextract{} for short.
 Basically, it detects useless variables (i.e. variables which have no influence on the result of a given function) and extracts them from the local variable order.
-This generalization allows to add and remove useless variables in linear time (in the number of variables), reduces the number of nodes and tends to reduce the overall memory cost.
-However, several drawbacks arise: no in-place sifting (permutation of adjacent variables), bigger nodes of variable size and it slightly complexifies manipulations.
+This generalization allows the addition removal of useless variables in linear time (in the number of variables), reduces the number of nodes and tends to reduce the overall memory cost.
+However, several drawbacks arise: no in-place \textit{sifting} (permutation of adjacent variables), nodes tend to have a bigger representation in memory and are no longer of fixed size, furthermore, it slightly complexifies manipulations.
 
 
-We implemented both the \uextract and the "output negation" variants in an OCaml program\cite{DAGamlGitHub} and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
+We implemented both the \uextract{} and the "output negation" variants in an OCaml program\cite{DAGamlGitHub} and tested it against several benchmarks\cite{BenchSatlib, BenchLgsynth91, BenchIscas99}.
 We observe an average of 25\% less nodes and 40\% less memory when representing circuits, and 3\% less nodes and memory when representing solutions from generated CNF formulas.
 \end{abstract}
 
@@ -99,11 +100,11 @@ With this alternative, the only piece of software which needs to be proven is th
 
 
 In order to prove that two digital circuits are equivalent, there is two main algorithmic solutions:
-Firstly, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
-This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation}, early conflict detection or \textit{conflict driven clause learning}.
+First, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
+This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation} (we simplify clauses in which a literal value is known), early conflict detection (we use the fact that some subsets of SAT are poly-time decidable, such as: 2SAT, Horn clauses, etc.) or \textit{conflict driven clause learning}.
 Secondly, the compilation of both circuits into Reduced Ordered Binary Decision Diagrams (ROBDDs).
 A ROBDD is a canonical structure which represent a vector of functions.
-Therefore, by using hash-consing techniques, we can performed the equality between two compiled functions in constant time.
+Therefore, by using hash-consing techniques, we can perform the equality between two compiled functions in constant time.
 However, the compilation might take an exponential time in the number of variable.
 In this report we will focus on ROBDDs.
 
@@ -128,13 +129,13 @@ Other extensions of the reduction rules exist such as: "input negation"\cite{Min
 
 In addition to use the "output negation" variant, we introduce a new variant which allows to extract useless variables (a.k.a non-support variables).
 A variable is said useless iff it does not change the results such as $x_1$ in $f(x_0, x_1, x_2) = x_0 \land x_2$ or $x_0$ in $g(x_0) = x_0 \land \lnot x_0$.
-We call this new variant \Uextract or \uextract for short.
+We call this new variant \Uextract{} or \uextract{} for short.
 
 The remainder of this report will be organized as follows.
-In Section~2, we formally introduce Boolean functions, useless variable and some notations.
+In Section~2, we formally introduce Boolean functions, useless variables and some notations.
 In Section~3, we formally introduce Reduced Ordered Binary Decision Diagrams (ROBDD).
 In Section~4, we introduce the Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}).
-In Section~5, we introduce the \uextract variant as part of the \GroBdd{} framework, before to expose results against three  different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
+In Section~5, we introduce the \uextract{} variant as part of the \GroBdd{} framework, before exposing results against three  different benchmarks \cite{BenchSatlib, BenchLgsynth91, BenchIscas99} using our implementation in OCaml.
 
 \section{Notations}
 
@@ -152,15 +153,15 @@ We denote the Shannon operator by $\shannon{}{}{}$ defined by $\forall x, y, z\i
 
 \paragraph{Restriction\\}
 
-Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$, $i~(0\leq i < n+1)$ be an integer and $b\in\B$ be a Boolean.
-We denote $f[i\leftarrow b]$ the Boolean function of arity $n$ defined by $f[i\leftarrow b](x_1, \dots, x_n) = f(x_0, \dots, x_{i-1}, b, x_i, \dots, x_n)$.
+Let $f\in\F_{n+1}$ be a Boolean function of arity $n+1$, $i\in\llbracket 0, n \rrbracket$ be an integer and $b\in\B$ be a Boolean.
+We denote $f[i\leftarrow b]$ the Boolean function of arity $n$ defined by $f[i\leftarrow b](x_1, \dots, x_n) = f(x_1, \dots, x_{i-1}, b, x_i, \dots, x_n)$.
 $f[i\leftarrow 0]$ (respectively $f[i\leftarrow 1]$) is called the $i$-th negative (respectively positive) restriction.
 
 Let $f$ be a function of arity $n+1$, we denote $f_0$ (respectively $f_1$) the function of arity $n$ defined by $f_0 = f[0\leftarrow 0]$ (respectively $f_1 = f[0\leftarrow 1]$).
 
 \paragraph{Construction\\}
 
-Let $f, g \in \F_n$ be Boolean functions of arity $n$ and $i~(0\leq i < n+1)$ be an integer.
+Let $f, g \in \F_n$ be Boolean functions of arity $n$ and $i\in\llbracket 0, n \rrbracket$ be an integer.
 We denote $f\star_ig$ the Boolean function of arity $n+1$ defined by $(f\star_ig)(x_0, \dots, x_{i-1}, y, x_i, \dots, x_n) = \shannon{y}{f(x_0, \dots, x_n)}{g(x_0, \dots, x_n)}$.
 
 We denote $\star = \star_0$
@@ -171,7 +172,7 @@ N.B.: $(f\star_i g)[i\leftarrow 0] = f$ and $ (f\star_i g)[i\leftarrow 1] = g$ (
 
 
 \theorem{Expansion Theorem}{
-Let $f\in\F_n$ be a Boolean function, then $\forall i\in[|0, n-1|], f = f[i\leftarrow 0]\star_i f[i\leftarrow 1]$ (in particular: $f = f_0 \star f_1$)
+Let $f\in\F_n$ be a Boolean function, then $\forall i\in\llbracket{}0, n-1\rrbracket{}, f = f[i\leftarrow 0]\star_i f[i\leftarrow 1]$ (in particular: $f = f_0 \star f_1$)
 }
 
 %\paragraph{Expansion Theorem\\}
@@ -247,10 +248,10 @@ Such transformations can disturb variables' order of evaluation, allowing to rep
 Furthermore, some transformations (within the range of transformation allowed) could have their complexity drastically reduced.
 For example, using the "output negation" variant, the complementation's time and space complexity goes from linear in the number of nodes to constant.
 
-Three set of transformation that would be of great interest are the \Uextract (or \uextract for short), the "inputs inverters" and \Xextract (or "\texttt{X} extract" for short).
+Three set of transformation that would be of great interest are the \Uextract{} (or \uextract{} for short), the "inputs inverters" and \Xextract{} (or \xextract{} for short).
 
 
-The \uextract variant ensures that the function represented by any node does not have useless variable.
+The \uextract{} variant ensures that the function represented by any node does not have useless variable.
 Therefore, it sets an upper bound on the number of nodes of arity $n$ to $2^{2^n}$ (this upper bound is not reached, because functions with useless variables cannot have a node to represent them).
 Furthermore, it allows to "copy" functions at (almost) no cost as the expression $f(x_1, x_3, x_5, x_7)$ and $f(x_0, x_1, x_3, x_5)$ are represented using the same structure.
 
@@ -258,7 +259,7 @@ Furthermore, it allows to "copy" functions at (almost) no cost as the expression
 The "inputs negation" variant would allow to complement inputs on any edge.
 The reduction rules would ensure that there is at most $2^{2^n-n}$ nodes of arity $n$ (this upper bound is not reached).
 However, simply introducing such transformation breaks the canonicity, therefore, we introduce polarity-phase invariant detection: we compute for each encountered function the linear space of input/output negations which do not change the function.
-This variant is called \NNIextract (or "NNI extract" for short) and is a generalization of the work of Burch et al. \cite{BurchLong1992}.
+This variant is called \NNIextract{} (or \nniextract{} for short) and is a generalization of the work of Burch et al. \cite{BurchLong1992}.
 
 We define a 1-prediction as follow:
 Let $f\in\F_n$ be a Boolean function of arity $n$, $i$ be an integer ($0\leq i < n$), $x$ and $y$ be Booleans.
@@ -357,7 +358,7 @@ We refer the reader to Annexes (cf. Section~\ref{grobdd-reduction}) for a proof 
 
 In this section, we introduced the concept of Generalized Reduction of Ordered Binary Decision Diagrams (\GroBdd{}) and provided a set of necessary conditions and reduction rules, which guarantee the reduced structure to be semi-canonical. This approach still allows to perform the equality test in a reasonable amount of time: proportional to the size of the transformation descriptor, which (for practical reasons) should be polynomial in the arity of the post-transformation function.
 In the remaining of this report, a \GroBdd{} is to be assumed reduced.
-In the next section, we will introduce the \Uextract variant (or \uextract for short) as being a simple model (called "U") in the \GroBdd{} formalism that we just introduced.
+In the next section, we will introduce the \Uextract{} variant (or \uextract{} for short) as being a simple model (called "U") in the \GroBdd{} formalism that we just introduced.
 
 \section{Useless Variable Extraction : \GroBdd{} model NU}
 
@@ -366,7 +367,7 @@ In the next section, we will introduce the \Uextract variant (or \uextract for s
 There are several interests in extracting useless variables, the more obvious one is that it tends to reduce the number of nodes (relatively to a regular ROBDD representing the same function with the same order).
 Here is a list of other interesting properties:\begin{itemize}
 \item When formalizing a problem it may appear that it exists a sub-problem that is present several times but on different variables with the same relative order, for example: in the n-queens problem : "there is exactly one queen per line" is a constraint that either you replicate or solve once and replicate the result.
-With the \uextract variant, you can solve the problem once and then, by creating the appropriate edge, replicating the solution without creating new nodes.
+With the \uextract{} variant, you can solve the problem once and then, by creating the appropriate edge, replicating the solution without creating new nodes.
 \item Given a function, you can know which variables are useless, just by looking at the transformation descriptor, thus without going through the all structure.
 \end{itemize}
 
@@ -404,7 +405,7 @@ In this section, we start by quickly presenting our implementation of previous c
 \subsubsection{Implementation details}
 Our implementation in OCaml of the previous concepts is available on GitHub as part of the DAGaml framework within the \texttt{grobdd} branch \cite{DAGamlGitHub}.
 The core program, i.e. the \GroBdd{} abstraction, is about 1~900 lines of code.
-Implementation details for models is about 6~100 lines of code, with 728 lines for the model "NU", the remaining lines implementing models "NNI" (1~181 lines, mentioned in Section~5, is a generalization of "inputs negation"), "NU-X" (2~587 lines, mentioned in Section~5, allows to extract "1-predictions"), but also regular ROBDD (318 lines) and ZBDD (201 lines).
+Implementation details for models is about 6~100 lines of code, with 728 lines for the model "NU", the remaining lines implementing models "NNI" (1~939 lines, mentioned in Section~4, is a generalization of "inputs negation"), "NU-X" (2~587 lines, mentioned in Section~4, allows to extract "1-predictions"), but also regular ROBDD (318 lines) and ZBDD (201 lines).
 Various useful tools are implemented (about 4~300 lines).
 All in all, this project is about 12~400 lines long.
 The implementation is designed in order to maximize code reusing through several layers of abstraction.
@@ -510,7 +511,7 @@ Using our implementation in OCaml against several benchmarks, we observed an ave
 Furthermore, we estimated the memory cost to be reduced by 40\% when representing circuits and 3\% when representing CNF formulas.
 
 
-Future work will be focus on merging the \NNIextract ("NNI extract") variant and \Xextract (X extract) variant into the "NNI-X extract" variant.
+Future work will be focus on merging the \nniextract{} ("NNI extract") variant and \xextract{} (X extract) variant into the "NNI-X extract" variant.
 Moreover, we will prove the correctness of "NNI extract" and "X extract" variants, improve the binary representation of current transformation descriptors, implement quantification operators, implement heuristics to improve the compilation of CNF formulas.
 
 
