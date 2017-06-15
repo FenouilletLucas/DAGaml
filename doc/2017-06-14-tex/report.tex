@@ -65,76 +65,51 @@
 
 \maketitle
 \begin{abstract}
-The Reduced Ordered Binary Decision Diagram (ROBDD)\cite{Bryant1986, Somenzi1999} is the state-of-the-art representation for Boolean functions.
-They are used in various fields such as logic synthesis, artificial intelligence or combinatorics.
-However, ROBDDs suffer from two main issues: (1) their representation is memory expensive and (2) their manipulation is memory intensive as it induces many random memory accesses.
-
-
-Several variations of ROBDD exist such as Zero-suppressed Binary Decision Diagram (ZBDD)\cite{IntroZDD}, Multi-valued Decision Diagram (MDD)\cite{IntroMDD, IntroMddRolf} and variations of the reduction rules such as "output negation"\cite{BryantVariantN}, "input negation"\cite{MinatoVariants}, "shifting variables"\cite{MinatoVariants}, "dual edges"\cite{RolfVariantDual} or "copy node"\cite{RolfVariantCopy}.
-
-
-In this report, we introduce a new class of variants called Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}).
-The main idea is to allow transformations on edges (such as "output negation") which maintain some kind of canonicity.
-We define a set of sufficient properties on these transformation which ensure a \GroBdd{} to be \texttt{semi-canonical}
-
-Within this framework, we introduce several models: \texttt{N}, \texttt{NU}, \texttt{NNI} and \texttt{NU-X}.
-The model \texttt{N} is equivalent to regular ROBDD with the "output negation" variant.
-The model \texttt{NU} allows to complement a function and extract non-support variables (i.e. variables which have no influence on the result of the function).
-The model \texttt{NNI} allows to complement both output and inputs. However, in order to ensure canonicity, it also computes polarity-phase invariants (a generalization of phase invariants \cite{BurchLong1992}).
-The model \texttt{NU-X} extends the model \texttt{NU} with the detection of 1-predictions (a generalization of Zero Suppressed Binary Decision Diagrams).
-
-These models have been implemented using OCaml \cite{DAGamlGitHub} and tested against several set of circuits \cite{BenchSatlib, BenchLgsynth91} and CNF formulas \cite{BenchIscas99}.
+The Reduced Ordered Binary Decision Diagram (ROBDD)\cite{Bryant1986, Somenzi1999} is the state-of-the-art representation for Boolean functions, which are used in various fields such as logic synthesis, artificial intelligence or combinatorics.
+However, efficiently manipulating ROBDDs is memory expensive.
+Several variants exists which allows to capture small properties of Boolean functions in order to simplify their representation and reduce the computation time, such as "output negation".
+Some variants are specialized in the representation of some subsets of Boolean functions, for example Zero Suppressed Binary Decision Diagrams (ZBDDs) which are more suitable for sparse functions.
+Simply merging variants may break canonicity (for example ZBDD and "output negation").
+Therefore, we designed GROBDD (Generalized Reduction of Ordered Binary Decision Diagram): a model that aims at providing sufficient conditions in order to ensure the semi-canonicity of the representation.
+Using GROBDD, we designed three new variants, namely: "extraction of useless variables", "extraction of input negation and output negation invariants" and "extraction of 1-predictions".
+These variants have been implemented using OCaml \cite{DAGamlGitHub} and tested against several set of circuits \cite{BenchSatlib, BenchLgsynth91} and CNF formulas \cite{BenchIscas99}.
 \end{abstract}
 
 \newpage
 
-
-
 \section{Introduction}
 
-Nowadays, most critical systems rely on digital circuits: in transportation (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
+Nowadays, most critical systems rely on digital circuits: in transports (e.g. cars, train, plains) , communication (e.g. satellites), computation (e.g. data centers, super-computers), exploration (e.g. space rocket, rovers).
 One way to minimize risks in digital parts of these systems is to provide a formal proof that they respect their specification.
 On the other hand, we want to minimize costs and energy consumption while maximizing their performances.
 In order to efficiently optimize digital circuits we usually rely on complex programs.
 However, these programs are rarely proven themselves, thus, circuits optimized using them might not be equivalent to the initial design and therefore might not respect the specification.
 The obvious solution would be to prove optimizing programs, however two major issues arise : these programs are complex  (thus, proving them would be expensive) and might be proprietary (thus, one cannot check that the proof is correct).
 A simpler alternative is to design a program which checks that two digital circuits are equivalent.
-With this alternative, the only piece of software which needs to be proven is the "equivalence checker".
+With this alternative, the only piece of software that needs to be proven is the "equivalence checker".
 
 
-In order to prove that two digital circuits are equivalent, there is two main algorithmic solutions:
-First, the DPLL (Davis–Putnam–Logemann–Loveland) algorithm.
-This backtracking procedure is usually implemented with various heuristics such as \textit{unit propagation}, early conflict detection (we use the fact that some subsets of SAT are poly-time decidable, such as: 2SAT, Horn clauses, etc.) or \textit{conflict driven clause learning}.
+In order to prove that two digital circuits are equivalent, there are two main algorithmic solutions: (1) the DPLL (Davis–Putnam–Logemann–Loveland) algorithm and (2) compilation to ROBDD (Reduced Ordered Binary Decision Diagram).
+The DPLL algorithm is a procedure usually implemented with various heuristics such as \textit{unit propagation}, early conflict detection or \textit{conflict driven clause learning}.
 Secondly, the compilation of both circuits into Reduced Ordered Binary Decision Diagrams (ROBDDs).
-A ROBDD is a canonical structure which represent a vector of functions.
-Therefore, by using hash-consing techniques, we can perform the equality test between two compiled functions in constant time.
-However, the compilation might take an exponential time in the number of variable.
-In this report we will focus on ROBDDs.
+In this report we will focus on ROBDD: a canonical structure which represents a vector of functions as a multi-rooted hash-consed Directed Acyclic Graph (DAG).
+Compiling a function into a ROBDD is an exponential time (in the number of variables) process in the worst case, however, testing two functions for equality is a constant time operation.
+However, unlike the DPLL algorithm, the ROBDD compilation
 
-
-ROBDDs have various other applications such as: Bounded Model Checking, Planning, Software Verification, Automatic Test Pattern Generation, Combinational Equivalence Checking or Combinatorial Interaction Testing.
-
-%\begin{figure}
-%\[f_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = (x_0 \land x_1) \lor \dots \lor (x_{2n} \land x_{2n+1})\]
-%\[g_n(x_0, x_1, \dots, x_{2n}, x_{2n+1}) = f_n(x_0, x_{n+1}, \dots, x_n, x_{2n+1})\]
-%\caption{The ROBDD representing the function $f_n$ has a linear size in $n$, the one representing $g_n$ has a an exponential size in $n$.}
-%\label{OrderExplosion}
-%\end{figure}
-
-
-However, ROBDDs are memory expensive as their size tends to grow exponentially with the number of variables.
+ROBDDs are memory expensive as their size tends to grow exponentially with the number of variables.
 Several variants have been invented in order to capture some semantic properties of the function and reduce the memory consumption.
-For example, Zero suppressed Binary Decision Diagram (ZBDD) are better suited for representing sparse functions.
-In this report we will use the "output negation" variant\cite{BryantVariantN}, which extends the reduction rules in order to guarantee canonicity under negation.
-Therefore, it allows (1) to reduce the size of the structure and (2) to negate a function in constant time (reducing the set of useful binary operators to XOR and AND).
+For example, Zero suppressed Binary Decision Diagrams (ZBDDs) are better suited to represent sparse functions.
+In this report we will using the "output negation" variant\cite{BryantVariantN}, which extends the reduction rules in order to guarantee canonicity under negation.
+Therefore, it allows (1) to reduce the size of the structure and (2) to negate a function in constant time.
 Other extensions of the reduction rules exist such as: "input negation"\cite{MinatoVariants} (each edge can complement the locally first input), "shifting variables"\cite{MinatoVariants} (each edge stores the number of useless variables before the next significant variables) or "dual edge"\cite{RolfVariantDual} (we define the dual of a function $f$ by $\bar{f} = (x_1, \dots, x_n) \longrightarrow \lnot f(\lnot x_1, \dots, \lnot x_n)$, therefore the reduction works similarly to the "output negation").
 
 
-On other problem that is usually raised when dealing with ROBDD is their lack of conciseness, i.e. there are functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
+An other problem that is usually raised when dealing with ROBDD is their lack of conciseness, i.e. there are functions which have a polynomial representation using an And-Inverter-Graph (AIG, i.e. a logic circuit composed of \texttt{AND} and \texttt{NOT} gates), but only exponential representation when using ROBDD.
 For example, it has been proven \cite{Bryant1986} that the integer multiplication has a quadratic AIG representation but no polynomial ROBDD representation (at least exponential).
 
 The "output negation" variant, by adding expressiveness to edges, improves the conciseness.
 We want to go further in this approach by allowing more complex transformations on edges while maintaining canonicity.
+%Therefore, we introduce \GroBdd{}(Generalized Reduction of Ordered Binary Decision Diagram): a framework that aims at providing sufficient conditions
 Such transformations can disturb variables' order of evaluation, allowing to represent "simple" decision processes in a more concise way.
 Furthermore, some transformations (within the range of transformation allowed) could have their complexity drastically reduced.
 For example, using the "output negation" variant, the complementation's time and space complexity goes from linear in the number of nodes to constant.
