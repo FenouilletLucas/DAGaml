@@ -243,24 +243,24 @@ A proof of this theorem is available in the review of Somenzi et al.\cite{Somenz
 
 \paragraph{Effective construction\\}
 In practice, ROBDDs are created starting from the ROBDDs for constants and variables and by applying operators (e.g. NOT, AND, XOR, quantification operators, restriction, etc.) and are kept reduced at all times.
-A ROBDD is a multi-rooted diagram which represent a vector of Boolean function, the equality test between two of this function is a constant time operation.
-Canonicity is ensured by using a association map (usually a hash table), which maps all nodes to an identifier (usually a pointer to the node itself).
+A ROBDD is a multi-rooted diagram which represent a vector of Boolean functions, the equality test between two of this function is a constant time operation.
+Canonicity is ensured by using a association table (usually a hash table), which maps all nodes to an identifier (usually a pointer to the node itself).
 Therefore, before creating a new node, all procedure must first check that it does not already exists. If it does, the procedure retrieves its identifier, otherwise, generates a new identifier and adds the pair node-identifier into the association table.
 The association table is usually called \textit{unique table}.
 
 \paragraph{Zero Suppressed Binary Decision Diagram (ZBDD)}
-The main difference between ROBDD and ZBDD stands in how they chose nodes to be removed.
+The main difference between ROBDD and ZBDD stands in how they chose to remove nodes.
 In a ROBDD, nodes $node$ with $node.\fieldElse{}$ identical to $node.\fieldThen{}$ are removed.
 In a ZBDD, nodes $node$ with $node.\fieldElse{}$ pointing to the terminal node $0$ are removed.
 Additionally, as ZBDD and "output negation" are not compatible, there is two terminal nodes respectively denoted $0$ and $1$).
 
 \section{Introduction of Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{})}
 
-Creating new canonical variants is a painful task for several reasons: (1) the combination of two canonical variants is not necessarily one, (2) proving that a variant is canonical from scratch needs to turn a local properties into a global one and (3) we have no boundaries on what a variant should looks like.
+Creating new canonical variants is a painful task for several reasons, such as: (1) the combination of two canonical variants is not necessarily one, (2) proving that a variant is canonical from scratch needs to turn a local properties into a global one and (3) we have no idea on what a variant should looks like.
 
-We designed the Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}) theory that properly defines what a model is, therefore, leads to define sufficient conditions which allows to prove that a variant is canonical (or semi-canonical).
-Hence, in this section, we formally define \GroBdd{}s, the present aims at providing examples of such reduction rules and boundaries on future reduction rules that would fit inside this framework.
-In this Section, we formally define \GroBdd{}s, then deduce a set of sufficient properties which ensure the canonicity (or the semi-canonicity) of a \GroBdd{}.
+We designed the Generalized Reduction of Ordered Binary Decision Diagram (\GroBdd{}) framework, in order to properly define what a model is.
+This definition would help us defining sufficient conditions on the variant which ensure the structure to be canonical (or semi-canonical).
+In this section, we formally define \GroBdd{}s, then deduce a set of sufficient properties which ensure the canonicity (or the semi-canonicity) of a \GroBdd{}.
 
 
 
@@ -292,14 +292,14 @@ A \GroBdd{} model is a 7-uplet $(T, \Y, \rho, \texttt{C}, \I, \texttt{B}, \mathc
 \item $T$: The set of all terminal nodes
 \item $\Y$: The set of all transformation descriptor
 \item $\rho$: The semantic interpretation of a transformation descriptor
-\item $\texttt{C}: \Y \longrightarrow \Y \longrightarrow \Y$: The \texttt{C}omposition operator, ensuring that $\rho(\texttt{C}~\gamma~\gamma') = \rho(\gamma')\circ\rho(\gamma)$ (\texttt{C} can be a partial function).
+\item $\texttt{C}: \Y \longrightarrow \Y \longrightarrow \Y$: The \texttt{C}omposition operator, ensuring that $\rho(\texttt{C}(\gamma, \gamma')) = \rho(\gamma')\circ\rho(\gamma)$ (\texttt{C} can be a partial function).
 \item $\I$: The set of identifiers.
-\item $\mathtt{B}: \Y\times\I \longrightarrow \Y\times\I \longrightarrow$\\
+\item $\mathtt{B}: (\Y\times\I)\times(\Y\times\I) \longrightarrow$\\
  $|~\texttt{ConsNode}$ $\Y\times (\Y\times\I) \times (\Y\times\I)$\\
  $|~\texttt{Merge}$ $\Y\times\I$\\
 The \texttt{B}uilding operator, ensuring that:\begin{compactenum}
-\item $\texttt{B}~(t_g, I_g)~(t_h, I_h) = \texttt{ConsNode} (t, (t'_X, I_X), (t'_Y, I_Y)) \Rightarrow f = t\left(t'_X(X) \star t'_Y(Y))\right)$
-\item $\texttt{B}~(t_g, I_g)~(t_h, I_h) = \texttt{Merge} (t'_Z, I_Z) \Rightarrow f = t'_Z(Z)$
+\item $\texttt{B}((t_g, I_g), (t_h, I_h))= \texttt{ConsNode} (t, (t'_X, I_X), (t'_Y, I_Y)) \Rightarrow f = t\left(t'_X(X) \star t'_Y(Y))\right)$
+\item $\texttt{B}((t_g, I_g), (t_h, I_h))= \texttt{Merge} (t'_Z, I_Z) \Rightarrow f = t'_Z(Z)$
 \end{compactenum}
 (with $f = t_g(g) \star t_h(h)$), (\texttt{B} can be a partial function)
 \item $\mathcal{P}: V\longrightarrow\B$: The "local semantic reduction" predicate.
@@ -308,7 +308,7 @@ The \texttt{B}uilding operator, ensuring that:\begin{compactenum}
 
 \paragraph{The \texttt{cons} procedure} is defined by:
 \begin{lstlisting}
-let $\texttt{cons}$ grobdd arc0 arc1 = match $\texttt{B}~(arc0.\fieldGamma{}, arc0.\fieldNode{}.\fieldIndex{})~(arc1.\fieldGamma{}, arc1.\fieldNode{}.\fieldIndex{})$ with
+let $\texttt{cons}$ grobdd arc0 arc1 = match $\texttt{B}((arc0.\fieldGamma{}, arc0.\fieldNode{}.\fieldIndex{}), (arc1.\fieldGamma{}, arc1.\fieldNode{}.\fieldIndex{}))$ with
   | $\texttt{ConsNode}$ $(\gamma, (\gamma', I'), (\gamma'', I'')) \longrightarrow$
     let $N$ = $\{\fieldElse{} = \{\fieldGamma{} = \gamma', \fieldNode{} = I'\}, \fieldThen{} = \{\fieldGamma = \gamma'', \fieldNode{} = I''\}\}$ in
     let $I$ = if ($N$ exists in the unique table of grobdd)
@@ -334,31 +334,32 @@ We define three reduction rules: \begin{compactenum}
 A \GroBdd{} is said reduced iff it satisfies the reduction rules.
 
 \subsection{Constraints}
-\subsubsection{Constraints on Transformations}
+We make a list of sufficient conditions on models which ensure the canonicity of the structure.
+Some of these condition are conjectured to be necessary.
+\subsubsection{Transformation Set}
 
-We denote $\Y$ the set of all transformation descriptors and $\T=\{\rho(\gamma)~|~\gamma\in\Y\}$ the set of transformations (and $\forall n, m\in\N, \T_{n, m} = \T \cap (\F_n \longrightarrow \F_m)$).
-\underline{Transformation descriptors are canonical}: $\forall t\in\T, \exists! \gamma\in\T, \rho(\gamma)=t$.\\
-\underline{Transformations are composable}: $\forall t\in\T_{n, m}, t'\in\T_{m ,l}, (t' \circ t) \in \T_{n, l}$).
-We define the set of asymmetric transformations by $A_n = \T_{n, n}$.
-We denote the set of symmetric transformations by $S_{n, m}$, such that $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$ and $S_{n, n} = \{Id_n\}$.\\
-\underline{Symmetric transformations are composable}: $\forall s\in S_{n, m}, s'\in S_{m ,l}, (s' \circ s) \in S_{n, l}$.
-We denote $\F^S_m = \{f\in\F_m~|~\forall n < m, \forall t\in\T_{n, m}, \forall f'\in\F_n, t(f') \neq f\}$ the set of S-free Boolean functions or arity $n$.
-Boolean functions are uniquely \underline{S-extractable}: $\forall f\in\F_m, \exists! (t, \tilde{f})\in \left( S_{n, m} \times \F^S_n \right), f = t(\tilde{f})$.
-Two Boolean functions $f, f'\in\F_n$ are \underline{A-equivalent} iff $\exists a\in A_n, f=a(f')$.
-Hence, if two functions are not A-equivalent, they are \underline{A-distinct}.
-Furthermore, we say that a Boolean function $f\in\F_n$ is \underline{A-invariant free} iff $\forall a\in A_n, f\neq a(f)$.
-We define $\F^A_n$ the subset of Boolean function $\F_n$ which are A-invariant free.
-Therefore, we define the constraint that $\forall n\in\N, \F^S_n \subset \F^A_n$ (i.e. a S-free Boolean function is also A-invariant free).
-N.B.: Several sets $S_{*, *}$ may fit this definition.
+The following conditions are conjectured to be necessary to ensure the canonicity (or semi-canonicity of the structure).
 
-Remark: A \GroBdd{} should ensure by construction that (1) all nodes are S-free and (2) all nodes are A-distinct.
-
-\subsubsection{Constraints on Terminals}
-Terminals are S-free ($\forall t\in T, \phi(t)\in\F^S_0$) and A-distinct ($\forall t, t'\in T, \phi(t) = \phi(t') \Rightarrow t = t'$).
-We assume defined the function $E_0: \F_0 \longrightarrow \mathtt{edge}$, such that $\forall b\in\F_0, \psi(E_0(b)) = b$. 
+The set of transformation descriptors must be uniquely mapped to the set of transformations\footnote{assuming otherwise, it exists a pair of distinct transformation descriptors that have the same semantic interpretation, therefore, we can create two structure which are distinct but equivalent}: $\forall t\in T, \exists!\gamma\in\Y, t=\rho(\gamma)$.
+Transformations produce bigger functions then their input\footnote{assuming otherwise, let $t\in\T_{n, m}$ (with $n>m$) be such a transformation, $t$ is not injective($\#\F_n > \#\F_m$), it exists a pair of distinct function which have the same image $f$ through $t$, therefore $f$ may have several representations}: $\forall n > m \in\N, \T_{n, m}=\emptyset$.
+Transformations are composable: $\forall n \leq m \leq l\in\N, \forall t\in\T_{n, m}, \forall t'\in\T_{m, l}, t' \circ t \in\T_{n, l}$.
+Hence, for all integer $n\in\N$, $\T_{n, n}$ is stable by composition.
+For all integer $n\in\N$, we define $A_n = \T_{n, n}$ the set of asymmetric transformations.
+Thus, for all pair $n, m\in\N$ of integers, we define the set of symmetric transformations $S_{n, m} \subset \T_{n, m}$, such that (1) $\forall t\in\T_{n, m}, \exists!(s, a)\in(S_{n, m}\times A_n), t = s \circ a$\footnote{remark: splitting transformations into their symmetric and asymmetric component was our "Eureka!" to solve the problem of properly defining semi-canonicty, i.e. a form of canonicity which allows nodes to be A-equivalent instead of strictly identical between to distinct representations.} and (2) $\forall n\in\N, S_{n, n} = \{Id_n\}$.
+Let $f\in\F_m (m\in\N)$ be a Boolean function, we say that $f$ is S-free iff $\forall n < m, \not\exists (t, f')\in(\T_{n, m}\times\F_n), t(f') = f$. We denote $\F^S$ the set of S-free functions and for all integer $n\in\N$, $\F^S_n  = \F^S\cap\F_n$ the set of S-free functions of arity $n$.
+For all function $f\in\F_m (m\in\N)$, $\exists!(t, f')\in(\T\times\F^S), t(f') = f$ (conjectured necessary), we respectively denote $\bar{f}$ such a $f'$ and $t_{\bar{f}\rightarrow f}$ such a $t$ (if $f$ is S-free, $\bar{f}=f$ and $t_{\bar{f}\rightarrow f} = Id$).
+We say that two Boolean functions $f, f'\in\F_n (n\in\N)$ are A-equivalent iff $\exists t\in A_n, f=t(f')$, we denote $\sim_A$ this equivalence relation (it two functions are not A-equivalent, they are A-distinct).
+We say that a Boolean function $f\in\F_n (n\in\N)$ is A-invariant free iff $\forall a\in A_n, f\neq a(f)$, we denote $\F^A\subset\F$ the set of A-invariant free function and $\F^A_n = \F^A\cap\F_n$ the set of A-invariant free function of arity $n$.
+We set the constraint that all S-free function are A-invariant free: $\F^S\subset\F^A$.
 
 
-\subsubsection{Constraints on the Building operator \texttt{B}}
+
+\subsubsection{Terminals}
+Terminals are S-free ($\forall t\in T, \phi(t)\in\F^S_0$) and A-distinct ($\forall t\neq t'\in T, \phi(t) \not\sim_A \phi(t')$).
+We assume defined the function $E_0: \F_0 \longrightarrow E$, such that $\forall b\in\F_0, \psi(E_0(b)) = b$. 
+
+
+\subsubsection{Building operator \texttt{B}}
 
 Let $X$ be a function, we denote $I_X$ the identifier of an hypothetical node whose semantic interpretation is $X$.
 For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node representing functions of arity $n$.
@@ -368,21 +369,23 @@ For all $n\in\N$, we denote $\I_n$ the set of identifiers corresponding to node 
 Let $G$ be a \GroBdd{}, we denote $v$ an internal node of $G$.
 We denote $t_0 = v.\fieldElse{}.\fieldGamma{}, I_0 = v.\fieldElse{}.\fieldNode{}, t_1 = v.\fieldThen{}.\fieldGamma{}$ and $I_1 = v.\fieldThen{}.\fieldNode{}$.
 The node $v$ is said B-stable iff $\mathtt{B}(t_0, I_0, t_1, I_1) = \mathtt{ConsNode}(Id, (t_0, I_0), (t_1, I_1))$.
+We define the "local semantic reduction" predicate $\mathcal{P}$, by for all node $v\in V$, $\mathcal{P} v$ is true iff $v$ is B-stable.
 }
 
 The exhaustive list of sufficient constraints are list in Annexes~\ref{grobdd-B-constraints} (namely: \texttt{B} is \texttt{B}-stable, \texttt{B} is S-free preserving and \texttt{B} is A-distinct preserving).
 
 
 \subsection{\GroBdd{} are (Semi-)Canonical}
-We refer the reader to Annexes (Section~\ref{grobdd-reduction}) for a proof that under previous constraints, a \GroBdd{} has the follozing properties: \begin{compactenum}
+We refer the reader to Annexes (Section~\ref{grobdd-reduction}) for a proof that under previous constraints, a \GroBdd{} has the following properties: \begin{compactenum}
 \item For all vector of Boolean function $F$ there exists a reduced \GroBdd{} $G$ representing it.
 \item A reduced \GroBdd{} $G$ is semi-canonical, defined as: \begin{compactenum}
 \item For all node $v\in V$, $\phi(v)$ is S-free.
-\item For all pair of nodes $v, v'$, $\phi(v)$ and $\phi(v')$ are A-distinct.
+\item For all pair of nodes $v, v'\in V$, $\phi(v)$ and $\phi(v')$ are A-distinct.
 \item If two edges $a$ and $a'$ represent the same function, then $a.\fieldGamma{} = a'.\fieldGamma{} \land a.\fieldNode{} = a'.\fieldNode{}$.
 \end{compactenum}
 \item Between two reduced \GroBdd{} $G$ and $G'$ representing the same vector of Boolean functions $F$, there exists a one-to-one mapping $\sigma: V \longrightarrow V'$ such that $\forall v, v' \in V \times V', \sigma(v) = v' \Rightarrow (\exists a \in A_{*}, \phi(v) = \rho(a)(\phi(v'))$.
 \end{compactenum}
+Furthermore, we can prove that, if the set of unique identifiers has no order $\I$ (i.e. the operator < is not defined on $\I$) then the structure is canonical.
 
 \subsection{Conclusion}
 
@@ -400,8 +403,8 @@ In the next section, we (1) introduce the variant \texttt{NU} and (2) compare th
 There are several interests in extracting useless variables, the more obvious one is that it tends to reduce the number of nodes (relatively to a regular ROBDD representing the same function with the same order).
 Here is a list of other interesting properties: \begin{compactitem}
 \item When formalizing a problem it may appear that there exists a sub-problem that is present several times but on different variables with the same relative order, for example: in the n-queens problem: "there is exactly one queen per line" is a constraint that either you replicate or solve once and replicate the result.
-With the \uextract{} variant, you can solve the problem once and then, by creating the appropriate edge, replicating the solution without creating new nodes.
-\item Given a function, you can know which variables are useless, just by looking at the transformation descriptor, thus without going through the whole structure.
+With the \uextract{} variant, we can solve the problem once and then, by creating the appropriate edge, replicating the solution without creating new nodes.
+\item Given a function, we can know which variables are useless, just by looking at the transformation descriptor, thus without going through the whole structure.
 \end{compactitem}
 
 \subsection{Definition}
@@ -438,10 +441,10 @@ The core program, i.e. the \GroBdd{} abstraction, is about 1~900 lines of code.
 Implementation of variant specific details about 6~100 lines of code: \texttt{N} (318 lines), \texttt{Z} (201 lines), \texttt{NU} (728 lines), \texttt{NNI} (1~939 lines) and \texttt{NU-X} (2~587 lines).
 Various useful tools are implemented (about 4~300 lines).
 All in all, this project is about 12~400 lines long.
-The implementation is made of several layers of abstraction allowing to minimize variant specific sections.
-Additionally, a significant part of the source code and computation time is dedicated to self-checking the consistency of the operation.
-During this project, we focused our efforts into finding, implementing and validating new generalizations which would reduce the number of nodes.
-However, we did not spent much time on minimizing the memory cost of our implementation, therefore, the estimated memory cost introduced in the next section should be considered carefully as an indicator.
+%The implementation is made of several layers of abstraction allowing to minimize variant specific sections.
+%Additionally, a significant part of the source code and computation time is dedicated to self-checking the consistency of the operation.
+%During this project, we focused our efforts into finding, implementing and validating new generalizations which would reduce the number of nodes.
+We did not spent much time on minimizing the memory cost of our implementation, therefore, the estimated memory cost introduced in the next section should be considered carefully (at most) as an indicator.
 Especially, because the nodes in a regular ROBDD are of constant size (e.g. 22 bytes in Minoto et al. implementation \cite{MinatoVariants}), however variants \texttt{NU}, \texttt{NNI} and \texttt{NU-X} use a variable size encoding of the transformation descriptor, which should complexifies the memory management of an industrial-proof software using these concepts.
 
 \subsubsection{Results}
@@ -494,16 +497,16 @@ $N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
 \multicolumn{5}{|c|}{pseudo-linear version} \\
 & & \multicolumn{3}{|c|}{\#node} \\
 $N$ & \#\texttt{SAT} & \texttt{NU} & \texttt{NNI} & \texttt{NU-X} \\ \hline
-1  & 1       & 1      & 0      & 0       \\
-2  & 0       & 0      & 0      & 0       \\
-3  & 0       & 0      & 0      & 0       \\
-4  & 2       & 14     & 6      & 1       \\
-5  & 10       & 73     & 15      & 6       \\
-6  & 4       & 61     & 16      & 3       \\
-7  & 40       & 348     & 39      & 30      \\
-8  & 92       & 645     & 77      & 65      \\
+1   & 1              & 1           & 0            & 0       \\
+2   & 0              & 0           & 0            & 0       \\
+3   & 0              & 0           & 0            & 0       \\
+4   & 2              & 14          & 6            & 1       \\
+5   & 10             & 73          & 15           & 6       \\
+6   & 4              & 61          & 16           & 3       \\
+7   & 40             & 348         & 39           & 30      \\
+8   & 92             & 645         & 77           & 65      \\
 \end{tabular}
-\caption{Comparing models \texttt{NU}, \texttt{NNI} and \texttt{NU-X} on the representation of the solutions of the N-Queens problems using a quadratic encoding (one variable per cell) or a pseudo-linear encoding (one integer or logarithmic size per queen).}
+\caption{Comparing models \texttt{NU}, \texttt{NNI} and \texttt{NU-X} on the representation of the solutions of the N-Queens problems using a quadratic encoding (one variable per cell) or a pseudo-linear encoding (one integer of logarithmic size per queen).}
 \label{table-nqueens}
 \end{table}
 
@@ -519,7 +522,7 @@ This problem can easily be reformulated as a Boolean function (either using an A
 We call this representation the "quadratic version" with each cell is represented (starting in the top left corner of chessboard, and then, line by line, down to the bottom right corner)
 A slightly more complex formulation, use the fact that there is exactly one queen per colon of the chessboard, thus, we can used an integer ($\log n$ Booleans) to represent its position in the colon.
 We call this representation the "pseudo-linear version", with integer being represented as interleaved Boolean vectors starting from the most significant bits.
-Numbers of node for both version on each model are summarized in Table~\ref{table-nqueens}, we display a representation of the solutions the 5-queen problem (quadratic version) in Figure~\ref{figure-nqueens}.
+Numbers of node for both version on each model are summarized in Table~\ref{table-nqueens}, we display a representation of the solutions the 5-queens problem in Figure~\ref{figure-nqueens}.
 
 
 
@@ -580,11 +583,15 @@ The node $v$ is said B-stable iff $\mathtt{B}(\gamma_0, I_0, \gamma_1, I_1) = \m
 Informally, when B returns a node, this node is \texttt{B}-stable.
 }
 
-\constraint{$\Ynode$ are \texttt{B}-stable}
-{\begin{compactenum}
-\item We assume all $\Ynode$ $v$ to be \texttt{B}-stable
+\definition{$\Ynode$}
+{A $\Ynode_{l, m, n}$ is a quadruple $(\gamma_0, I_0, \gamma_1, I_1) \in \Y_{l, n} \times \I_l \times \Y_{m, n} \times \I_m$. Let $v$ be a $\Ynode$, we denote $v.\gamma_0$ (respectively $v.I_0$, $v.\gamma_1$ and $v.I_1$) the first (respectively second, third and fourth) component of $v$.
+\begin{compactenum}
+\item For all $\Ynode$ $v$, we always assume that functions $\phi(v.I_0)$ and $\phi(v.I_1)$ are \texttt{S}-free.
+\item All pair $f, f'$ of function in $\{\phi(v.I_0) ~|~ v \in\Ynode\} \cup \{\phi(v.I_1) ~|~ v\in\Ynode\}$ are A-distinct.
+\item  $\Ynodes$ $v$ are \texttt{B}-stable
 \[\mathtt{B}(v.\fieldGamma{}_0, v.I_0, v.\fieldGamma{}_1, v.I_1) = \mathtt{ConsNode}(Id, (v.\fieldGamma{}_0, v.I_0), (v.\fieldGamma{}_1, v.I_1))\]
 \end{compactenum}
+We extend the definition of $\phi$, with : for all $\Ynode$ $v$, $\phi(v) = \rho(v.\gamma_0)(\phi(v.I_0)) \star \rho(v.\gamma_1)(\phi(v.I_1))$.
 }
 \constraint{\texttt{B} is S-free preserving}
 {The algorithm \texttt{B} is said S-free preserving iff for all $\Ynode$ $v$, $\phi(v)$ is S-free.}
