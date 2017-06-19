@@ -4,10 +4,10 @@ for file in $@
 do
 	workfile=$(python extract_name.py $file)
 	echo "$file -> $workfile"
-if false
-then
 	echo " - verilog to cp.tacx"
-	(time ./test_upgrade_benchmark_cnf_to_tacx_cp.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
+	(time ./test_upgrade_benchmark_cnf_to_tacx_cp_v2.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
+if true
+then
 	echo " - cp.tacx to nni.tacx"
 	(time ./test_upgrade_tacx_cp_to_nni.native $workfile.cp.tacx $workfile.nni.tacx)	&> $workfile.cp-to-nni.log
 	echo " - cp.tacx to cpx.tacx"
@@ -26,7 +26,6 @@ then
 	(time ./test_upgrade_pure_cp_to_nni.native $workfile.cp.tacx.pure $workfile.nni.pure)	&> $workfile.solved-cp-to-nni.log
 	echo " - cp.pure to cpx.pure"
 	(time ./test_upgrade_pure_cp_to_cpx.native $workfile.cp.tacx.pure $workfile.cpx.pure)	&> $workfile.solved-cp-to-cpx.log
-fi
 	echo " - summarize"
 	echo $workfile > $workfile.stats.log
 	./test_pure_stats.native --bryant $workfile.bryant.pure	>> $workfile.stats.log
@@ -37,4 +36,5 @@ fi
 	#./test_pure_stats.native --nni $workfile.nni.tacx.pure	>> $workfile.stats.log
 	./test_pure_stats.native --cpx $workfile.cpx.pure	>> $workfile.stats.log
 	./test_pure_stats.native --cpx $workfile.cpx.tacx.pure	>> $workfile.stats.log
+fi
 done

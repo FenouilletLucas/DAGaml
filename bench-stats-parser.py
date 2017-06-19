@@ -8,10 +8,10 @@ def onefile(NAME):
 		U = [x for x in TEXT[l-1].split(' ') if x!='']
 		U = [x for x in U[-1].split('\t') if x!='']
 		return U[-1].replace(',', '.')
-        try:
-            print(",\t".join([TEXT[0]]+list(map(select, L))))
-        except:
-            print(TEXT[0])
+	try:
+		print(",\t".join([TEXT[0]]+list(map(select, L))))
+	except:
+		print(TEXT[0])
 
 print('\n')
 for name in sys.argv[1:]:
