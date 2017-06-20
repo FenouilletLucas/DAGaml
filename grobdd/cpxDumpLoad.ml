@@ -140,7 +140,7 @@ let block_to_pretty block =
 		| false, true  -> "I"
 		| true , true  -> "O"
 	in
-	let floor = (if block.neg then "-" else "+")^(StrUtil.catmap "" (function S -> "S" | P -> "P" | X(b, 0) -> pretty_x b block.shift | X _ -> ".") block.sub) in
+	let floor = (if block.neg then "-" else "+")^(StrUtil.catmap "" (function S -> "S" | P -> "U" | X(b, 0) -> pretty_x b block.shift | X _ -> ".") block.sub) in
 	match maxX with
 	| None
 	| Some 0 -> floor

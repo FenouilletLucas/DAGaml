@@ -19,7 +19,7 @@ let dot_of_edge = dot_of_edge_aux "black"
 
 let dot_of_node node =
 	let e0, e1 = CpGops.binload_node node |> CpGops.node_split in
-	"", (dot_of_edge_aux "red" e0), (dot_of_edge_aux "green" e1)
+	"", (dot_of_edge_aux "red" e0), (dot_of_edge_aux "blue" e1)
 
 let default_leaf = ((false, []), Utils.Leaf ())
 

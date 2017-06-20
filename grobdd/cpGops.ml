@@ -7,11 +7,11 @@ open CpTypes
 open Extra
 
 let strdump_uniq_elem = function
-	| P -> "P"
+	| P -> "U"
 	| S -> "S"
 
 let strload_uniq_elem = function
-	| 'P' -> P
+	| 'U' -> P
 	| 'S' -> S
 	| _   -> assert false
 

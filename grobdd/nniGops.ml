@@ -104,8 +104,8 @@ let strdump_riuniq b =
 		| [] -> String.concat "\n" ((List.map (String.concat "") ((List.rev matrix)@[(if b then "-" else "+")::(List.rev floor)])))
 		| head::tail -> match head with
 			| IS b				-> aux (n+1) ((if b then "F" else "S")::floor) matrix tail
-			| IP (b, None)		-> aux (n+1) ((if b then "A" else "P")::floor) matrix tail
-			| IP (b, Some v)	-> aux (n+1) ((if b then "N" else "I")::floor) ((iuniq_elem n v tail)::matrix) tail
+			| IP (b, None)		-> aux (n+1) ((if b then "A" else "U")::floor) matrix tail
+			| IP (b, Some v)	-> aux (n+1) ((if b then "N" else "P")::floor) ((iuniq_elem n v tail)::matrix) tail
 	in
 	aux 0 [] []
 
