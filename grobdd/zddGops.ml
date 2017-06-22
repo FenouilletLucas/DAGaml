@@ -40,11 +40,11 @@ let eq getid = function
 
 let solve_cons getid ((xX, yX), iX) ((xY, yY), iY) =
 	assert(xX = xY);
-	match iX with
+	match iY with
 	| Utils.Leaf false ->
 	(
-		assert(yX = 0);
-		Utils.MEdge ((xY+1, yY), iY)
+		assert(yY = 0);
+		Utils.MEdge ((xX+1, yX), iX)
 	)
 	| _ ->
 	(
@@ -79,5 +79,7 @@ let node_pull getid ((x, y), i) =
 	)
 	else
 	(
-		Utils.MEdge (((x-1, 0), Utils.Leaf false), ((x-1, y), i))
+		let zero = ((x-1, 0), Utils.Leaf false)
+		and path = ((x-1, y), i) in
+		Utils.MEdge (path, zero)
 	)

@@ -5,7 +5,7 @@
 
 let make_const  b n = Cp.TACX.push_leaf (b, MyList.ntimes CpTypes.P n) ()
 
-let make_ident man b n = Cp.( *! ) man (make_const (not b) n) (make_const b n)
+let make_ident man b n = Cp.( *! ) man (make_const b n) (make_const (not b) n)
 
 let push_pass = Cp.push_pass
 
