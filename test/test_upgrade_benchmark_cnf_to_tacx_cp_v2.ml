@@ -155,18 +155,53 @@ let split3 x =
 			| None       -> aux c0 c1 (head'::cX) tail
 	in aux [] [] []
 
+
+let init_union_find n = Array.init n (fun x -> x)
+
+let rec find array x =
+	if array.(x) = x
+	then x
+	else
+	(
+		let x' = find array (array.(x)) in
+		array.(x) <- x';
+		x'
+	)
+
+let union array x y =
+	let x' = find array x
+	and y' = find array y in
+	if x' < y'
+	then array.(x') <- y'
+	else if y' < x'
+	then array.(y') <- x'
+	else ()
+
+let andsplit xmax llist =
+	let array = init_union_find xmax in
+	List.iter (function [] -> assert false | x::tail -> List.iter (union array x) tail) llist ;
+	let count = Array.make xmax 0 in
+	Array.iter (fun i -> count.(i) <- count.(i)+1) array;
+	let coupe = Array.init xmax (fun _ -> []) in
+	List.iter (function [] -> assert false | (x::_) as clause -> (let x' = find array x in coupe.(x') <- clause::(coupe.(x')))) llist;
+	let return = ref [] in
+	Array.iter (function [] -> () | list -> return := (list::(!return))) coupe;
+	List.map List.rev !return;
+
 let treefy man xmax llist =
 	let ( *! ) = Cp.( *! ) man
 	and ( &! ) = Cp.( &! ) man in
-	let rec recsplit3 x llist =	
+	let rec simp x llist =	
 		assert(x <= xmax);
 		match simplify llist with
 		| Error bool -> Cp.make_const bool (xmax-x)
-		| Ok llist -> let if0, if1, ifX = split3 x llist in
-			let if0 = recsplit3 (x+1) if0
-			and if1 = recsplit3 (x+1) if1
-			and ifX = recsplit3 (x+1) ifX in
-			(Cp.no ((Cp.no if1) *! (Cp.no if0))) &! (Cp.push_pass ifX)
+		| Ok llist -> Oops.vec_et (&!)
+	and		split llist =
+		let if0, if1, ifX = split3 x llist in
+		let if0 = recsplit3 (x+1) if0
+		and if1 = recsplit3 (x+1) if1
+		and ifX = recsplit3 (x+1) ifX in
+		(Cp.no ((Cp.no if1) *! (Cp.no if0))) &! (Cp.push_pass ifX)
 	in recsplit3 0 llist
 
 
