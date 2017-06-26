@@ -177,6 +177,8 @@ let union array x y =
 	then array.(y') <- x'
 	else ()
 
+(*
+
 let andsplit xmax llist =
 	let array = init_union_find xmax in
 	List.iter (function [] -> assert false | x::tail -> List.iter (union array x) tail) llist ;
@@ -188,15 +190,16 @@ let andsplit xmax llist =
 	Array.iter (function [] -> () | list -> return := (list::(!return))) coupe;
 	List.map List.rev !return;
 
+*)
+
 let treefy man xmax llist =
 	let ( *! ) = Cp.( *! ) man
 	and ( &! ) = Cp.( &! ) man in
-	let rec simp x llist =	
+	let rec recsplit3 x llist =	
 		assert(x <= xmax);
 		match simplify llist with
 		| Error bool -> Cp.make_const bool (xmax-x)
-		| Ok llist -> Oops.vec_et (&!)
-	and		split llist =
+		| Ok llist ->
 		let if0, if1, ifX = split3 x llist in
 		let if0 = recsplit3 (x+1) if0
 		and if1 = recsplit3 (x+1) if1

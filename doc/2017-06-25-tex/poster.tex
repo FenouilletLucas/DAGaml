@@ -4,37 +4,42 @@
 \usepackage{times}
 \usepackage{amsmath,amsthm, amssymb, latexsym}
 \boldmath
+
+%\usetheme{Berlin}
+\usetheme{Copenhagen}
  
 %\usetheme{Sharelatex}
 \usepackage[orientation=portrait,size=a0,scale=1.4,debug]{beamerposter}
  
-\title[GroBdd]{A Generalized Reduction of Ordered Binary Decision Diagram}
-\author[joan.thibault@ens-rennes.fr]{Joan Thibault}
-\institute[DFKI]{Deutsches Forschungszentrum für Künstliche Intelligenz}
-\date{\today}
+\title[GroBdd : A Generalized Reduction of Ordered Binary Decision Diagram]{A Generalized Reduction of Ordered Binary Decision Diagram\\
+  {\small Internship supervised by Rolf Drechsler (DFKI, Bremen, Germany)}}
+\author[Joan Thibault, joan.thibault@ens-rennes.fr, +33.6.21.70.56.71]{Joan Thibault}
+\date{July 3, 2017}
  
 %\logo{\includegraphics[height=7.5cm]{SharelatexLogo}}
 
-
-
-
+\begin{document}
+\begin{frame}{} 
+\maketitle
+\vfill
+\begin{block}{\large Introduction to Reduced Ordered Binary Decision Diagrams (ROBDDs)}
+\begin{block}{Definition}
+ROBDDs are a common and efficient way of canonically representing Boolean functions as Directed Acyclic Graphs.
+They have applications in various fields, such as logic synthesis, artificial intelligence and combinatorics. 
+They allow to quickly perform various operations such as : equality (\textbf{O(1)}), finding a solution (\textbf{O(\#variable)}), evaluation (\textbf{O(\#variable)}).
+ROBDDs can be combined using Boolean operators (OR, AND, XOR) and quantified in quadratic time (\textbf{O(\#node)}).
+\end{block}
+\begin{block}{Issues}
+However, efficiently manipulating ROBDDs requires a lot of memory.
+In order to reduce their size, several variations have been introduced.
+\end{block}
+\begin{block}{}
+\end{block}
+\end{block}.
  
-  \begin{document}
-  \begin{frame}{} 
-    \vfill
-    \begin{block}{\large Fontsizes}
-      \centering
-      {\tiny tiny}\par
-      {\scriptsize scriptsize}\par
-      {\footnotesize footnotesize}\par
-      {\normalsize normalsize}\par
-      ...
-    \end{block}
- 
-    \end{block}
     \vfill
     \begin{columns}[t]
-      \begin{column}{.30\linewidth}
+      \begin{column}{.40\linewidth}
         \begin{block}{Introduction}
           \begin{itemize}
           \item some items
@@ -43,7 +48,7 @@
           \end{itemize}
         \end{block}
       \end{column}
-      \begin{column}{.48\linewidth}
+      \begin{column}{.40\linewidth}
         \begin{block}{Introduction}
           \begin{itemize}
           \item some items and $\alpha=\gamma, \sum_{i}$
@@ -55,6 +60,8 @@
  
       \end{column}
     \end{columns}
+    
+    
   \end{frame}
 \end{document}
 
