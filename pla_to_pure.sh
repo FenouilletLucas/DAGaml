@@ -3,9 +3,9 @@ for file in $@
 do
 	workfile=$(python extract_name.py $file)
 	echo "$file -> $workfile"
-if false
+if true
 then
-	echo "    -  verilog to  cp.tacx"
+	echo "    -  PLA     to  cp.tacx"
 	(time ./test_upgrade_benchmark_pla_to_tacx_cp.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
 	echo "    -  cp.tacx to nni.tacx"
 	(time ./test_upgrade_tacx_cp_to_nni.native $workfile.cp.tacx $workfile.nni.tacx)	&> $workfile.cp-to-nni.log
