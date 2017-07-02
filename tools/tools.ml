@@ -112,3 +112,12 @@ let int_of_bin bl =
 	in aux 0 (List.rev bl)
 
 let char_of_bin bl = Char.chr ( int_of_bin bl )
+
+(* with [p] a predicate and [a] an array *)
+let array_index (p : 'a -> bool) (a : 'a array) : int option =
+	let n = Array.length a in
+	let rec aux x =
+			if x < n
+			then (if p a.(x) then Some x else aux (x+1))
+			else None
+	in aux 0

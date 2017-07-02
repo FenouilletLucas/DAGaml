@@ -4,7 +4,7 @@ for file in $@
 do
 	workfile=$(python extract_name.py $file)
 	echo "$file -> $workfile"
-if false
+if true
 then
 	echo " - verilog to cp.tacx"
 	(time ./test_upgrade_benchmark_cnf_to_tacx_cp_v2.native $file $workfile.cp.tacx) 		&> $workfile.v-to-cp.log
@@ -23,7 +23,7 @@ then
 fi
 	echo " - cp.pure to zdd.pure"
 	(time ./test_downgrade_pure_cp_to_zdd.native $workfile.cp.tacx.pure $workfile.zdd.pure)	&> $workfile.solved-cp-to-zdd.log
-if false
+if true
 then
 	echo " - cp.pure to nni.pure"
 	(time ./test_upgrade_pure_cp_to_nni.native $workfile.cp.tacx.pure $workfile.nni.pure)	&> $workfile.solved-cp-to-nni.log

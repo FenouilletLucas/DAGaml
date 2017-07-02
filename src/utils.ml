@@ -12,6 +12,10 @@ type ('leaf, 'node) gnode =
 	| Leaf of 'leaf
 	| Node of 'node
 
+let gnode_is_leaf = function
+	| Leaf _ -> true
+	| Node _ -> false
+
 type ('stop, 'left, 'right, 'both) binpull =
 	| MStop of 'stop
 	| Go0   of 'left

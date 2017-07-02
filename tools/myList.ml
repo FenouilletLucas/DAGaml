@@ -133,6 +133,14 @@ let list_index item =
 			else (aux (pos+1) tail)
 	in aux 0
 
+let ifind (p : 'a -> 'b option) : 'a list -> (int * 'b) option =
+	let rec aux pos = function
+		| [] -> None
+		| head::tail -> match p head with
+			| None -> aux (pos+1) tail
+			| Some obj -> Some(pos, obj)
+	in aux 0
+
 let hdtl = function
 	| []	-> assert false
 	| x::y	-> x, y
