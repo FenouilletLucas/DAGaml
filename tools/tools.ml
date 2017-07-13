@@ -63,11 +63,16 @@ let opmm x = function
 
 
 
-let rec math_pow x = function
-	| 0	-> 1
-	| 1	-> x
-	| n when n mod 2 = 0	-> math_pow (x*x) (n/2)
-	| n						-> x*(math_pow (x*x) (n/2))
+let rec math_pow = function
+	| 0 -> (function 0 -> 1 | _ -> 0)
+	| 1 -> (fun _ -> 1)
+	| 2 -> (fun x -> 1 lsl x)
+	| x -> (function
+		| 0	-> 1
+		| 1	-> x
+		| n when n mod 2 = 0	-> math_pow (x*x) (n/2)
+		| n						-> x*(math_pow (x*x) (n/2))
+	)
 
 let math_log x =
 	let rec aux = function
@@ -76,6 +81,20 @@ let math_log x =
 		| n when n < x	-> 1
 		| n				-> 1+(aux (n/x))
 	in (fun x -> assert(x > 0); aux x)
+
+let math_log_up x y =
+	assert(x > 0);
+	assert(y > 0);
+	let z = math_log x y in
+	let z' = if y > (math_pow x z)
+		then (z+1)
+		else z
+	in
+	assert(z' >= 0);
+	if z = 0
+		then (assert(y = 1))
+		else (assert(math_pow x (z'-1) < y && y <= math_pow x z'));
+	z'
 
 let string_of_option string_of = function
 	| None -> "None"

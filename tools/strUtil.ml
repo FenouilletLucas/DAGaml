@@ -8,8 +8,8 @@ let bool_of_char = function
 	| '0'	-> false
 	| _		-> failwith "[tools/strUtil] bool parsing failure - 7"
 let string_of_bool = function
-	| true	-> "1"
-	| false	-> "0"
+	| true	-> "true"
+	| false	-> "false"
 let pretty_of_bool = function
 	| true	-> "1"
 	| false	-> "."
@@ -71,3 +71,5 @@ let split (c:char) (s:string) : string list =
 	in aux [] 0
 
 let ntimes s n = String.concat "" (MyList.ntimes s n)
+
+let print_stream stream = print_string(catmap "" Tools.string_of_bool stream)

@@ -13,7 +13,7 @@ type spx_tag = {hasS : bool; hasP : bool; maxX : int option}
 type block_choice =
 	| C0
 	| Id  of int
-	| SPX of bool * spx_tag * (elem list)
+	| SPX of (bool * spx_tag * (elem list))
 
 type block = {
 	neg		: bool;

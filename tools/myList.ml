@@ -133,6 +133,15 @@ let list_index item =
 			else (aux (pos+1) tail)
 	in aux 0
 
+let index p =
+	let rec aux pos = function
+		| [] -> None
+		| head::tail ->
+			if p head
+			then Some pos
+			else (aux(pos+1) tail)
+	in aux 0
+
 let ifind (p : 'a -> 'b option) : 'a list -> (int * 'b) option =
 	let rec aux pos = function
 		| [] -> None

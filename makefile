@@ -88,6 +88,13 @@ extra:
 		test/test_downgrade_pure_cpx_to_bryant.native \
 		tools/binStream.native \
 		tools/oStream.native \
+		grobdd/cpxTypes2.native \
+		grobdd/cpxUtils2.native \
+		grobdd/cpxUtils2Test.native \
+		grobdd/cpxUtils2Test.d.byte \
+		grobdd/cpxDumpLoad2.native \
+		grobdd/cpxDumpLoad2Test.native \
+		grobdd/cpxDumpLoad2Test.d.byte
 
 extraephe:
 		$(OB) \

@@ -21,3 +21,4 @@ val index_from: string -> int -> char -> int option
 val split: char -> string -> string list
 
 val ntimes : string -> int -> string
+val print_stream : bool list -> unit
