@@ -94,7 +94,10 @@ extra:
 		grobdd/cpxUtils2Test.d.byte \
 		grobdd/cpxDumpLoad2.native \
 		grobdd/cpxDumpLoad2Test.native \
-		grobdd/cpxDumpLoad2Test.d.byte
+		grobdd/cpxDumpLoad2Test.d.byte \
+		grobdd/cpxGops2.native \
+		grobdd/cpxGops2Test.native \
+		grobdd/cpxGops2Test.d.byte
 
 extraephe:
 		$(OB) \

@@ -44,18 +44,25 @@ let subset_t special default =
 	in (fun idx size -> assert((idx>=0)&&(size>=0)&&(idx<size)); aux(idx, size))
 
 
-let opmax x = function
-	| Some y	-> Some (max x y)
-	| None		-> Some x
+let opfold_left f x = function
+	| Some y -> Some(f x y)
+	| None   -> Some x
 
-let opmin x = function
-	| Some y	-> Some (min x y)
-	| None		-> Some x
+let opfold_right f = function
+	| Some x -> (fun y -> Some(f x y))
+	| None   -> (fun y -> Some y)
 
-let opopmin x y = match x, y with
-    | None, None -> None
-    | Some x, Some y -> Some (min x y)
-    | ((Some _) as r), None | None, ((Some _) as r) -> r
+let opopfold f x y = match x, y with
+	| None  , None   -> None
+  | Some z, None
+	| None  , Some z -> Some z
+  | Some x, Some y -> Some (f x y)
+	
+
+let opmax x = opfold_left max x
+let opmin x = opfold_left min x
+
+let opopmin x = opopfold min x
 
 let opmm x = function
 	| Some (mini, maxi)	-> Some (min mini x, max maxi x)

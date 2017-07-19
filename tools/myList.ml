@@ -46,8 +46,10 @@ let opmap2 opfun liste1 liste2 = list_of_oplist (List.map2 opfun liste1 liste2)
 let sum = List.fold_left (+) 0
 
 let count f l = sum(l||>(fun x -> if f x then 1 else 0))
+let counti f l = sum(List.mapi (fun i x -> if (f i x) then 1 else 0)l)
 
 let count_true = count (fun x -> x)
+let counti_true = counti (fun _ x -> x)
 
 let ntimes x =
 	let rec aux carry = function
@@ -234,12 +236,13 @@ let indexify_true = indexify (fun x -> x)
 let foldmap func check init =
 	let rec aux carry fold = function
 		| [] -> (List.rev carry, fold)
-		| head::tail ->	(
+		| head::tail ->
+		(
 			(*(check fold) is true*)
-			let head', fold' = func head fold in
+			let head', fold' = func fold head in
 			assert(check fold');
 			aux (head'::carry) fold' tail
-						)
+		)
 	in
 	assert(check init);
 	aux [] init

@@ -92,7 +92,7 @@ let push_P_block_choice = function
 
 let push_P_block block = {neg = block.neg; arity = block.arity+1; block = push_P_block_choice block.block}
 
-let push_P_node (block, node) = (push_P_block block, node)
+let push_P_edge (block, node) = (push_P_block block, node)
 
 let minicheck_spx = List.for_all (function X(_, i) when i < 0 -> false | _ -> true)
 
@@ -177,7 +177,8 @@ let assert_block_spx arity (shift, tag, liste) next_is_leaf  =
 			assert(next_is_leaf => (shift && (MyList.count isX liste > 1)))
 		| Some maxX ->
 		assert(
-			(0 <= maxX) && (maxX < arity) &&
+			(0 < maxX) && (maxX < arity) &&
+			(MyList.count isX liste >= maxX+1) &&
 			(next_is_leaf => (((mod2 maxX) <> shift)))
 		)
 	;
@@ -188,12 +189,14 @@ let check_block_spx arity (shift, tag, liste) next_is_leaf : bool =
 	(arity = List.length liste)&&
 	(check_spx_tag tag liste)&&
 	(next_is_leaf => (not tag.hasS))&&
+	(tag.maxX = None => (shift = false))&&
 	(match tag.maxX with
-		| None -> (not shift)&&(not next_is_leaf)
+		| None -> (not shift)&&(next_is_leaf => tag.hasS)
 		| Some 0 ->
 			(next_is_leaf => (shift && (MyList.count isX liste > 1)))
 		| Some maxX ->
-			(0 <= maxX) && (maxX < arity) &&
+			(0 < maxX) && (maxX < arity) &&
+			(MyList.count isX liste >= maxX+1) &&
 			(next_is_leaf => (((mod2 maxX) <> shift)))
 	)&&
 	(spx_is_contig (shift, tag, liste) next_is_leaf)
@@ -222,10 +225,10 @@ let check_block block next_is_leaf =
 	(0 <= block.arity) &&
 	(check_block_choice block.arity next_is_leaf block.block)
 
-let check_node (block, node) = check_block block (Utils.gnode_is_leaf node)
+let check_edge (block, node) = check_block block (Utils.gnode_is_leaf node)
 
 
-let reduce_block_spx neg arity next_is_leaf (shift, tag, liste) =
+let reduce_block_spx neg arity next_is_leaf shift liste =
 	assert(List.length liste = arity);
 	assert(minicheck_spx liste); (* just checks that Xs are positive *)
 	let tag = get_spx_tag_from_block_spx liste in
@@ -248,7 +251,7 @@ let reduce_block_spx neg arity next_is_leaf (shift, tag, liste) =
 				let shift = shift <> (mod2 minX) in
 				let rec aux carry opt curr =
 					assert(curr >= opt);
-					if curr < maxX
+					if curr <= maxX
 					then if cnt.(curr) > 0
 						then if mod2 (curr-opt) <> (mod2 minX)
 							then (aux ((opt+1)::carry) (opt+1) (curr+1))
@@ -256,7 +259,8 @@ let reduce_block_spx neg arity next_is_leaf (shift, tag, liste) =
 						else (aux ((-1)::carry) opt (curr+1))
 					else (carry |> List.rev |> Array.of_list)
 				in
-				let remap = aux (0::(if minX > 0 then (MyList.make (minX-1) (-1)) else [])) 0 (minX+1) in
+				let remap = aux (0::(MyList.make minX (-1))) 0 (minX+1) in
+				assert(Array.length remap = maxX+1);
 				let liste = List.map (function S -> S | P -> P | X(b, i) -> X(b, remap.(i))) liste in
 				let maxX = Array.fold_left max (-1) remap in
 				assert(maxX >= 0);
@@ -308,13 +312,13 @@ let reduce_block_spx neg arity next_is_leaf (shift, tag, liste) =
 let reduce_block_choice neg arity next_is_leaf = function
 	| C0 -> {neg; arity; block = C0}
 	| Id x -> assert(0 <= x && x < arity); {neg; arity; block = Id x}
-	| SPX block_spx -> reduce_block_spx neg arity next_is_leaf block_spx
+	| SPX (shift, _, liste) -> reduce_block_spx neg arity next_is_leaf shift liste
 
 let reduce_block block next_is_leaf =
 	assert(0 <= block.arity);
 	reduce_block_choice block.neg block.arity next_is_leaf block.block
 
-let reduce_node (block, node) =
+let reduce_edge (block, node) =
 	reduce_block block (Utils.gnode_is_leaf node)
 
 let push_X0_block_spx iB tB (* if, rank = 0, then *) neg arity (shift, tag, liste) next_is_leaf =
@@ -361,6 +365,9 @@ let push_X0_block_choice iB tB (* if, rank = 0, then *) neg arity next_is_leaf =
 let push_X0_block iB tB (* if, rank = 0, then *) block next_is_leaf =
 	push_X0_block_choice iB tB block.neg block.arity next_is_leaf block.block
 
+let push_X0_edge iB tB (* if, rank = 0, then *) (block, node) =
+	(push_X0_block iB tB block (Utils.gnode_is_leaf node), node)
+
 let count_nS_spx = MyList.count isS
 
 let count_nS_block_choice = function
@@ -370,16 +377,15 @@ let count_nS_block_choice = function
 let count_nS_block block = count_nS_block_choice block.block
 let count_nS_edge (block, node) = count_nS_block block
 
-let make_block_S n =
-	assert(n>=0);
-	{neg = false; arity = n; block = SPX(false, {hasS = n > 0; hasP = false; maxX = None}, make_nS n)}
+let make_block_S neg arity =
+	assert(arity>=0);
+	{neg; arity; block = SPX(false, {hasS = arity > 0; hasP = false; maxX = None}, make_nS arity)}
 
-let make_block2_S n =
-	let block = make_block_S n in
-	(block, block)
+let make_block2_S (negX, negY) n =
+	(make_block_S negX n, make_block_S negY n)
 
-let cmake_nSS block = make_block2_S (count_nS_block block)
-let cmake_nS  block = make_block_S  (count_nS_block block)
+let cmake_nS  neg  block = make_block_S  neg  (count_nS_block block)
+let cmake_nSS negs block = make_block2_S negs (count_nS_block block)
 
 let tacx_split (ttag, block) =
 	let blockX, blockY = block_split block in
@@ -406,11 +412,11 @@ let compose_block_spx_spx (shift, tag, liste) (shift', tag', liste') =
 		in
 		aux [] (spxC, spxc)
 	in
-	let maxX, liste = match tag.maxX with
+	let shift, maxX, liste = match tag.maxX with
 	| None ->
 	(
 		assert(shift = false);
-		(tag'.maxX, compose0 liste liste')
+		(shift', tag'.maxX, compose0 liste liste')
 	)
 	| Some maxX ->
 	(
@@ -418,12 +424,12 @@ let compose_block_spx_spx (shift, tag, liste) (shift', tag', liste') =
 		| None ->
 		(
 			assert(shift' = false);
-			(tag.maxX, compose0 liste liste')
+			(shift, tag.maxX, compose0 liste liste')
 		)
 		| Some maxX' ->
 		(
 			let shiftX = if (shift <> (mod2 maxX)) = shift' then maxX else (maxX+1) in
-			(Some(shiftX+maxX'), compose shiftX liste liste')
+			(shift, Some(shiftX+maxX'), compose shiftX liste liste')
 		)
 	)
 	in
@@ -431,41 +437,53 @@ let compose_block_spx_spx (shift, tag, liste) (shift', tag', liste') =
 	(shift, tag, liste)
 
 let compose_block blockC blockc next_is_leaf =
+	assert(check_block blockC false);
+	assert(check_block blockc next_is_leaf);
 	assert(count_nS_block blockC = blockc.arity);
 	match blockC.block with
 	| C0 | Id _ -> assert false
 	| SPX(shift, tag, liste) ->
-	match tag.maxX with
+	let blockCc = match tag.maxX with
 	| None ->
 	(
+		(* block SP *)
 		(* no need for reduction *)
 		assert(shift = false);
 		match blockc.block with
 		| C0 ->
 		(
 			assert(next_is_leaf);
-			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = SPX(shift <> blockc.neg, tag, liste)}
+			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = C0}
 		)
 		| Id x ->
 		(
 			assert(next_is_leaf);
 			(* blockC is SPX but only one S and no X *)
-			let y = MyList.index isS liste |> Tools.unop in
-			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = Id (y+x)}
+			let rec aux posC posc : _ list -> int = assert(posc>=0); function
+					| [] -> assert false
+					| head::tail -> match head with
+						| S -> if posc=0
+							then posC
+							else (aux (posC+1) (posc-1) tail)
+						| _ ->  aux (posC+1)  posc    tail
+			in
+			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = Id (aux 0 x liste)}
 		)
 		| SPX(shift', tag', liste') -> 
 		(
-			let block_spx = compose_block_spx_spx (shift <> blockc.neg, tag, liste) (shift', tag', liste') in
+			let block_spx = compose_block_spx_spx (false, tag, liste) (shift', tag', liste') in
 			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = SPX block_spx}
 		)
 	)
 	| Some maxX ->
 	(
 		(* needs reduction *)
-		let blockCc = match blockc.block with
+		match blockc.block with
 		| C0 ->
 		(
 			assert(next_is_leaf);
+			let tag = {hasS = false; hasP = tag.hasP || tag.hasS; maxX = tag.maxX} in
+			let liste = List.map (function S -> P |  e -> e) liste in
 			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = SPX(shift <> blockc.neg, tag, liste)}
 		)
 		| Id x ->
@@ -480,9 +498,9 @@ let compose_block blockC blockc next_is_leaf =
 			let block_spx = compose_block_spx_spx (shift <> blockc.neg, tag, liste) (shift', tag', liste') in
 			{neg = blockC.neg <> blockc.neg; arity = blockC.arity; block = SPX block_spx}
 		)
-		in
-		reduce_block blockCc next_is_leaf
 	)
+	in
+	reduce_block blockCc next_is_leaf
 
 let compose_edge blockC (blockc, nodec) = (compose_block blockC blockc (Utils.gnode_is_leaf nodec), nodec)
 
@@ -490,3 +508,57 @@ let get_root b (block, _) = ({neg = b; arity = block.arity; block = C0}, Utils.L
 
 let neg (block, node) = ({neg = not block.neg; arity = block.arity; block = block.block}, node)
 let cneg b (block, node) = ({neg = b <> block.neg; arity = block.arity; block = block.block}, node)
+
+let assign_edge : bool option list option -> _ -> _ * bool option list option = function
+	| None -> fun edge -> (edge, None)
+	| Some set ->
+	(
+		let arity = List.length set in
+		let arity' = MyList.count (function None -> true | _ -> false) set in
+		fun (block, node) ->
+			assert(check_edge (block, node));
+			assert(arity = block.arity);
+			match block.block with
+			| C0 -> (({neg = block.neg; arity = arity'; block = C0}, Utils.Leaf()), None)
+			| Id x ->
+			(
+				match List.nth set x with
+				| Some b -> (({neg = block.neg <> b; arity = arity'; block = C0}, Utils.Leaf()), None)
+				| None ->
+				(
+					let x' = MyList.counti (fun i -> function None when i < x -> true | _ -> false) set in
+					(({neg = block.neg; arity = arity'; block = Id x'}, Utils.Leaf()), None)
+				)
+			)
+			| SPX(shift, tag, liste) ->
+			(
+				let opsubopset, opmin = MyList.foldmap (fun (opmin : int option) -> fun ((set : bool option), elem) -> match set with
+					| None      -> ((Some elem, (match elem with S -> Some None | _ -> None)), opmin)
+					| Some set  -> match elem with
+						| P		    -> ((None     , None	                                      ), opmin)
+						| S		    -> ((None     , Some (Some set)                             ), opmin)
+						| X(b, i) -> let opmin = if b = set then Tools.opmin i opmin else opmin in
+												 ((None     , None                                        ), opmin)
+					) (fun _ -> true) None (List.combine set liste) in
+				let opliste, opset = List.split opsubopset in
+				let liste = MyList.list_of_oplist opliste
+				and set   = MyList.list_of_oplist opset   in
+				match opmin with
+				| None ->
+				(
+					let block = reduce_block_spx block.neg arity' (Utils.gnode_is_leaf node) shift liste in
+					((block, node), (if List.for_all ((=)None) set then None else (Some set)))
+				)
+				| Some min ->
+				(
+					let liste = List.map (function X(_, i) as e when i < min -> e | _ -> P) liste in
+					let neg = block.neg <> shift <> (mod2 min) in
+					let block = reduce_block_spx neg arity' true (mod2 min) liste in
+					((block, Utils.Leaf()), None)
+				)
+			)
+	)
+
+let assign_dummydump = function
+	| None -> "None"
+	| Some set -> "["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) set)^"]"
