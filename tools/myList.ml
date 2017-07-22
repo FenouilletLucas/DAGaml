@@ -40,6 +40,8 @@ let list_of_oplistv4 =
 
 let list_of_oplist = list_of_oplistv4
 
+let unop = list_of_oplist
+
 let opmap opfun liste = list_of_oplist (List.map opfun liste)
 let opmap2 opfun liste1 liste2 = list_of_oplist (List.map2 opfun liste1 liste2)
 
@@ -281,3 +283,7 @@ let last =
 	in function
 		| [] -> assert false
 		| liste -> aux [] liste
+
+let setnth liste x e =
+	assert(0 <= x && x < (List.length liste));
+	List.mapi (fun i -> if i = x then (fun _ -> e) else (fun y -> y)) liste

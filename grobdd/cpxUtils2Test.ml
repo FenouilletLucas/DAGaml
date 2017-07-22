@@ -138,7 +138,6 @@ Iter.iter (fun blockA ->
 
 print_string "TEST 4.0 : check assign returns correct block"; print_newline();;
 
-let gen_assign n = (Iter.of_list [None; Some false; Some true]) $^ n;;
 
 Iter.iter (fun (block : block) ->
 	if (check_block block false)

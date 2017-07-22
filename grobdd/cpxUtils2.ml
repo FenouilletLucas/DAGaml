@@ -5,6 +5,8 @@
 
 open CpxTypes2
 
+let arity_edge (block, _) = block.arity
+
 let (=>) (x:bool) (y:bool) : bool = (x <= y)
 (*
 assert((false => false) = true )
@@ -128,6 +130,10 @@ let get_spx_tag arity = function
 		assert(check_spx_tag tag liste);
 		tag
 
+let get_maxX_block block = match block.block with
+	| C0 | Id _ -> None
+	| SPX(_, tag, _) -> tag.maxX
+
 (**	Determine (if possible) the value of the function according to its top descriptor [block] for the valuation [x]
 		Returns [None] otherwise
  **)
@@ -207,8 +213,8 @@ let assert_block_choice arity next_is_leaf = function
 	| SPX block_spx -> assert_block_spx arity block_spx next_is_leaf; ()
 
 let check_block_choice arity next_is_leaf = function
-	| C0 -> true
-	| Id x -> (x >= 0) && (x < arity)
+	| C0 -> next_is_leaf
+	| Id x -> next_is_leaf && (x >= 0) && (x < arity)
 	| SPX block_spx -> check_block_spx arity block_spx next_is_leaf
 
 let assert_block block next_is_leaf =
@@ -321,6 +327,11 @@ let reduce_block block next_is_leaf =
 let reduce_edge (block, node) =
 	reduce_block block (Utils.gnode_is_leaf node)
 
+let spx_liste_to_edge neg shift (liste, node) =
+	let block = reduce_block_spx neg (List.length liste) (Utils.gnode_is_leaf node) shift liste in
+	(block, node)
+	
+
 let push_X0_block_spx iB tB (* if, rank = 0, then *) neg arity (shift, tag, liste) next_is_leaf =
 	match tag.maxX with
 	| None ->
@@ -357,8 +368,9 @@ let push_X0_block_choice iB tB (* if, rank = 0, then *) neg arity next_is_leaf =
 		assert(next_is_leaf);
 		let tag = {hasS = false; hasP = arity>1; maxX = Some 0} in
 		let tB' = tB <> neg in
+		assert(arity >= x+1);
 		let liste = (X(iB, 0))::((make_nP x)@((X(tB', 0))::(make_nP (arity-x-1)))) in
-		{neg = not tB; arity = arity+1; block = SPX(tB', tag, liste)}
+		{neg = not tB; arity = arity+1; block = SPX(true, tag, liste)}
 	)
 	| SPX block_spx -> push_X0_block_spx iB tB neg arity block_spx next_is_leaf
 
@@ -381,11 +393,22 @@ let make_block_S neg arity =
 	assert(arity>=0);
 	{neg; arity; block = SPX(false, {hasS = arity > 0; hasP = false; maxX = None}, make_nS arity)}
 
+let make_block_C0 neg arity =
+	{neg; arity; block = C0}
+
+let make_edge_C0 neg arity = (make_block_C0 neg arity, Utils.Leaf())
+	
+
+let make_block_P neg arity next_is_leaf =
+	assert(arity>=0);
+	{neg; arity; block = if next_is_leaf then C0 else SPX(false, {hasS = false; hasP = arity>0; maxX = None}, MyList.ntimes P arity)}
+
 let make_block2_S (negX, negY) n =
 	(make_block_S negX n, make_block_S negY n)
 
 let cmake_nS  neg  block = make_block_S  neg  (count_nS_block block)
 let cmake_nSS negs block = make_block2_S negs (count_nS_block block)
+
 
 let tacx_split (ttag, block) =
 	let blockX, blockY = block_split block in
@@ -504,6 +527,15 @@ let compose_block blockC blockc next_is_leaf =
 
 let compose_edge blockC (blockc, nodec) = (compose_block blockC blockc (Utils.gnode_is_leaf nodec), nodec)
 
+let compose_utils_merge blockC = function
+	| Utils.MEdge edge -> Utils.MEdge(compose_edge blockC edge)
+	| Utils.MNode (block, node) -> Utils.MNode(compose_block blockC block false, node)
+
+let compose_utils_merge3 blockC = function
+	| Utils.M3Edge edge -> Utils.M3Edge(compose_edge blockC edge)
+	| Utils.M3Cons (block, node) -> Utils.M3Cons(compose_block blockC block false, node)
+	| Utils.M3Node (block, node) -> Utils.M3Node(compose_block blockC block false, node)
+
 let get_root b (block, _) = ({neg = b; arity = block.arity; block = C0}, Utils.Leaf())
 
 let neg (block, node) = ({neg = not block.neg; arity = block.arity; block = block.block}, node)
@@ -558,6 +590,35 @@ let assign_edge : bool option list option -> _ -> _ * bool option list option = 
 				)
 			)
 	)
+
+let check_peval = function
+	| None -> true
+	| Some peval -> List.exists (function Some _ -> true | None -> false) peval
+
+let compose_peval pevalC pevalc =
+	(* WARNING : arity(pevalC) <= arity(pevalc) *)
+	match pevalC, pevalc with
+	| None, None               -> None
+	| Some peval, None
+	| None, Some peval         -> Some peval
+	| Some pevalC, Some pevalc ->
+	(
+		let rec aux carry = function
+			| ([]   , []       ) -> List.rev carry
+			| (_    , []       ) 
+			| ([]   , None:: _ ) -> assert false
+			| (x::x', None::y' ) -> aux (x::carry) (x', y')
+			| (x'   , y::y'    ) -> aux (y::carry) (x', y')
+		in Some(aux [] (pevalC, pevalc))
+	)
+
+let assign_pedge peval (block, pnode) =
+	let (block', pnode'), peval' = assign_edge peval (block, pnode) in
+	let pnode' = match pnode' with
+		| Utils.Leaf () -> assert(peval' = None); Utils.Leaf()
+		| Utils.Node (peval, node) -> Utils.Node(compose_peval peval' peval, node)
+	in
+	(block', pnode')
 
 let assign_dummydump = function
 	| None -> "None"
