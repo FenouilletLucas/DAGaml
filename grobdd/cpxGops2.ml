@@ -272,25 +272,6 @@ let node_pull ((block, node) as edge) =
 				Utils.MEdge (Tools.cswap b (edge_then, edge_else))
 		)
 
-let solve_and_id_spx_no_merge x shift liste =
-	let rec aux carryC carryc i = function
-		| [] -> (List.rev carryC, List.rev carryc)
-		| head::tail -> match head with
-			| P when i<>x  -> (aux (P::carryC)        carryc  (i+1) tail)
-			| _            -> (aux (S::carryC) (head::carryc) (i+1) tail)
-	in
-	let listeC, listec = aux [] [] 0 liste in
-	let tagC = get_spx_tag_from_block_spx listeC
-	and tagc = get_spx_tag_from_block_spx listec in
-	let rec aux n i = function
-		| [] -> assert false
-		| head::tail -> if i = x then n else match head with
-			| P -> aux  n    (i+1) tail
-			| _ -> aux (n+1) (i+1) tail
-	in
-	(false, tagC, listeC), (List.length listec), (aux 0 0 liste), (shift, tagc, listec)
-
-
 
 let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
 	assert(check_edge edge0);
@@ -344,30 +325,29 @@ let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx
 		assert(check_block blockC false);
 		Utils.M3Edge(compose_edge blockC (assign_pedge peval edge0))
 	)
-	| SPX spx0, SPX spx1 -> ifspx2 block0.arity block0.neg block1.neg (spx0, pnode0) (spx1, pnode1)
+	| SPX spx0, SPX spx1 -> if spx0 = spx1 && pnode0 = pnode1
+		then (Utils.M3Edge (if block0.neg = block1.neg
+			then edge0
+			else (make_edge_C0 false block0.arity)))
+		else (ifspx2 block0.arity block0.neg block1.neg (spx0, pnode0) (spx1, pnode1))
 
-let final_and_ifspx2 arity neg0 neg1 (spx0, pnode0) (spx1, pnode1) =
-	Utils.MNode (
-		make_block_S false (arity+1),
-		((
-			{neg = neg0; arity; block = SPX spx0},
-			{neg = neg1; arity; block = SPX spx1}
-		), pnode0, pnode1)
-	)
 
 exception Return_False
 
-let rec facto_and_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0) as spx0), pnode0) (((shift1, tag1, liste1) as spx1), pnode1) =
-	let factoPP () =
-		let cfun = function (P, P) -> P, None | (x, y) -> (S, Some(x, y)) in
-		let listeC, (liste0, liste1) = consensus cfun liste0 liste1 in
-		let arity' = List.length liste0 in
-		assert(arity' = List.length liste1);
-		let blockC = reduce_block_spx false arity  false                    false  listeC
-		and block0 = reduce_block_spx neg0  arity' (Utils.gnode_is_leaf pnode0) shift0 liste0
-		and block1 = reduce_block_spx neg1  arity' (Utils.gnode_is_leaf pnode1) shift1 liste1 in
-		Utils.M3Node(blockC, ((block0, block1), pnode0, pnode1))
-	in
+let factoPP arity neg0 neg1 ((shift0, tag0, liste0), pnode0) ((shift1, tag1, liste1), pnode1) =
+	let cfun = function (P, P) -> P, None | (x, y) -> (S, Some(x, y)) in
+	let listeC, (liste0, liste1) = consensus cfun liste0 liste1 in
+	let arity' = List.length liste0 in
+	assert(arity' = List.length liste1);
+	let blockC = reduce_block_spx false arity  false                    false  listeC
+	and block0 = reduce_block_spx neg0  arity' (Utils.gnode_is_leaf pnode0) shift0 liste0
+	and block1 = reduce_block_spx neg1  arity' (Utils.gnode_is_leaf pnode1) shift1 liste1 in
+	(blockC, ((block0, block1), pnode0, pnode1))
+
+let final_and_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 = Utils.M3Node(factoPP arity neg0 neg1 spx_pnode0 spx_pnode1)
+
+let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pnode0) as pedge0) ((((shift1, tag1, liste1) as spx1), pnode1) as pedge1) =
+	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
 	let extractXO liste =
 		let listeC_peval, oplistec = List.map (function
 			| X(b, 0) -> (X(b, 0), (Some(not b))), None           
@@ -471,6 +451,161 @@ let rec facto_and_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0) as spx0), pnod
 			)
 		) 
 	)
+
+let solve_xor_id_spx_no_merge x shift liste =
+	let rec aux carryC carryc i = function
+		| [] -> (List.rev carryC, List.rev carryc)
+		| head::tail -> match head with
+			| P when i<>x  -> (aux (P::carryC)        carryc  (i+1) tail)
+			| _            -> (aux (S::carryC) (head::carryc) (i+1) tail)
+	in
+	let listeC, listec = aux [] [] 0 liste in
+	let tagC = get_spx_tag_from_block_spx listeC
+	and tagc = get_spx_tag_from_block_spx listec in
+	let rec aux n i = function
+		| [] -> assert false
+		| head::tail -> if i = x then n else match head with
+			| P -> aux  n    (i+1) tail
+			| _ -> aux (n+1) (i+1) tail
+	in
+	(false, tagC, listeC), (List.length listec), (aux 0 0 liste), (shift, tagc, listec)
+
+let meta_solve_xor ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
+	assert(check_edge edge0);
+	assert(check_edge edge1);
+	assert(block0.arity = block1.arity);
+	match block0.block, block1.block with
+	| C0      , _        -> Utils.M3Edge(cneg_edge block0.neg edge1)
+	| _       , C0       -> Utils.M3Edge(cneg_edge block1.neg edge0)
+	| Id x    , Id y     ->
+	(
+		if x = y
+		then (Utils.M3Edge(make_edge_C0 (block0.neg<>block1.neg) block0.arity))
+		else
+		(
+			assert(pnode0 = Utils.Leaf());
+			assert(pnode1 = Utils.Leaf());
+			assert(block0.arity >= 2);
+			let liste = MyList.init block0.arity (fun i -> if i = x || i = y then S else P) in
+			let tag = {hasS = false; hasP = block0.arity>2; maxX = None} in
+			let blockC = {neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX(false, tag, liste)} in
+			let block0 = {neg = false; arity = 1; block = Id 0}
+			and block1 = {neg = true ; arity = 1; block = Id 0} in
+			Utils.M3Cons(blockC, ((block0, Utils.Leaf()), (block1, Utils.Leaf())))
+		)
+	)
+	| Id x   , SPX(shift, tag, liste) ->
+	(
+		let spxC, (arityc:int), (xc:int), spxc = solve_xor_id_spx_no_merge x shift liste in
+		if xc = 0
+		then
+		(
+			let pedgec = ({neg = false; arity = arityc; block = SPX spxc}, pnode1) in
+			assert(block0.arity>=1);
+			let tail = MyList.ntimes None (block0.arity-1) in
+			let pedge0 =           assign_pedge (Some((Some false)::tail)) pedgec
+			and pedge1 = neg_edge (assign_pedge (Some((Some true )::tail)) pedgec) in
+			let blockC = {neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX spxC} in
+			Utils.M3Cons(blockC, (pedge0, pedge1))
+		)
+		else
+		(Utils.M3Node (
+			{neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX spxC},
+			((
+				{neg = false; arity = arityc; block = Id xc},
+				{neg = false; arity = arityc; block = SPX spxc}
+			), pnode0, pnode1)
+		))
+	)
+	| SPX(shift, tag, liste), Id x    ->
+	(
+		let spxC, (arityc:int), (xc:int), spxc = solve_xor_id_spx_no_merge x shift liste in
+		if xc = 0
+		then
+		(
+			let pedgec = ({neg = false; arity = arityc; block = SPX spxc}, pnode0) in
+			assert(block0.arity>=1);
+			let tail = MyList.ntimes None (block0.arity-1) in
+			let pedge0 =           assign_pedge (Some((Some false)::tail)) pedgec
+			and pedge1 = neg_edge (assign_pedge (Some((Some true )::tail)) pedgec) in
+			let blockC = {neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX spxC} in
+			Utils.M3Cons(blockC, (pedge0, pedge1))
+		)
+		else
+		(Utils.M3Node (
+			{neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX spxC},
+			((
+				{neg = false; arity = arityc; block = Id xc},
+				{neg = false; arity = arityc; block = SPX spxc}
+			), pnode0, pnode1)
+		))
+	)
+	| SPX spx0, SPX spx1 -> if spx0 = spx1 && pnode0 = pnode1
+		then (Utils.M3Edge(make_edge_C0 (block0.neg<>block1.neg) block0.arity))
+		else (ifspx2 block0.arity block0.neg block1.neg (spx0, pnode0) (spx1, pnode1))
+
+let final_xor_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 =
+	let (blockC, ((block0, block1), pnode0, pnode1)) = factoPP arity neg0 neg1 spx_pnode0 spx_pnode1 in
+	let blockC = cneg_block (block0.neg<>block1.neg) blockC
+	and block0 = {neg = false; arity = block0.arity; block = block0.block}
+	and block1 = {neg = false; arity = block0.arity; block = block0.block} in
+	Utils.M3Node(blockC, ((block0, block1), pnode0, pnode1))
+
+let rec facto_xor_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0), pnode0) as pedge0) (((shift1, tag1, liste1), pnode1) as pedge1) : (_, _, _) Utils.merge3 =
+	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
+	match tag0.maxX, tag1.maxX with
+	| Some maxX0, Some maxX1 ->
+	(
+		let opmin = List.fold_left (fun opmin -> function
+			| X(b, i), X(b', i') -> if (b=b')&&(i=i')
+				then opmin
+				else (Tools.opmin (min i i') opmin)
+			| X(_, i), _
+			| _      , X(_, i) -> Tools.opmin i opmin
+			| _                -> opmin) None (List.combine liste0 liste1)
+		in
+		let shift, cfun = match opmin with
+			| None -> false, (function
+				| (P, P) -> P, None
+				| X((b, _) as bi), X((b', _) as bi')->
+					(
+						assert(bi = bi');
+						X(b, 0), None;
+					)
+				| (x, y) -> S, Some(x, y)
+			)
+			| Some min ->
+			(
+				let remapX = function X(b, i) -> assert(i>=min); X(b, i-min) | e -> e in
+				(mod2 min), (function
+					| P, P -> P, None
+					| X(b, i), X(b', i') when (b=b')&&(i=i')&&(i<=min) -> X(b, 0), None
+					| (x, y) -> S, Some (remapX x, remapX y)
+				)
+			)
+		in
+		let listeC, (liste0, liste1) = consensus cfun liste0 liste1 in
+		let blockC = reduce_block_spx (neg0<>neg1) arity false (shift0<>shift1) listeC in
+		match liste0, liste1 with
+		| (X(b, 0))::liste0, (X(b', 0))::liste1 ->
+		(
+			assert(b<>b');
+			let pedge0 = spx_liste_to_edge false (shift0<>shift) (liste0, pnode0)
+			and pedge1 = spx_liste_to_edge false (shift1<>shift) (liste1, pnode1) in
+			Utils.M3Cons(blockC, Tools.cswap b (pedge1, pedge0))
+		)
+		| _ ->
+		(
+			let pedge0 = spx_liste_to_edge false (shift0<>shift) (liste0, pnode0)
+			and pedge1 = spx_liste_to_edge false (shift1<>shift) (liste1, pnode1) in
+			compose_utils_merge3 blockC (meta_solve_xor pedge0 pedge1 final_xor_ifspx2)
+		)
+		
+	)
+	| _ -> factoPP()
+	
+
+(* WIP *)
 
 (*
 

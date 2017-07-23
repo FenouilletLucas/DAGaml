@@ -6,6 +6,10 @@
 open CpxTypes2
 
 let arity_edge (block, _) = block.arity
+let neg_block block = {neg = not block.neg; arity = block.arity; block = block.block}
+let cneg_block neg block = {neg = neg <> block.neg; arity = block.arity; block = block.block}
+let neg_edge (block, node) = (neg_block block, node)
+let cneg_edge neg (block, node) = (cneg_block neg block, node)
 
 let (=>) (x:bool) (y:bool) : bool = (x <= y)
 (*
