@@ -213,6 +213,18 @@ let dummydump_block block =
 
 let dummydump_edge (block, gtree) = "( "^(dummydump_block block)^", "^(match gtree with Utils.Leaf () -> "Leaf" | Utils.Node _ -> "Node")^" )"
 
+let dummydump_merge = function
+	| Utils.MEdge edge -> "MEdge( "^(dummydump_edge edge)^" )"
+	| Utils.MNode (blockC, ((block0, block1), node0, node1)) ->
+		"MNode( "^(dummydump_block blockC)^", "^(dummydump_edge (block0, node0))^", "^(dummydump_edge (block1, node1))^" )"
+
+let dummydump_merge3 = function
+	| Utils.M3Edge edge -> "M3Edge( "^(dummydump_edge edge)^" )"
+	| Utils.M3Cons (blockC, (edge0, edge1)) ->
+		("M3Cons( "^(dummydump_block blockC)^", "^(dummydump_edge edge0)^", "^(dummydump_edge edge1)^" )")
+	| Utils.M3Node (blockC, ((block0, block1), node0, node1)) ->
+		("M3Node( "^(dummydump_block blockC)^", "^(dummydump_edge (block0, node0))^", "^(dummydump_edge (block1, node1))^" )")
+
 let bindump_block2 (blockX, blockY) (next_is_leafX, next_is_leafY) stream =
 	bindump_block blockX next_is_leafX (bindump_block blockY next_is_leafY stream)
 

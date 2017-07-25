@@ -8,6 +8,11 @@ open CpxUtils2
 
 module CpxDL = CpxDumpLoad
 
+
+let ddl_cons = false
+let ddl_and  = false
+let ddl_xor  = false
+
 let consensus f x y =
 	let xy, xy' = List.split(List.map f (List.combine x y)) in
 	xy, List.split(MyList.list_of_oplist xy')
@@ -274,6 +279,13 @@ let node_pull ((block, node) as edge) =
 
 
 let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
+	if ddl_and then (
+		print_string "meta: ";
+		CpxDumpLoad2.dummydump_edge edge0 |> print_string;
+		print_string " && ";
+		CpxDumpLoad2.dummydump_edge edge1 |> print_string;
+		print_newline()
+	);
 	assert(check_edge edge0);
 	assert(check_edge edge1);
 	assert(block0.arity = block1.arity);
@@ -297,19 +309,19 @@ let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx
 		(
 			let liste = MyList.init block0.arity (fun i ->
 				if i = x0
-					then X(not block0.neg, 0)
+					then X(block0.neg, 0)
 				else if i = x1
-					then X(not block1.neg, 0)
+					then X(block1.neg, 0)
 					else P
 			) in
 			let tag = {hasS = false; hasP = block0.arity>2; maxX = Some 0} in
 			let spx = (true, tag, liste) in
-			({neg = false; arity = block0.arity; block = SPX spx}, Utils.Leaf())
+			({neg = true; arity = block0.arity; block = SPX spx}, Utils.Leaf())
 		)
 	))
 	| Id x   , _         ->
 	(
-		let peval = Some(MyList.init block1.arity (fun i -> if i = x then (Some block0.neg) else None)) in
+		let peval = Some(MyList.init block1.arity (fun i -> if i = x then (Some(not block0.neg)) else None)) in
 		let liste = MyList.init block1.arity (fun i -> if i = x then (X(block0.neg, 0)) else S) in
 		let tag = {hasP = false; hasS = block1.arity>1; maxX = Some 0} in
 		let blockC = {neg = false; arity = block1.arity; block = SPX (false, tag, liste)} in
@@ -318,7 +330,7 @@ let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx
 	)
 	| _      , Id x      ->
 	(
-		let peval = Some(MyList.init block0.arity (fun i -> if i = x then (Some block1.neg) else None)) in
+		let peval = Some(MyList.init block0.arity (fun i -> if i = x then (Some(not block1.neg)) else None)) in
 		let liste = MyList.init block0.arity (fun i -> if i = x then (X(block1.neg, 0)) else S) in
 		let tag = {hasP = false; hasS = block0.arity>1; maxX = Some 0} in
 		let blockC = {neg = false; arity = block0.arity; block = SPX (false, tag, liste)} in
@@ -347,6 +359,13 @@ let factoPP arity neg0 neg1 ((shift0, tag0, liste0), pnode0) ((shift1, tag1, lis
 let final_and_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 = Utils.M3Node(factoPP arity neg0 neg1 spx_pnode0 spx_pnode1)
 
 let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pnode0) as pedge0) ((((shift1, tag1, liste1) as spx1), pnode1) as pedge1) =
+	if ddl_and then (
+		print_string "facto: ";
+		CpxDumpLoad2.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
+		print_string " && ";
+		CpxDumpLoad2.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
+		print_newline()
+	);
 	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
 	let extractXO liste =
 		let listeC_peval, oplistec = List.map (function
@@ -360,15 +379,15 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 	in
 	let extractX0X0 listeX listeY =
 		let cfun = function
-			| P, P -> P, (None, None)
+			| P       , P        -> P, (None, None)
 			| X(bX, 0), X(bY, 0) ->
 			(if bX = bY
-				then X(bX, 0), (None, None)
+				then (X(bX, 0), (None, None))
 				else (raise Return_False)
 			)
 			| X(bX, 0), e        -> X(bX, 0), (None, Some(Some(not bX), e))
-			| e, X(bY, 0)        -> X(bY, 0), (Some(Some(not bY), e), None)
-			| eX, eY             -> S, (Some(None, eX), Some(None, eY))
+			| e       , X(bY, 0) -> X(bY, 0), (Some(Some(not bY), e), None)
+			| eX      , eY       -> S       , (Some(None, eX), Some(None, eY))
 		in
 		let listeC, pevalX_listeX, pevalY_listeY = consensus2 cfun listeX listeY in
 		let pevalX, listeX = List.split pevalX_listeX
@@ -383,36 +402,28 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 		in
 		consensus cfun listeX listeY
 	in
-	let factoXP maxX0 =
-		let listeC, peval, listec = extractXO liste0 in
-		let hasSC = List.exists (function S -> true | _ -> false) listeC in
-		let blockC = {neg = false; arity; block = SPX(false, {hasP = false; hasS = hasSC; maxX = Some 0}, listeC)} in
-		let edge1 = assign_pedge (Some peval) ({neg = neg1; arity; block = SPX spx1}, pnode1) in
-		assert(check_edge edge1);
-		let tagc = {hasS = tag0.hasS; hasP = tag0.hasP; maxX = (if maxX0 = 0 then None else Some(maxX0-1))} in
-		let shiftc = not(tagc.maxX = None) in
-		let edge0 = ({neg = neg0; arity = List.length listec; block = SPX(shiftc, tagc, listec)}, pnode0) in
-		assert(check_edge edge0);
-		assert(arity_edge edge0 = arity_edge edge1);
-		compose_utils_merge3 blockC (meta_solve_and edge0 edge1 facto_and_ifspx2)
+	let factoXP () =
+		let listeC, peval, liste0 = extractXO liste0 in
+		let blockC = reduce_block_spx false arity false false listeC in
+		let pedge0 = spx_liste_to_edge neg0 (not shift0) (liste0, pnode0) in
+		let pedge1 = assign_pedge (Some peval) ({neg = neg1; arity; block = SPX spx1}, pnode1) in
+		assert(arity_edge pedge0 = arity_edge pedge1);
+		assert(count_nS_block blockC = arity_edge pedge0);	
+		compose_utils_merge3 blockC (meta_solve_and pedge0 pedge1 facto_and_ifspx2)
 	in
-	let factoPX maxX1 =
-		let listeC, peval, listec = extractXO liste1 in
-		let hasSC = List.exists (function S -> true | _ -> false) listeC in
-		let blockC = {neg = false; arity; block = SPX(false, {hasP = false; hasS = hasSC; maxX = Some 0}, listeC)} in
-		let edge0 = assign_pedge (Some peval) ({neg = neg0; arity; block = SPX spx0}, pnode0) in
-		assert(check_edge edge0);
-		let tagc = {hasS = tag1.hasS; hasP = tag1.hasP; maxX = (if maxX1 = 0 then None else Some(maxX1-1))} in
-		let shiftc = not(tagc.maxX = None) in
-		let edge1 = ({neg = neg0; arity = List.length listec; block = SPX(shiftc, tagc, listec)}, pnode0) in
-		assert(check_edge edge1);
-		assert(arity_edge edge0 = arity_edge edge1);
-		compose_utils_merge3 blockC (meta_solve_and edge0 edge1 facto_and_ifspx2)
+	let factoPX () =
+		let listeC, peval, liste1 = extractXO liste1 in
+		let blockC = reduce_block_spx false arity false false listeC in
+		let pedge1 = spx_liste_to_edge neg1 (not shift1) (liste1, pnode1) in
+		let pedge0 = assign_pedge (Some peval) ({neg = neg0; arity; block = SPX spx0}, pnode0) in
+		assert(arity_edge pedge1 = arity_edge pedge0);
+		assert(count_nS_block blockC = arity_edge pedge1);	
+		compose_utils_merge3 blockC (meta_solve_and pedge1 pedge0 facto_and_ifspx2)
 	in
 	match tag0.maxX, tag1.maxX with
 	| None      , None       -> (factoPP())
-	| Some maxX0, None       -> (if neg0 <> shift0 then (factoPP()) else (factoXP maxX0))
-	| None      , Some maxX1 -> (if neg1 <> shift1 then (factoPP()) else (factoPX maxX1))
+	| Some maxX0, None       -> (if neg0 <> shift0 then (factoPP()) else (factoXP ()))
+	| None      , Some maxX1 -> (if neg1 <> shift1 then (factoPP()) else (factoPX ()))
 	| Some maxX0, Some maxX1 ->
 	(match neg0<>shift0, neg1<>shift1 with
 		| false, false ->
@@ -423,12 +434,21 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 				let blockC = reduce_block_spx false arity false false listeC in
 				let pedge0 = spx_liste_to_edge neg0 shift0 (liste0, pnode0) |> assign_pedge (Some peval0)
 				and pedge1 = spx_liste_to_edge neg1 shift1 (liste1, pnode1) |> assign_pedge (Some peval1) in
-				compose_utils_merge3 blockC (meta_solve_and pedge0 pedge1 facto_and_ifspx2)
+				assert(check_block blockC false);
+				assert(check_edge pedge0);
+				assert(check_edge pedge1);
+				assert(arity_edge pedge0 = arity_edge pedge1);
+				assert(arity_edge pedge0 = count_nS_block blockC);
+				let merge3 = meta_solve_and pedge0 pedge1 facto_and_ifspx2 in
+				assert(check_utils_merge3 merge3);
+				let merge3 = compose_utils_merge3 blockC merge3 in
+				assert(check_utils_merge3 merge3);
+				merge3
 			)
 			with Return_False -> Utils.M3Edge(make_edge_C0 false arity)
 		)
-		| true , false -> (factoPX maxX1)
-		| false, true  -> (factoXP maxX0)
+		| true , false -> (factoPX ())
+		| false, true  -> (factoXP ())
 		| true , true  ->
 		(
 			let listeC, (liste0, liste1) = extractX1X1 liste0 liste1 in
@@ -447,7 +467,7 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 				and (block1, pnode1) as pedge1 = spx_liste_to_edge neg1 shift1 (liste1, pnode1) in
 				if get_maxX_block blockC = None
 				then (Utils.M3Node (blockC, ((block0, block1), pnode0, pnode1)))
-				else (compose_utils_merge3 blockC (meta_solve_and (block0, pnode0) (block1, pnode1) facto_and_ifspx2))
+				else (compose_utils_merge3 blockC (meta_solve_and pedge0 pedge1 facto_and_ifspx2))
 			)
 		) 
 	)
@@ -471,6 +491,13 @@ let solve_xor_id_spx_no_merge x shift liste =
 	(false, tagC, listeC), (List.length listec), (aux 0 0 liste), (shift, tagc, listec)
 
 let meta_solve_xor ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
+	if ddl_xor then (
+		print_string "meta: ";
+		CpxDumpLoad2.dummydump_edge edge0 |> print_string;
+		print_string " <> ";
+		CpxDumpLoad2.dummydump_edge edge1 |> print_string;
+		print_newline()
+	);
 	assert(check_edge edge0);
 	assert(check_edge edge1);
 	assert(block0.arity = block1.arity);
@@ -487,7 +514,7 @@ let meta_solve_xor ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx
 			assert(pnode1 = Utils.Leaf());
 			assert(block0.arity >= 2);
 			let liste = MyList.init block0.arity (fun i -> if i = x || i = y then S else P) in
-			let tag = {hasS = false; hasP = block0.arity>2; maxX = None} in
+			let tag = {hasS = true; hasP = block0.arity>2; maxX = None} in
 			let blockC = {neg = block0.neg<>block1.neg; arity = block0.arity; block = SPX(false, tag, liste)} in
 			let block0 = {neg = false; arity = 1; block = Id 0}
 			and block1 = {neg = true ; arity = 1; block = Id 0} in
@@ -548,10 +575,17 @@ let final_xor_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 =
 	let (blockC, ((block0, block1), pnode0, pnode1)) = factoPP arity neg0 neg1 spx_pnode0 spx_pnode1 in
 	let blockC = cneg_block (block0.neg<>block1.neg) blockC
 	and block0 = {neg = false; arity = block0.arity; block = block0.block}
-	and block1 = {neg = false; arity = block0.arity; block = block0.block} in
+	and block1 = {neg = false; arity = block1.arity; block = block1.block} in
 	Utils.M3Node(blockC, ((block0, block1), pnode0, pnode1))
 
-let rec facto_xor_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0), pnode0) as pedge0) (((shift1, tag1, liste1), pnode1) as pedge1) : (_, _, _) Utils.merge3 =
+let rec facto_xor_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pnode0) as pedge0) ((((shift1, tag1, liste1) as spx1), pnode1) as pedge1) : (_, _, _) Utils.merge3 =
+	if ddl_xor then (
+		print_string "facto: ";
+		CpxDumpLoad2.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
+		print_string " <> ";
+		CpxDumpLoad2.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
+		print_newline()
+	);
 	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
 	match tag0.maxX, tag1.maxX with
 	| Some maxX0, Some maxX1 ->
@@ -567,7 +601,7 @@ let rec facto_xor_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0), pnode0) as pe
 		let shift, cfun = match opmin with
 			| None -> false, (function
 				| (P, P) -> P, None
-				| X((b, _) as bi), X((b', _) as bi')->
+				| X((b, i) as bi), X((b', _) as bi')->
 					(
 						assert(bi = bi');
 						X(b, 0), None;
@@ -590,8 +624,8 @@ let rec facto_xor_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0), pnode0) as pe
 		| (X(b, 0))::liste0, (X(b', 0))::liste1 ->
 		(
 			assert(b<>b');
-			let pedge0 = spx_liste_to_edge false (shift0<>shift) (liste0, pnode0)
-			and pedge1 = spx_liste_to_edge false (shift1<>shift) (liste1, pnode1) in
+			let pedge0 = spx_liste_to_edge (shift1<>shift) (shift0<>shift) (liste0, pnode0)
+			and pedge1 = spx_liste_to_edge (shift0<>shift) (shift1<>shift) (liste1, pnode1) in
 			Utils.M3Cons(blockC, Tools.cswap b (pedge1, pedge0))
 		)
 		| _ ->
@@ -603,435 +637,47 @@ let rec facto_xor_ifspx2 arity neg0 neg1 (((shift0, tag0, liste0), pnode0) as pe
 		
 	)
 	| _ -> factoPP()
+
+let meta_solve_binop solver pedge0 pedge1 : (_, _, _) Utils.merge3 =
+	assert(check_edge pedge0);
+	assert(check_edge pedge1);
+	assert(arity_edge pedge0 = arity_edge pedge1);
+	match solver pedge0 pedge1 with
+	| Utils.M3Edge pedge -> (assert(check_edge pedge); Utils.M3Edge pedge)
+	| Utils.M3Cons (blockC, (pedge0, pedge1)) ->
+	(
+		assert(check_block blockC false);
+		assert(check_edge pedge0);
+		assert(check_edge pedge1);
+		assert(arity_edge pedge0 = arity_edge pedge1);
+		assert(arity_edge pedge0 + 1 = count_nS_block blockC);
+		Utils.M3Cons (blockC, (pedge0, pedge1))
+	)
+	| Utils.M3Node (blockC, ((block0, block1), pnode0, pnode1)) ->
+	(
+		let pedge0 = block0, pnode0
+		and pedge1 = block1, pnode1 in
+		assert(check_block blockC false);
+		assert(check_edge pedge0);
+		assert(check_edge pedge1);
+		assert(block0.arity = block1.arity);
+		assert(block0.arity = count_nS_block blockC);
+		let pedge0, pedge1 = Tools.cswap (not(pedge0<=pedge1)) (pedge0, pedge1) in
+		let block0, pnode0 = pedge0
+		and block1, pnode1 = pedge1 in
+		Utils.M3Node (blockC, ((block0, block1), pnode0, pnode1))
+	)
 	
 
-(* WIP *)
+let solve_and pedge0 pedge1 : (_, _, _) Utils.merge3 =
+	if ddl_and then (print_string "@@solve_and:"; print_newline());
+	meta_solve_binop (fun pedge0 pedge1 -> meta_solve_and pedge0 pedge1 facto_and_ifspx2) pedge0 pedge1
 
+let solve_xor pedge0 pedge1 : (_, _, _) Utils.merge3 =
+	if ddl_xor then (print_string "@@solve_xor:"; print_newline());
+	meta_solve_binop (fun pedge0 pedge1 -> meta_solve_xor pedge0 pedge1 facto_xor_ifspx2) pedge0 pedge1
+	
 (*
-
-let solve_xor_0 (ex, ix) (ey, iy) =
-	let _, _, max_xy, _ = compare_subs ex.sub ey.sub in
-	match max_xy with
-	| None ->
-	(
-		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) -> assert(b=b' && i=i'); X(b, 0), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
-		let subX, subY = List.split(MyList.list_of_oplist subXY) in
-		let blockC = {
-			neg = ex.neg <> ex.shift <> ey.neg <> ey.shift;
-			shift = false;
-			sub  = subC;
-		}
-		and blockX = reduce {
-			neg = ex.shift;
-			shift = ex.shift;
-			sub = subX;
-		}
-		and blockY = reduce {
-			neg = ey.shift;
-			shift = ey.shift;
-			sub = subY;
-		} in
-		reduce {
-			neg = blockC.neg <> blockX.neg <> blockY.neg;
-			shift = blockC.shift <> blockX.neg <> blockY.neg;
-			sub = blockC.sub;
-		},
-		(
-			{
-				negX = false;
-				negY = false;
-				shiftX = blockX.shift;
-				shiftY = blockY.shift;
-				subXY = List.combine blockX.sub blockY.sub;
-			},
-			ix,
-			iy
-		)
-	)
-	| Some max_xy ->
-	(
-		let subC, subXY = List.split(List.map (function(P, P) -> P, None | (X(b, i), X(b', i')) when b = b' && i = i' && i <= max_xy -> X(b, 0), None | (x, y) -> S, Some(x, y)) (List.combine ex.sub ey.sub)) in
-		let subX, subY = List.split(MyList.list_of_oplist subXY) in
-		let blockC = {
-			neg = ex.neg <> ex.shift <> ey.neg <> ey.shift;
-			shift = false;
-			sub  = subC;
-		}
-		and blockX = reduce {
-			neg = ex.shift;
-			shift = ex.shift;
-			sub = subX;
-		}
-		and blockY = reduce {
-			neg = ey.shift;
-			shift = ey.shift;
-			sub = subY;
-		} in
-		reduce {
-			neg = blockC.neg <> blockX.neg <> blockY.neg;
-			shift = blockC.shift <> blockX.neg <> blockY.neg;
-			sub = blockC.sub;
-		},
-		(
-			{
-				negX = false;
-				negY = false;
-				shiftX = blockX.shift;
-				shiftY = blockY.shift;
-				subXY = List.combine blockX.sub blockY.sub;
-			},
-			ix,
-			iy
-		)
-	)
-
-
-
-let solve_xor getid ((ex, ix) as x) ((ey, iy) as y) =
-	match node_is_const x with
-	| Some b -> Utils.MEdge ( cneg b y )
-	| None -> match node_is_const y with
-	| Some b -> Utils.MEdge ( cneg b x )
-	| None ->
-	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
-	then Utils.MEdge (get_root (ex.neg <> ey.neg) x )
-	else
-	(
-		let e, (xy, ix, iy) = solve_xor_0 x y in
-		let ex, ey = block_split xy in
-		let ex = reduce ex
-		and ey = reduce ey in
-		Utils.MNode (e, (if (ex, ix) < (ey, iy)
-		then (block_merge ex ey, ix, iy)
-		else (block_merge ey ex, iy, ix)))
-	)
-
-let solve_xore gid x y = match solve_xor gid x y with
-	| Utils.MEdge (edge, gtree) -> Utils.M3Edge (edge, (None, gtree))
-	| Utils.MNode (edge, (block, x, y)) -> Utils.M3Node (edge, (block, (None, x), (None, y)))
-
-
-let node_push_cons gid x y = match solve_cons gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_node block, x, y))
-
-let tacx_push_cons gid x y = match solve_cons gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_tacx (CpTypes.Cons, block), x, y))
-
-let node_push_and gid (x, y) = match solve_and gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_node block, x, y))
-
-let tacx_push_and gid x y = match solve_and gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_tacx (CpTypes.And, block), x, y))
-
-let node_push_xor gid (x, y) = match solve_xor gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_node block, x, y))
-
-let tacx_push_xor gid x y = match solve_xor gid x y with
-	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (block, x, y)) -> Utils.MNode (e, (CpxDL.bindump_tacx (CpTypes.Xor, block), x, y))
-
-
-let tacx_pull_node _ (c, ix, iy) =
-	let t, ex, ey = tacx_split (CpxDL.binload_tacx c) in
-	(t, (ex, ix), (ey, iy))
-
-let tacx_pull gid e = assert false
-
-let tacx_push gid = CpTypes.(function
-	| Cons -> tacx_push_cons gid
-	| And  -> tacx_push_and  gid
-	| Xor  -> tacx_push_xor  gid)
-
-let contiguify (block, ident) =
-	let min_bigger_than x sub = List.fold_left (fun opmin -> function X(b, i) when i > x -> Tools.opmin i opmin | _ -> opmin) None sub in
-	let dec_bigger_than x dec sub = List.map (function X(b, i) when i > x -> X(b, i-dec) | x -> x) sub in
-	let min sub = List.fold_left (fun opmin -> function X(b, i) -> Tools.opmin i opmin | _ -> opmin) None sub in
-	let dec dec sub =
-		if dec = 0
-		then sub
-		else (List.map (function X(b, i) -> X(b, i-dec) | x -> x) sub)
-	in
-	match min block.sub with
-	| None -> ({neg = block.neg; shift = false; sub = block.sub}, ident)
-	| Some min ->
-	(
-		let rec aux pos sub = match min_bigger_than pos sub with
-			| None -> sub
-			| Some min ->
-			(
-				let diff = min - pos in
-				let dec = diff - (diff mod 2) in
-				aux (if diff mod 2 = 0 then pos else (pos+1)) (if dec = 0 then sub else (dec_bigger_than pos dec sub))
-			)
-		in
-		let block = {neg = block.neg; shift = block.shift<>(mod2 min); sub = aux 0 (dec min block.sub)} in
-		((match ident with Utils.Leaf () -> reduce_0 block | Utils.Node _ -> block), ident)
-	)
-
-	
-
-let assign = function
-	| None -> fun block -> block, None
-	| Some set -> fun (block, ident) ->
-		assert(List.length set = List.length block.sub);
-		let foldmap f i l =
-			let rec aux l' i = function
-				| [] -> List.rev l', i
-				| head::tail ->
-					let e, i = f i head in
-					aux (e::l') i tail
-			in aux [] i l
-		in
-		let opsubopset, opmin = foldmap (fun opmin -> fun (set, sub) -> match set with
-			| None	   -> ( Some sub, (match sub with S -> Some None | _ -> None)), opmin
-			| Some set -> match sub with
-				| P		  -> (None    , None     ), opmin
-				| S		  -> (None    , Some (Some set) ), opmin
-				| X(b, i) -> (None    , None     ), if b = set then Tools.opmin i opmin else opmin
-			) None (List.combine set block.sub) in
-		let opsub, opset = List.split opsubopset in
-		let sub = MyList.list_of_oplist opsub
-		and set = MyList.list_of_oplist opset in
-		match opmin with
-		| None -> ((contiguify ({neg = block.neg; shift = block.shift; sub = sub}, ident)), (if List.for_all ((=)None) set then None else (Some set)))
-		| Some min -> ((contiguify ({neg = block.neg <> block.shift <> (mod2 min); shift = (mod2 min); sub = List.map (function S | P -> P | X(_, i) when i >= min -> P | (X _) as x -> x) sub}, Utils.Leaf())), None)
-
-
-let assign_dummydump = function
-	| None -> "None"
-	| Some set -> "["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) set)^"]"
-
-
-
-let solve_ande_P2 (ex, ix) (ey, iy) =
-	let sub, subXY = consensus(function
-		| (P, P) -> P, None
-		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
-	Utils.M3Node (
-		{
-			neg = false;
-			shift = false;
-			sub;
-		},
-		(
-			{
-				negX = ex.neg;
-				negY = ey.neg;
-				shiftX = ex.shift;
-				shiftY = ey.shift;
-				subXY;
-			},
-			(None, ix),
-			(None, iy)
-		)
-	)
-
-let solve_ande_P2X2_11 (ex, ix) (ey, iy) =
-	(*print_string "solve_ande_P2PX2_11"; print_newline();*)
-	let sub, subXY = consensus(function
-		| P, P -> P, None
-		| X(b, 0), X(b', 0) when b = b' -> X(b, 0), None
-		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
-	Utils.M3Node (
-		{
-			neg = false;
-			shift = true;
-			sub;
-		},
-		(
-			{
-				negX = ex.neg;
-				negY = ey.neg;
-				shiftX = ex.shift;
-				shiftY = ey.shift;
-				subXY;
-			},
-			(None, ix),
-			(None, iy)
-		)
-	)
-
-
-let solve_ande_P2X2 bX bY (ex, ix) (ey, iy) =
-	let bX, ex = if (bX = false) && (block_is_singleton ex)
-		then (true,(
-			assert(ex.shift = true);
-			{neg = not ex.neg; shift = true; sub = List.map (function X(b, i) -> assert(i = 0); X(not b, 0) | x -> x) ex.sub};
-		))
-		else (bX, ex)
-	and bY, ey = if (bY = false) && (block_is_singleton ey)
-		then (true,(
-			assert(ey.shift = true);
-			{neg = not ey.neg; shift = true; sub = List.map (function X(b, i) -> assert(i = 0); X(not b, 0) | x -> x) ey.sub};
-		))
-		else (bY, ey)
-	in
-	if (not bX) && (not bY)
-	then ( solve_ande_P2X2_11 (ex, ix) (ey, iy) )
-	else try
-	(
-		(*print_string "solve_ande_P2PX2"; print_newline();
-		print_string "\tbX: "; print_string(StrUtil.string_of_bool bX); print_newline();
-		print_string "\tbY: "; print_string(StrUtil.string_of_bool bY); print_newline();*)
-		let sub, setsubXsetsubY = List.split(List.map(function
-			| P, P -> P, (None, None)
-			| X(b, 0), X(b', 0) when bX && bY -> if b = b' then (X(b, 0), (None, None)) else (raise Return_False) 
-			| X(b, 0), y		when bX -> X(b, 0), (None, Some(Some(not b), y))
-			| x, X(b, 0)		when bY -> X(b, 0), (Some(Some(not b), x), None)
-			| x, y				-> S, (Some(None, x), Some(None, y))
-		) (List.combine ex.sub ey.sub)) in
-		let setsubX, setsubY = List.split setsubXsetsubY in
-		let setX, subX = List.split(MyList.list_of_oplist setsubX)
-		and setY, subY = List.split(MyList.list_of_oplist setsubY) in
-		let setX = if List.for_all (function None -> true | _ -> false) setX then None else Some setX
-		and setY = if List.for_all (function None -> true | _ -> false) setY then None else Some setY in
-		let subX = if bX then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subX) else subX
-		and subY = if bY then (List.map (function X(b, i) -> assert(i>0); X(b, i-1) | x -> x) subY) else subY in
-		let ex = {neg = ex.neg; shift = ex.shift<>bX; sub = subX}
-		and ey = {neg = ey.neg; shift = ey.shift<>bY; sub = subY} in
-		(*print_string "[0] solve_ande_P2X2"; print_newline();
-		print_string "\tex: "; print_string(CpxDL.block_dummydump ex); print_newline();
-		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();
-		print_string "\tsetX:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setX)^"]"); print_newline();
-		print_string "\tsetY:"; print_string ("["^(StrUtil.catmap "; " (Tools.string_of_option StrUtil.string_of_bool) setY)^"]"); print_newline();*)
-		let (ex, ix), setX = assign setX (ex, ix)
-		and (ey, iy), setY = assign setY (ey, iy) in
-		(*print_string "[1] solve_ande_P2X2"; print_newline();
-		print_string "\tex: "; print_string(CpxDL.block_dummydump ex); print_newline();
-		print_string "\tey: "; print_string(CpxDL.block_dummydump ey); print_newline();*)
-
-		Utils.M3Node (
-			{
-				neg = false;
-				shift = false;
-				sub;
-			},
-			(
-				{
-					negX = ex.neg;
-					negY = ey.neg;
-					shiftX = ex.shift;
-					shiftY = ey.shift;
-					subXY = List.combine ex.sub ey.sub;
-				},
-				(setX, ix),
-				(setY, iy)
-			)
-		)
-	)
-	with Return_False -> ( let edge, gtree = get_root false (ex, ix) in Utils.M3Edge (edge, (None, gtree)) )
-
-let solve_ande_0 ((blockX, ix) as x) ((blockY, iy) as y) =
-	(*print_string "solve_ande_0"; print_newline();
-	print_string "\tblockX: "; print_string(CpxDL.edge_dummydump (blockX, ix)); print_newline();
-	print_string "\tblockY: "; print_string(CpxDL.edge_dummydump (blockY, iy)); print_newline();*)
-	let _, maxXX = classify blockX
-	and _, maxXY = classify blockY in
-	if (maxXX = None) && (maxXY = None)
-	then ( solve_ande_P2 x y )
-	else
-	(
-		let tx = blockX.neg <> blockX.shift
-		and ty = blockY.neg <> blockY.shift in
-		solve_ande_P2X2 (not tx) (not ty) x y
-	)
-
-let compose blockC (blockc, e) =
-	(*print_string "compose: "; print_newline();
-	print_string "\tblockC: "; print_string(CpxDL.block_dummydump blockC); print_newline();
-	print_string "\tblockc: "; print_string(CpxDL.edge_dummydump (blockc, e)); print_newline();*)
-	let edge = compose blockC (blockc, e) in
-	(*print_string "\tblockCc: "; print_string(CpxDL.edge_dummydump edge); print_newline();*)
-	edge
-
-let solve_ande getid ((ex, ix) as x) ((ey, iy) as y) =
-	match node_is_const x with
-	| Some b -> Utils.M3Edge ( let edge, gtree = if b then y else x in (edge, (None, gtree)))
-	| None -> match node_is_const y with
-	| Some b -> Utils.M3Edge ( let edge, gtree = if b then x else y in (edge, (None, gtree)))
-	| None ->
-	if (CpGops.cmpid getid (ix, iy) = None) && (ex.shift = ey.shift) && (ex.sub = ey.sub)
-	then Utils.M3Edge (let edge, gtree = if ex.neg = ey.neg then x (* = y *) else get_root false x in (edge, (None, gtree)))
-	else
-	( match solve_ande_0 x y with
-		| Utils.M3Edge (e, (ope, i)) -> Utils.M3Edge (reduce' e, (ope, i))
-		| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
-		| Utils.M3Node (e, (exy, (opex, ix), (opey, iy))) ->
-			let sub, subXY = List.split(List.map(function(P, P) -> P, None | (x, y) -> S, Some(x, y))exy.subXY) in
-			let subXY = MyList.list_of_oplist subXY in
-			let e = compose_block' e {neg = false; shift = false; sub}
-			and exy = {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY} in
-			assert(not(List.exists (function(P, P) -> true | _ -> false) exy.subXY));
-			if (opex = None) && (opey = None)
-			then
-			(
-				let ex, ey = block_split exy in
-				(*print_string "[POST] solve_ande_0"; print_newline();
-				print_string "e: "; print_string(CpxDL.block_dummydump e); print_newline();
-				print_string "ex: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
-				print_string "ey: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();*)
-				let e = reduce' e in
-				let ex = reduce ex
-				and ey = reduce ey in
-				(*print_string "[POST] solve_ande_0"; print_newline();
-				print_string "e: "; print_string(CpxDL.block_dummydump e); print_newline();
-				print_string "blockX: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
-				print_string "blockY: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();*)
-				match block_is_const ex with
-				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ey, iy) else (ex, ix)) in (edge, (None, gtree)))
-				| None -> match block_is_const ey with
-				| Some b -> Utils.M3Edge (let edge, gtree = compose e (if b then (ex, ix) else (ey, iy)) in (edge, (None, gtree)))
-				| None ->
-				(
-					let return () = Utils.M3Node (e, (if (ex, ix) < (ey, iy) then (block_merge ex ey, (None, ix), (None, iy)) else (block_merge ey ex, (None, iy), (None, ix)))) in
-					assert(List.length ex.sub = List.length ey.sub);
-					assert(List.length ex.sub >= 1);
-					if (ex.neg <> ex.shift) && (ey.neg <> ex.shift)
-					then match ex.sub, ey.sub with
-						| X(b, 0)::subX, X(b', 0)::subY when b <> b' ->
-						(
-							let x = (reduce {neg = ex.neg; shift = ex.shift; sub = subX}, (None, ix))
-							and y = (reduce {neg = ey.neg; shift = ey.shift; sub = subY}, (None, iy)) in
-							Utils.M3Cons (e, (Tools.cswap b (y, x)))
-						)
-						| _ -> return()
-					else return()
-				)
-			)
-			else
-			(
-				let return () = Utils.M3Node (e, (exy, (opex, ix), (opey, iy))) in
-				if (List.length exy.subXY >= 1) && (exy.negX <> exy.shiftX) && (exy.negY <> exy.shiftY)
-				then match exy.subXY with
-					| [] -> assert false
-					| (X(b, 0), X(b', 0))::subXY when b <> b' ->
-					(
-						let ex, ey = CpxUtils.block_split {negX = exy.negX; negY = exy.negY; shiftX = exy.shiftX; shiftY = exy.shiftY; subXY } in
-						let x = (reduce {neg = ex.neg; shift = ex.shift; sub = ex.sub}, (opex, ix))
-						and y = (reduce {neg = ey.neg; shift = ey.shift; sub = ey.sub}, (opey, iy)) in
-						Utils.M3Cons (e, (Tools.cswap b (y, x)))
-					)
-					| _ -> return()
-				else return()
-			)
-			(*(
-				(*print_string "[PROPA] solve_ande_0"; print_newline();
-				let ex, ey = block_split exy in
-				print_string "\te: "; print_string(CpxDL.block_dummydump e); print_newline();
-				print_string "\tex: "; print_string(CpxDL.edge_dummydump (ex, ix)); print_newline();
-				print_string "\tey: "; print_string(CpxDL.edge_dummydump (ey, iy)); print_newline();
-				print_string "\tsetX:"; print_string (assign_dummydump opex); print_newline();
-				print_string "\tsetY:"; print_string (assign_dummydump opey); print_newline();*)
-				Utils.M3Node (e, (exy, (opex, ix), (opey, iy)))
-			)*)
-	)
-
-
 let node_push_ande gid (x, y) = match solve_ande gid x y with
 	| Utils.M3Edge e -> Utils.M3Edge e
 	| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))

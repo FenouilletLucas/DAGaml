@@ -540,12 +540,62 @@ let compose_utils_merge3 blockC = function
 	| Utils.M3Cons (block, node) -> Utils.M3Cons(compose_block blockC block false, node)
 	| Utils.M3Node (block, node) -> Utils.M3Node(compose_block blockC block false, node)
 
+let arity_utils_merge = function
+	| Utils.MEdge (block, _)
+	| Utils.MNode (block, _) -> block.arity
+
+let arity_utils_merge3 = function
+	| Utils.M3Edge (block, _)
+	| Utils.M3Cons (block, _)
+	| Utils.M3Node (block, _) -> block.arity
+
+let check_utils_mergeC = function
+	| Utils.MEdge edge -> check_edge edge
+	| Utils.MNode (block, ((block0, block1), node0, node1)) ->
+	(
+		(check_block block false)&&
+		(check_edge (block0, node0))&&
+		(check_edge (block1, node1))&&
+		(block0.arity = block1.arity)&&
+		(count_nS_block block = block0.arity + 1)
+	)
+
+let check_utils_mergeAX = function
+	| Utils.MEdge edge -> check_edge edge
+	| Utils.MNode (block, ((block0, block1), node0, node1)) ->
+	(
+		(check_block block false)&&
+		(check_edge (block0, node0))&&
+		(check_edge (block1, node1))&&
+		(block0.arity = block1.arity)&&
+		(count_nS_block block = block0.arity)
+	)
+
+let check_utils_merge3 = function
+	| Utils.M3Edge edge -> check_edge edge
+	| Utils.M3Cons (block, (edge0, edge1)) ->
+	(
+		(check_block block false)&&
+		(check_edge edge0)&&
+		(check_edge edge1)&&
+		(arity_edge edge0 = arity_edge edge1)&&
+		(count_nS_block block = arity_edge edge0 + 1)
+	)
+	| Utils.M3Node (block, ((block0, block1), node0, node1)) ->
+	(
+		(check_block block false)&&
+		(check_edge (block0, node0))&&
+		(check_edge (block1, node1))&&
+		(block0.arity = block1.arity)&&
+		(count_nS_block block = block0.arity)
+	)
+
 let get_root b (block, _) = ({neg = b; arity = block.arity; block = C0}, Utils.Leaf())
 
 let neg (block, node) = ({neg = not block.neg; arity = block.arity; block = block.block}, node)
 let cneg b (block, node) = ({neg = b <> block.neg; arity = block.arity; block = block.block}, node)
 
-let assign_edge : bool option list option -> _ -> _ * bool option list option = function
+let assign_edge : peval -> _ edge -> _ edge * peval = function
 	| None -> fun edge -> (edge, None)
 	| Some set ->
 	(
@@ -616,7 +666,7 @@ let compose_peval pevalC pevalc =
 		in Some(aux [] (pevalC, pevalc))
 	)
 
-let assign_pedge peval (block, pnode) =
+let assign_pedge peval (block, pnode) : _ pedge =
 	let (block', pnode'), peval' = assign_edge peval (block, pnode) in
 	let pnode' = match pnode' with
 		| Utils.Leaf () -> assert(peval' = None); Utils.Leaf()

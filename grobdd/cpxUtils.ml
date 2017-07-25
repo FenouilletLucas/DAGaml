@@ -322,7 +322,9 @@ let push_XsRT liste rB tB = List.fold_right (function iB -> push_X iB rB tB) lis
 
 let node_push_XsRT liste rB tB (block, gtree) = (push_XsRT liste rB tB block, gtree)
 
-let count_nS = MyList.count (function S -> true | _ -> false) 
+let count_nS liste = MyList.count (function S -> true | _ -> false) liste
+
+
 let make_nSS n = {
 	negX   = false;
 	negY   = false;

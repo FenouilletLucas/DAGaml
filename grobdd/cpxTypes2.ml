@@ -44,3 +44,7 @@ type 'a tacx = tacx_state * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
 type 'a cedge = edge_cstate * (unit, 'a) Utils.gnode
 type 'a cnode = node_cstate * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
 type 'a ctacx = tacx_cstate * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
+
+
+type    peval = bool option list option
+type 'a pedge = (peval * 'a) edge
