@@ -10,9 +10,6 @@ open CpxUtils2
 open CpxDumpLoad2
 
 
-let is_nil (*next_is_leaf*) block = match block.block with
-	| C0 | Id _ -> true
-	| SPX _ -> false
 
 let n = int_of_string(Sys.argv.(1));;
 

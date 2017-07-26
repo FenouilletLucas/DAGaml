@@ -695,6 +695,111 @@ struct
 			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
 		]
 	end
+	
+	module type MODELE_IBOP_BIDIR =
+	(* Internal Binary OPerator with BIDIRectional propagation*)
+	sig
+		type compact
+		type residual
+		type eval
+
+		type pnode = (M.leaf, eval option * G.pnode) Utils.gnode
+		type pedge = M.edge * pnode
+
+		val  solver : (G.pnode -> G.ident) -> pedge -> pedge ->
+			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) Utils.merge3
+
+		val solver' : (G.pnode -> G.ident) -> compact -> (edge, G.tree) Utils.merge -> (edge, G.tree) Utils.merge ->
+			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) Utils.merge3
+
+		val eval : eval -> pedge -> pedge (* apply the evaluation sequence on the descriptor *)
+
+		val read : eval -> (unit, eval, eval, eval * eval) Utils.binpull (* read the first symbole of the evaluation sequence *)
+		
+		val  decomp : G.tree -> G.tree -> compact -> edge * edge
+		val compose : residual -> edge -> edge
+	end
+	
+	module IBOP_BIDIR(D0:MODELE_IBOP_BIDIR) =
+	(* Internal Binary OPerator with BIDIRectional propagation*)
+	struct
+		type memo = {
+			man  : manager;
+			calc : edge -> edge -> edge;
+			memo : (D0.compact * G.tree * G.tree, edge) MemoTable.t;
+			eval : (D0.eval    * G.tree         , edge) MemoTable.t;
+		}
+
+		type manager = memo
+		
+		let makeman man hsize =
+			let memo, apply = MemoTable.make hsize in
+			let memo_eval, apply_eval = MemoTable.make hsize in
+			let push = push man
+			and pull = pull man
+			and pull_node = function
+				| Utils.Leaf _		-> assert false
+				| Utils.Node node	-> pull_node man node in
+			let pedge_of_edge (block, node) = (block, pnode_of_node node) in
+			let rec	read (peval:D0.eval) (node:G.tree) =
+				apply_eval (fun (peval, node) -> match D0.read peval with
+				| Utils.MStop () -> assert false
+				| Utils.Go0 peval -> eval peval (pull_node node |> fst)
+				| Utils.Go1 peval -> eval peval (pull_node node |> snd)
+				| Utils.MPull (peval0, peval1) ->
+				(
+					let edge0, edge1 = pull_node node in
+					push (eval peval0 edge0) (eval peval1 edge1)
+				)
+			) (peval, node)
+			and		eval (peval:D0.eval) (edge:edge) =
+				eval_pedge (D0.eval peval (pedge_of_edge edge))
+			and   eval_pedge (block, pnode) : edge = match pnode with
+				| Utils.Leaf leaf -> (block, Utils.Leaf leaf)
+				| Utils.Node (peval, node) -> match peval with
+					| None -> (block, Utils.Node node)
+					| Some peval -> compose block (read peval (Utils.Node node))
+			in
+			let rec calcrec (edgeX:edge) (edgeY:edge) : edge = match D0.solver G.get_ident (pedge_of_edge edgeX) (pedge_of_edge edgeY) with
+				| Utils.M3Edge pedge -> eval_pedge pedge
+				| Utils.M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
+				| Utils.M3Node (residual, (compact, pnodeX, pnodeY)) -> ((D0.compose residual (propa compact pnodeX pnodeY)):edge)
+			and eval_pnode : D0.pnode -> (edge, G.tree) Utils.merge = function
+				| Utils.Leaf leaf -> Utils.MNode (Utils.Leaf leaf)
+				| Utils.Node (peval, node) -> match peval with
+					| None -> Utils.MNode (Utils.Node node)
+					| Some peval -> Utils.MEdge (read peval (Utils.Node node))
+			and		propa compact pnodeX pnodeY = match pnodeX, pnodeY with
+				| Utils.Node(None, nodeX), Utils.Node(None, nodeY) ->
+					apply calc (compact, (Utils.Node nodeX), (Utils.Node nodeY))
+				| _ ->
+				(
+					match D0.solver' G.get_ident compact (eval_pnode pnodeX) (eval_pnode pnodeY) with
+					| Utils.M3Edge pedge -> eval_pedge pedge
+					| Utils.M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
+					| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
+				)
+			and		calc (compact, nodeX, nodeY) =
+				let fx, fy = D0.decomp nodeX nodeY compact in
+				let fx0, fx1 = pull fx
+				and fy0, fy1 = pull fy in
+				let f0 = calcrec fx0 fy0
+				and f1 = calcrec fx1 fy1 in
+				push f0 f1
+		in
+		{
+			man  = man;
+			calc = calcrec;
+			memo = memo;
+			eval = memo_eval;
+		}, calcrec
+		let newman man = makeman man 10000
+		let calc man = man.calc
+		let dump_stat man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
+		]
+	end
 
 	module type MODELE_EVAL =
 	sig

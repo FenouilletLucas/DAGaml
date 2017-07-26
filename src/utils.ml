@@ -28,3 +28,17 @@ type ('edge, 'cons, 'node) merge3 =
 	| M3Edge of 'edge
 	| M3Cons of 'cons
 	| M3Node of 'node
+
+let pnode_of_node = function
+	| Leaf leaf -> Leaf leaf
+	| Node node -> Node (None, node)
+
+type ('edge, 'node, 'leaf, 'link) node =
+	| TNode of ('node * (('edge, 'node, 'leaf, 'link) edge * ('edge, 'node, 'leaf, 'link) edge))
+	| TLeaf of 'leaf
+	| TLink of 'link
+and  ('edge, 'node, 'leaf, 'link) edge = 'edge * ('edge, 'node, 'leaf, 'link) node
+
+type ('pnode, 'tnode) pt_node =
+	| PTree of 'pnode
+	| TTree of 'tnode

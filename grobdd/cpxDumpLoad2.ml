@@ -8,6 +8,12 @@ open CpxUtils2
 
 let log2 = Tools.math_log_up 2
 
+let is_nil (*next_is_leaf*) block = match block.block with
+	| C0 | Id _ -> true
+	| SPX _ -> false
+
+let is_nil2 (blockX, blockY) = (is_nil blockX, is_nil blockY)
+
 let bindump_elem_spx size elem stream = match elem with
 	| S -> true::stream
 	| P -> false::true::stream
@@ -117,6 +123,10 @@ let bindump_block block next_is_leaf stream =
 	)))
 
 
+let bindump_block' block =
+	let nil = is_nil block in
+	Bitv.L.of_bool_list (nil::(bindump_block block nil []))
+
 let binload_block next_is_leaf stream : block * (bool list)=
 	let neg, stream = BinLoad.bool stream in
 	let arity, stream = BinLoad.int stream in
@@ -186,6 +196,13 @@ let binload_block next_is_leaf stream : block * (bool list)=
 	) in
 	{neg; arity; block}, stream
 	
+let binload_block' stream =
+	let stream = Bitv.L.to_bool_list stream in
+	let nil, stream = BinLoad.bool stream in
+ 	let block, stream = binload_block nil stream in
+	assert(stream = []);
+	block
+
 let bindump_edge block next_is_leaf =
 	bindump_block block next_is_leaf [] |> Bitv.L.of_bool_list
 
@@ -233,26 +250,39 @@ let binload_block2 (next_is_leafX, next_is_leafY) stream =
 	let blockY, stream = binload_block next_is_leafY stream in
 	((blockX, blockY), stream)
 
-let bindump_node block2 next_is_leafXY = bindump_block2 block2 next_is_leafXY [] |> Bitv.L.of_bool_list
 
-let binload_node next_is_leafXY stream =
-	let block2, stream = binload_block2 next_is_leafXY (Bitv.L.to_bool_list stream) in
+let bindump_node block2 : Bitv.t =
+	let b0, b1 as nil2 = is_nil2 block2 in
+	b0::b1::(bindump_block2 block2 nil2 []) |> Bitv.L.of_bool_list
+
+let binload_node stream =
+	let stream = Bitv.L.to_bool_list stream in
+	let b0, stream = BinLoad.bool stream in
+	let b1, stream = BinLoad.bool stream in
+	let block2, stream = binload_block2 (b0, b1) stream in
 	assert(stream = []);
 	block2
 
-let bindump_tacx (ttag, block2) next_is_leafXY stream =
-	let stream = bindump_block2 block2 next_is_leafXY stream in
-	match ttag with
+let bindump_tacx (ttag, block2) stream =
+	let b0, b1 as nil2 = is_nil2 block2 in
+	let stream = bindump_block2 block2 nil2 stream in
+	let stream = match ttag with
 	| CpTypes.Cons -> false::false::stream
 	| CpTypes.And  -> false::true ::stream
 	| CpTypes.Xor  -> true ::false::stream
+	in
+	b0::b1::stream
 
-let bindump_tacx tacx_block next_is_leafXY = bindump_tacx tacx_block next_is_leafXY [] |> Bitv.L.of_bool_list
+let bindump_tacx tacx_block = bindump_tacx tacx_block [] |> Bitv.L.of_bool_list
 
-let binload_tacx next_is_leafXY = function
+let binload_tacx stream =
+	let b0, stream = BinLoad.bool stream in
+	let b1, stream = BinLoad.bool stream in
+	let nil2 = (b0, b1) in
+	match stream with
 	| b0::b1::stream ->
 	(
-		let block, stream = binload_block2 next_is_leafXY stream in
+		let block, stream = binload_block2 nil2 stream in
 		((match b0, b1 with
 		| false, false -> CpTypes.Cons
 		| false, true  -> CpTypes.And
@@ -261,8 +291,8 @@ let binload_tacx next_is_leafXY = function
 	)
 	| _ -> assert false
 
-let binload_tacx next_is_leafXY stream =
-	let tacx_block, stream = binload_tacx next_is_leafXY (Bitv.L.to_bool_list stream) in
+let binload_tacx stream =
+	let tacx_block, stream = binload_tacx (Bitv.L.to_bool_list stream) in
 	assert(stream = []);
 	tacx_block
 

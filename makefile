@@ -82,6 +82,7 @@ full:
 
 extra:
 	$(OB) \
+		src/taggedSubdagPropa.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_bin_of_int.native \
@@ -98,7 +99,9 @@ extra:
 		grobdd/cpxGops2.native \
 		grobdd/cpxGops2Test.native \
 		grobdd/cpxGopsTest.native \
-		grobdd/cpxGops2Test.d.byte
+		grobdd/cpxGops2Test.d.byte \
+		grobdd/cpx2.native \
+		grobdd/cpx2.d.byte
 
 extraephe:
 		$(OB) \

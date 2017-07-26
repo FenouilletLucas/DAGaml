@@ -29,9 +29,8 @@ let _ =
 			assert(node0' = node0);
 			assert(node1' = node1);
 			(
-				let nils = Utils.gnode_is_leaf node0', Utils.gnode_is_leaf node1' in
-				let stream = bindump_node node nils in
-				let node' = binload_node nils stream in
+				let stream = bindump_node node in
+				let node' = binload_node stream in
 				assert(node' = node)
 			);
 			match node_pull (edge01, Utils.Node 3) with
@@ -71,7 +70,7 @@ let _ =
 	) (Iter.progress 1000 0 ((gen_block_checked n) $* (gen_block_checked n)))
 	in
 
-	(* meta_test reversible; *)
+	meta_test reversible;
 
 
 	print_string "TEST 3.2 : solve_cons using in_block"; print_newline();
@@ -101,7 +100,7 @@ let _ =
 		()
 	in
 
-	(* meta_test compatible_test_3_2; *)
+	meta_test compatible_test_3_2;
 
 	print_string "TEST 4.2 : check assign using solve_cons"; print_newline();
 
@@ -114,11 +113,8 @@ let _ =
 				and pe_set_x1 = assign_edge (Some set) x1
 				and pe_0set_x01 = assign_edge (Some((Some false)::set)) x01
 				and pe_1set_x01 = assign_edge (Some((Some true )::set)) x01 in
-	(*			and pe_Nset_x01 = assign (Some( None       ::set)) x01 in *)
-	(*			let pe_set_x0_pe_set_x1 = pe_set_x0 *! pe_set_x1 in *)
 				assert(pe_set_x0 = pe_0set_x01);
 				assert(pe_set_x1 = pe_1set_x01);
-	(*			assert(pe_Nset_x01 = pe_set_x0_pe_set_x1); *)
 				()
 			) (gen_assign n)
 		)
@@ -129,7 +125,7 @@ let _ =
 		()
 	in
 	
-	(* meta_test compatible_test_4_2; *)
+	meta_test compatible_test_4_2;
 
 	let assign_merge3 solve peval = function
 	| Utils.M3Edge pedge -> Utils.M3Edge(assign_pedge peval pedge)

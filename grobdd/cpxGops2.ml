@@ -6,7 +6,7 @@
 open CpxTypes2
 open CpxUtils2
 
-module CpxDL = CpxDumpLoad
+module CpxDL = CpxDumpLoad2
 
 
 let ddl_cons = false
@@ -281,9 +281,9 @@ let node_pull ((block, node) as edge) =
 let meta_solve_and ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
 	if ddl_and then (
 		print_string "meta: ";
-		CpxDumpLoad2.dummydump_edge edge0 |> print_string;
+		CpxDL.dummydump_edge edge0 |> print_string;
 		print_string " && ";
-		CpxDumpLoad2.dummydump_edge edge1 |> print_string;
+		CpxDL.dummydump_edge edge1 |> print_string;
 		print_newline()
 	);
 	assert(check_edge edge0);
@@ -361,9 +361,9 @@ let final_and_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 = Utils.M3Node(factoP
 let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pnode0) as pedge0) ((((shift1, tag1, liste1) as spx1), pnode1) as pedge1) =
 	if ddl_and then (
 		print_string "facto: ";
-		CpxDumpLoad2.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
+		CpxDL.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
 		print_string " && ";
-		CpxDumpLoad2.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
+		CpxDL.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
 		print_newline()
 	);
 	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
@@ -493,9 +493,9 @@ let solve_xor_id_spx_no_merge x shift liste =
 let meta_solve_xor ((block0, pnode0) as edge0) ((block1, pnode1) as edge1) ifspx2 =
 	if ddl_xor then (
 		print_string "meta: ";
-		CpxDumpLoad2.dummydump_edge edge0 |> print_string;
+		CpxDL.dummydump_edge edge0 |> print_string;
 		print_string " <> ";
-		CpxDumpLoad2.dummydump_edge edge1 |> print_string;
+		CpxDL.dummydump_edge edge1 |> print_string;
 		print_newline()
 	);
 	assert(check_edge edge0);
@@ -581,9 +581,9 @@ let final_xor_ifspx2 arity neg0 neg1 spx_pnode0 spx_pnode1 =
 let rec facto_xor_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pnode0) as pedge0) ((((shift1, tag1, liste1) as spx1), pnode1) as pedge1) : (_, _, _) Utils.merge3 =
 	if ddl_xor then (
 		print_string "facto: ";
-		CpxDumpLoad2.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
+		CpxDL.dummydump_edge ({neg = neg0; arity; block = SPX spx0}, pnode0) |> print_string;
 		print_string " <> ";
-		CpxDumpLoad2.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
+		CpxDL.dummydump_edge ({neg = neg1; arity; block = SPX spx1}, pnode1) |> print_string;
 		print_newline()
 	);
 	let factoPP () = Utils.M3Node(factoPP arity neg0 neg1 pedge0 pedge1) in
@@ -677,40 +677,38 @@ let solve_xor pedge0 pedge1 : (_, _, _) Utils.merge3 =
 	if ddl_xor then (print_string "@@solve_xor:"; print_newline());
 	meta_solve_binop (fun pedge0 pedge1 -> meta_solve_xor pedge0 pedge1 facto_xor_ifspx2) pedge0 pedge1
 	
-(*
-let node_push_ande gid (x, y) = match solve_ande gid x y with
-	| Utils.M3Edge e -> Utils.M3Edge e
-	| Utils.M3Cons (e, (e0, e1)) -> Utils.M3Cons (e, (e0, e1))
-	| Utils.M3Node (e, (block, x, y)) -> Utils.M3Node (e, (CpxDL.bindump_node block, x, y))
+let node_push_ande _ (pedge0, pedge1) = match solve_and pedge0 pedge1 with
+	| Utils.M3Edge edge -> Utils.M3Edge edge
+	| Utils.M3Cons cons -> Utils.M3Cons cons
+	| Utils.M3Node (block, (block2, pnode0, pnode1)) ->
+		Utils.M3Node (block, (CpxDL.bindump_node block2, pnode0, pnode1))
 
-let tacx_propa_cons gid x y = match solve_cons gid x y with
-	| Utils.MEdge (edge, gtree) -> Utils.MEdge (edge, (None, gtree))
-	| Utils.MNode (e, (block, gtreeX, gtreeY)) ->
-	(
-		let edgeX, edgeY = block_split block in
-		Utils.MNode (e, (CpTypes.Cons, (edgeX, (None, gtreeX)), (edgeY, (None, gtreeY))))
-	)
+let pnode_of_node = function
+	| Utils.Leaf () -> Utils.Leaf ()
+	| Utils.Node node -> Utils.Node (None, node)
 
-let tacx_propa_and gid x y = match solve_ande gid x y with
-	| Utils.M3Edge e -> Utils.MEdge e
-	| Utils.M3Cons (e, (eogX, eogY)) -> Utils.MNode (e, (CpTypes.Cons, eogX, eogY))
-	| Utils.M3Node (e, (block, ogX, ogY)) ->
-	(
-		let edgeX, edgeY = block_split block in
-		Utils.MNode (e, (CpTypes.And, (edgeX, ogX), (edgeY, ogY)))
-	)
+let node_push_cons _ x y = match solve_cons x y with
+	| Utils.MEdge edge -> Utils.MEdge edge
+	| Utils.MNode (block, (block2, node0, node1)) -> Utils.MNode (block, (CpxDL.bindump_node block2, node0, node1))
 
-let tacx_propa_xor gid x y = match solve_xore gid x y with
-	| Utils.M3Edge e -> Utils.MEdge e
-	| Utils.M3Cons (e, (eogX, eogY)) -> Utils.MNode (e, (CpTypes.Cons, eogX, eogY))
-	| Utils.M3Node (e, (block, ogX, ogY)) ->
-	(
-		let edgeX, edgeY = block_split block in
-		Utils.MNode (e, (CpTypes.Xor, (edgeX, ogX), (edgeY, ogY)))
-	)
+let tacx_propa_cons _ x y =
+	match solve_cons x y with
+	| Utils.MEdge (block, pnode) ->
+		Utils.MEdge(block, pnode)
+	| Utils.MNode (block, ((block0, block1), pnode0, pnode1)) -> 
+		Utils.MNode(block, (CpTypes.Cons, (block0, pnode0), (block1, pnode1)))
+
+let tacx_propa_and _ x y = match solve_and x y with
+	| Utils.M3Edge edge -> Utils.MEdge edge
+	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (CpTypes.Cons, pedge0, pedge1))
+	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (CpTypes.And, (block0, pnode0), (block1, pnode1)))
+
+let tacx_propa_xor _ x y = match solve_xor x y with
+	| Utils.M3Edge edge -> Utils.MEdge edge
+	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (CpTypes.Cons, pedge0, pedge1))
+	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (CpTypes.Xor, (block0, pnode0), (block1, pnode1)))
 
 let tacx_propa gid = CpTypes.(function
 	| Cons -> tacx_propa_cons gid
 	| And  -> tacx_propa_and  gid
 	| Xor  -> tacx_propa_xor  gid)
-*)
