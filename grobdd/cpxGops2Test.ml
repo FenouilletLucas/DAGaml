@@ -11,8 +11,25 @@ open CpxDumpLoad2
 open CpxGops2
 
 
+
 let _ =
+	let test_reversible     = true
+	and test_compatible_3_2 = true
+	and test_compatible_4_2 = true
+	and test_and_eval       = true
+	and test_xor_eval       = true
+	and test_and_assign     = true
+	and test_xor_assign     = true in
+
+
 	let n = int_of_string(Sys.argv.(1)) in
+	
+	print_string "#block[";
+	print_int n;
+	print_string "] = ";
+	print_int (Iter.length (gen_block_checked n));
+	print_string ";";
+	print_newline();
 
 	print_string "TEST 3.1 : solve_cons"; print_newline();
 
@@ -70,7 +87,7 @@ let _ =
 	) (Iter.progress 1000 0 ((gen_block_checked n) $* (gen_block_checked n)))
 	in
 
-	meta_test reversible;
+	if test_reversible then (meta_test reversible);
 
 
 	print_string "TEST 3.2 : solve_cons using in_block"; print_newline();
@@ -100,7 +117,7 @@ let _ =
 		()
 	in
 
-	meta_test compatible_test_3_2;
+	if test_compatible_3_2 then (meta_test compatible_test_3_2);
 
 	print_string "TEST 4.2 : check assign using solve_cons"; print_newline();
 
@@ -125,7 +142,7 @@ let _ =
 		()
 	in
 	
-	meta_test compatible_test_4_2;
+	if test_compatible_4_2 then (meta_test compatible_test_4_2);
 
 	let assign_merge3 solve peval = function
 	| Utils.M3Edge pedge -> Utils.M3Edge(assign_pedge peval pedge)
@@ -139,7 +156,15 @@ let _ =
 			| None -> Utils.M3Cons(blockC', (pedge0, pedge1))
 			| Some [] -> assert(false)
 			| Some (head::peval) -> match head with
-				| None -> Utils.M3Cons(blockC', (assign_pedge (Some peval) pedge0, assign_pedge (Some peval) pedge1))
+				| None ->
+				(
+					let pedge0 = assign_pedge (Some peval) pedge0
+					and pedge1 = assign_pedge (Some peval) pedge1 in
+				 	match compose_utils_merge blockC' (solve_cons pedge0 pedge1) with
+					| Utils.MEdge pedge -> Utils.M3Edge pedge
+					| Utils.MNode (blockC, ((block0, block1), pnode0, pnode1)) ->
+						Utils.M3Cons (blockC, ((block0, pnode0), (block1, pnode1)))
+				)
 				| Some choice -> Utils.M3Edge(compose_edge blockC' (assign_pedge (Some peval) (if choice then pedge1 else pedge0)))
 	)
 	| Utils.M3Node (blockC, ((block0, block1), pnode0, pnode1)) ->
@@ -207,7 +232,7 @@ let _ =
 	and pedge1 = ( {neg = false; arity = 3; block = SPX(true, {hasS = false; hasP = true; maxX = Some 0}, [X(true, 0); P; X(true, 0)])}, Utils.Leaf() ) in
 	conserve_eval solve_and opand pedge0 pedge1;
 
-	meta_test (conserve_eval solve_and opand);
+	if test_and_eval then (meta_test (conserve_eval solve_and opand));
 	print_string "TEST 5.2 : check XOR using eval"; print_newline();
 	let pedge0 = ( {neg = true; arity = 3; block = SPX(true, {hasS = false; hasP = true; maxX = Some 0}, [P; X(true, 0); X(true, 0)])}, Utils.Leaf() )
 	and pedge1 = ( {neg = true; arity = 3; block = SPX(true, {hasS = false; hasP = true; maxX = Some 0}, [X(true, 0); P; X(true, 0)])}, Utils.Leaf() ) in
@@ -215,7 +240,70 @@ let _ =
 	let pedge0 = ( {neg = true; arity = 3; block = SPX(true, {hasS = true; hasP = false; maxX = Some 1}, [X(true, 1); S; X(true, 0)])}, Utils.Node (None, 0) )
 	and pedge1 = ( {neg = true; arity = 3; block = SPX(true, {hasS = false; hasP = false; maxX = Some 1}, [X(false, 1); X(true, 1); X(true, 0)])}, Utils.Node (None, 0) ) in
 	conserve_eval solve_xor opxor pedge0 pedge1;
-	meta_test (conserve_eval solve_xor opxor);
+	if test_xor_eval then (meta_test (conserve_eval solve_xor opxor));
+
+	let conserve_assign solver pedge0 pedge1 =
+		(* print_string "@@"; print_newline(); *)
+		assert(arity_edge pedge0 = arity_edge pedge1);
+		let merge3 : (_, _, _) Utils.merge3 = solver pedge0 pedge1 in
+		assert(check_utils_merge3 merge3);
+		Iter.iter (fun peval ->
+			let e0  = assign_pedge  (Some peval) pedge0
+			and e1  = assign_pedge  (Some peval) pedge1
+			and m3  = assign_merge3 solver (Some peval) merge3 in
+			let m3' = solver e0 e1 in
+			if(not(m3 = m3'))
+			then
+			(
+				print_string "\nlet pedge0 = ";
+				dummydump_edge pedge0 |> print_string;
+				print_string "\nand pedge1 = ";
+				dummydump_edge pedge1 |> print_string;
+				print_string "\nand merge3 = ";
+				dummydump_merge3 merge3 |> print_string;
+				print_string "\nand m3  = ";
+				dummydump_merge3 m3 |> print_string;
+				print_string "\nand e0  = ";
+				dummydump_edge e0 |> print_string;
+				print_string "\nand e1  = ";
+				dummydump_edge e1 |> print_string;
+				print_string "\nand m3' = ";
+				dummydump_merge3 m3' |> print_string;
+				print_string " in";
+				print_newline();
+				assert(false)
+			)) (gen_assign (arity_edge pedge0))
+	in
+	print_string "TEST 5.2 : check AND using assign"; print_newline();
+	let pedge0 = ( {neg = true; arity = 2; block = SPX(false, {hasS = true; hasP = false; maxX = Some (0)}, [X(true, 0); S])}, Utils.Node (None, 0))
+	and pedge1 = ( {neg = true; arity = 2; block = SPX(false, {hasS = false; hasP = false; maxX = Some (0)}, [X(false, 0); X(true, 0)])}, Utils.Node (None, 0)) in
+	conserve_assign solve_and pedge0 pedge1;
+	let pedge0 = ( {neg = true; arity = 2; block = SPX(true, {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0); X(true, 0)])}, Utils.Node (None, 0))
+	and pedge1 = ( {neg = true; arity = 2; block = SPX(true, {hasS = false; hasP = false; maxX = Some (1)}, [X(true, 0); X(true, 1)])}, Utils.Node (None, 0)) in
+(*
+	and merge3 = M3Node(
+		{neg = false; arity = 2; block = SPX(false, {hasS = true; hasP = false; maxX = Some (0)}, [X(true, 0); S])},
+		( {neg = false; arity = 1; block = SPX(false, {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0)])}, Node ),
+		( {neg = false; arity = 1; block = SPX(true , {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0)])}, Node ) )
+	and m3  = M3Edge( ( {neg = true; arity = 2; block = SPX(true, {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0); X(false, 0)])}, Leaf ) )
+	and e0  = ( {neg = true; arity = 2; block = SPX(true, {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0); X(true, 0)])}, Node )
+	and e1  = ( {neg = true; arity = 2; block = SPX(true, {hasS = false; hasP = false; maxX = Some (1)}, [X(true, 0); X(true, 1)])}, Node )
+	and m3' = M3Node(
+		{neg = false; arity = 2; block = SPX(false, {hasS = true; hasP = false; maxX = Some (0)}, [X(true, 0); S])},
+		( {neg = false; arity = 1; block = SPX(false, {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0)])}, Node ),
+		( {neg = false; arity = 1; block = SPX(true , {hasS = false; hasP = false; maxX = Some (0)}, [X(true, 0)])}, Node ) ) in
+*)
+	conserve_assign solve_and pedge0 pedge1;
+
+
+
+	if test_and_assign then (meta_test (conserve_assign solve_and));
+	print_string "TEST 5.2 : check XOR using assign"; print_newline();
+	let pedge0 = ( {neg = true; arity = 1; block = SPX(true, {hasS = false; hasP = false; maxX = Some 0}, [X(true, 0)])}, Utils.Node (None, 0) )
+	and pedge1 = ( {neg = true; arity = 1; block = SPX(true, {hasS = false; hasP = false; maxX = Some 0}, [X(true, 0)])}, Utils.Node (None, 1) ) in
+	conserve_assign solve_xor pedge0 pedge1;
+
+	if test_xor_assign then (meta_test (conserve_assign solve_xor));
 	
 	()
 	

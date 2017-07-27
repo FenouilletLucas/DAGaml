@@ -100,8 +100,8 @@ extra:
 		grobdd/cpxGops2Test.native \
 		grobdd/cpxGopsTest.native \
 		grobdd/cpxGops2Test.d.byte \
-		grobdd/cpx2.native \
-		grobdd/cpx2.d.byte
+		#grobdd/cpx2.native \
+		#grobdd/cpx2.d.byte
 
 extraephe:
 		$(OB) \
