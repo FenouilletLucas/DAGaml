@@ -770,14 +770,21 @@ struct
 					| None -> Utils.MNode (Utils.Node node)
 					| Some peval -> Utils.MEdge (read peval (Utils.Node node))
 			and		propa compact pnodeX pnodeY = match pnodeX, pnodeY with
-				| Utils.Node(None, nodeX), Utils.Node(None, nodeY) ->
-					apply calc (compact, (Utils.Node nodeX), (Utils.Node nodeY))
-				| _ ->
+				| Utils.Node(Some _, _), _
+				| _, Utils.Node(Some _, _) ->
 				(
 					match D0.solver' G.get_ident compact (eval_pnode pnodeX) (eval_pnode pnodeY) with
 					| Utils.M3Edge pedge -> eval_pedge pedge
 					| Utils.M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
 					| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
+				)
+				| _ ->
+				(
+					let unp = function
+						| Utils.Leaf leaf -> Utils.Leaf leaf
+						| Utils.Node(none, node) -> (assert(none = None); Utils.Node node)
+					in
+					apply calc (compact, unp pnodeX, unp pnodeY)
 				)
 			and		calc (compact, nodeX, nodeY) =
 				let fx, fy = D0.decomp nodeX nodeY compact in

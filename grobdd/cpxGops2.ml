@@ -625,6 +625,15 @@ let rec facto_xor_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 	| _ -> (final_xor_ifspx2 arity neg0 neg1 pedge0 pedge1)
 
 let meta_solve_binop solver pedge0 pedge1 : (_, _, _) Utils.merge3 =
+	let reduce_assign = function
+		| Some peval when List.exists (function Some _ -> true | _ -> false) peval -> Some peval
+		| _ -> None
+	in
+	let reduce_pnode = function
+		| Utils.Leaf () -> Utils.Leaf ()
+		| Utils.Node (peval, node) -> Utils.Node(reduce_assign peval, node)
+	in
+	let reduce_pedge (block, pnode) = (block, reduce_pnode pnode) in
 	assert(check_edge pedge0);
 	assert(check_edge pedge1);
 	assert(arity_edge pedge0 = arity_edge pedge1);
@@ -643,8 +652,8 @@ let meta_solve_binop solver pedge0 pedge1 : (_, _, _) Utils.merge3 =
 	)
 	| Utils.M3Node (blockC, ((block0, block1), pnode0, pnode1)) ->
 	(
-		let pedge0 = block0, pnode0
-		and pedge1 = block1, pnode1 in
+		let pedge0 = reduce_pedge (block0, pnode0)
+		and pedge1 = reduce_pedge (block1, pnode1) in
 		assert(check_block blockC false);
 		assert(check_edge pedge0);
 		assert(check_edge pedge1);
@@ -674,6 +683,8 @@ let node_push_ande _ (pedge0, pedge1) = match solve_and pedge0 pedge1 with
 let pnode_of_node = function
 	| Utils.Leaf () -> Utils.Leaf ()
 	| Utils.Node node -> Utils.Node (None, node)
+
+let pedge_of_edge (block, node) = (block, pnode_of_node node)
 
 let node_push_cons _ x y = match solve_cons x y with
 	| Utils.MEdge edge -> Utils.MEdge edge

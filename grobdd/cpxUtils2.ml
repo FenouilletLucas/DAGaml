@@ -329,7 +329,10 @@ let reduce_block block next_is_leaf =
 	reduce_block_choice block.neg block.arity next_is_leaf block.block
 
 let reduce_edge (block, node) =
-	reduce_block block (Utils.gnode_is_leaf node)
+	(reduce_block block (Utils.gnode_is_leaf node), node)
+
+let spx_liste_to_block neg shift liste =
+	reduce_block_spx neg (List.length liste) false shift liste
 
 let spx_liste_to_edge neg shift (liste, node) =
 	let block = reduce_block_spx neg (List.length liste) (Utils.gnode_is_leaf node) shift liste in
@@ -535,6 +538,10 @@ let compose_utils_merge blockC = function
 	| Utils.MEdge edge -> Utils.MEdge(compose_edge blockC edge)
 	| Utils.MNode (block, node) -> Utils.MNode(compose_block blockC block false, node)
 
+let compose_utils_merge_node_edge block : (_, _) Utils.merge -> _ edge = function
+	| Utils.MEdge edge -> compose_edge block edge
+	| Utils.MNode node -> reduce_edge (block, Utils.Node node)
+
 let compose_utils_merge3 blockC = function
 	| Utils.M3Edge edge -> Utils.M3Edge(compose_edge blockC edge)
 	| Utils.M3Cons (block, node) -> Utils.M3Cons(compose_block blockC block false, node)
@@ -595,55 +602,55 @@ let get_root b (block, _) = ({neg = b; arity = block.arity; block = C0}, Utils.L
 let neg (block, node) = ({neg = not block.neg; arity = block.arity; block = block.block}, node)
 let cneg b (block, node) = ({neg = b <> block.neg; arity = block.arity; block = block.block}, node)
 
-let assign_edge : peval -> _ edge -> _ edge * peval = function
-	| None -> fun edge -> (edge, None)
-	| Some set ->
-	(
-		let arity = List.length set in
-		let arity' = MyList.count (function None -> true | _ -> false) set in
-		fun (block, node) ->
-			assert(check_edge (block, node));
-			assert(arity = block.arity);
-			match block.block with
-			| C0 -> (({neg = block.neg; arity = arity'; block = C0}, Utils.Leaf()), None)
-			| Id x ->
+let assign_edge' set : _ edge -> _ edge * peval =
+	let arity = List.length set in
+	let arity' = MyList.count (function None -> true | _ -> false) set in
+	fun (block, node) ->
+		assert(check_edge (block, node));
+		assert(arity = block.arity);
+		match block.block with
+		| C0 -> (({neg = block.neg; arity = arity'; block = C0}, Utils.Leaf()), None)
+		| Id x ->
+		(
+			match List.nth set x with
+			| Some b -> (({neg = block.neg <> b; arity = arity'; block = C0}, Utils.Leaf()), None)
+			| None ->
 			(
-				match List.nth set x with
-				| Some b -> (({neg = block.neg <> b; arity = arity'; block = C0}, Utils.Leaf()), None)
-				| None ->
-				(
-					let x' = MyList.counti (fun i -> function None when i < x -> true | _ -> false) set in
-					(({neg = block.neg; arity = arity'; block = Id x'}, Utils.Leaf()), None)
-				)
+				let x' = MyList.counti (fun i -> function None when i < x -> true | _ -> false) set in
+				(({neg = block.neg; arity = arity'; block = Id x'}, Utils.Leaf()), None)
 			)
-			| SPX(shift, tag, liste) ->
+		)
+		| SPX(shift, tag, liste) ->
+		(
+			let opsubopset, opmin = MyList.foldmap (fun (opmin : int option) -> fun ((set : bool option), elem) -> match set with
+				| None      -> ((Some elem, (match elem with S -> Some None | _ -> None)), opmin)
+				| Some set  -> match elem with
+					| P		    -> ((None     , None	                                      ), opmin)
+					| S		    -> ((None     , Some (Some set)                             ), opmin)
+					| X(b, i) -> let opmin = if b = set then Tools.opmin i opmin else opmin in
+											 ((None     , None                                        ), opmin)
+				) (fun _ -> true) None (List.combine set liste) in
+			let opliste, opset = List.split opsubopset in
+			let liste = MyList.list_of_oplist opliste
+			and set   = MyList.list_of_oplist opset   in
+			match opmin with
+			| None ->
 			(
-				let opsubopset, opmin = MyList.foldmap (fun (opmin : int option) -> fun ((set : bool option), elem) -> match set with
-					| None      -> ((Some elem, (match elem with S -> Some None | _ -> None)), opmin)
-					| Some set  -> match elem with
-						| P		    -> ((None     , None	                                      ), opmin)
-						| S		    -> ((None     , Some (Some set)                             ), opmin)
-						| X(b, i) -> let opmin = if b = set then Tools.opmin i opmin else opmin in
-												 ((None     , None                                        ), opmin)
-					) (fun _ -> true) None (List.combine set liste) in
-				let opliste, opset = List.split opsubopset in
-				let liste = MyList.list_of_oplist opliste
-				and set   = MyList.list_of_oplist opset   in
-				match opmin with
-				| None ->
-				(
-					let block = reduce_block_spx block.neg arity' (Utils.gnode_is_leaf node) shift liste in
-					((block, node), (if List.for_all ((=)None) set then None else (Some set)))
-				)
-				| Some min ->
-				(
-					let liste = List.map (function X(_, i) as e when i < min -> e | _ -> P) liste in
-					let neg = block.neg <> shift <> (mod2 min) in
-					let block = reduce_block_spx neg arity' true (mod2 min) liste in
-					((block, Utils.Leaf()), None)
-				)
+				let block = reduce_block_spx block.neg arity' (Utils.gnode_is_leaf node) shift liste in
+				((block, node), (if List.for_all ((=)None) set then None else (Some set)))
 			)
-	)
+			| Some min ->
+			(
+				let liste = List.map (function X(_, i) as e when i < min -> e | _ -> P) liste in
+				let neg = block.neg <> shift <> (mod2 min) in
+				let block = reduce_block_spx neg arity' true (mod2 min) liste in
+				((block, Utils.Leaf()), None)
+			)
+		)
+
+let assign_edge = function
+	| None -> (fun edge -> (edge, None))
+	| Some set -> (fun edge -> assign_edge' set edge)
 
 let check_peval = function
 	| None -> true
@@ -665,6 +672,14 @@ let compose_peval pevalC pevalc =
 			| (x'   , y::y'    ) -> aux (y::carry) (x', y')
 		in Some(aux [] (pevalC, pevalc))
 	)
+
+let assign_pedge' peval (block, pnode) : _ pedge =
+	let (block', pnode'), peval' = assign_edge' peval (block, pnode) in
+	let pnode' = match pnode' with
+		| Utils.Leaf () -> assert(peval' = None); Utils.Leaf()
+		| Utils.Node (peval, node) -> Utils.Node(compose_peval peval' peval, node)
+	in
+	(block', pnode')
 
 let assign_pedge peval (block, pnode) : _ pedge =
 	let (block', pnode'), peval' = assign_edge peval (block, pnode) in
