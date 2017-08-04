@@ -83,6 +83,7 @@ full:
 extra:
 	$(OB) \
 		src/taggedSubdagPropa.native \
+		src/binUbdag.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_noreg_cpx2_cons.native \
@@ -91,19 +92,9 @@ extra:
 		test/test_downgrade_pure_cpx_to_bryant.native \
 		tools/binStream.native \
 		tools/oStream.native \
-		grobdd/cpxTypes2.native \
-		grobdd/cpxUtils2.native \
 		grobdd/cpxUtils2Test.native \
-		grobdd/cpxUtils2Test.d.byte \
-		grobdd/cpxDumpLoad2.native \
 		grobdd/cpxDumpLoad2Test.native \
-		grobdd/cpxDumpLoad2Test.d.byte \
-		grobdd/cpxGops2.native \
 		grobdd/cpxGops2Test.native \
-		grobdd/cpxGopsTest.native \
-		grobdd/cpxGops2Test.d.byte \
-		grobdd/cpx2.native \
-		grobdd/cpx2.d.byte
 
 extraephe:
 		$(OB) \
