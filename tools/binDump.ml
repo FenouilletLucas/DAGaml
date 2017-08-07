@@ -43,4 +43,6 @@ let sized_int size n stream : bool list =
 		assert(false)
 	))
 
+let pair dumpA dumpB (a, b) stream = dumpA a (dumpB b stream)
+
 	

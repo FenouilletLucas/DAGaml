@@ -84,4 +84,9 @@ let sized_int size stream =
 let int stream =
 	let k, stream = unary stream in
 	sized_int k stream
+
+let pair loadA loadB stream =
+	let a, stream = loadA stream in
+	let b, stream = loadB stream in
+	(a, b), stream
 	

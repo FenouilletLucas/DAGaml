@@ -1,7 +1,3 @@
-type stream  = bool list
-type 't dump = 't -> stream -> stream
-type 't load = stream -> 't  * stream
-
 module type MODELE =
 sig
 	type leaf
@@ -12,11 +8,11 @@ sig
 	type 'i edge' = edge * 'i next'
 	type 'i node' = node * 'i edge' * 'i edge'
 
-	val dump_edge : ('i dump) -> 'i edge' dump
-	val dump_node : ('i dump) -> 'i node' dump
+	val dump_edge : ('i Utils.dump) -> 'i edge' Utils.dump
+	val dump_node : ('i Utils.dump) -> 'i node' Utils.dump
 	
-	val load_edge : ('i load) -> 'i edge' load
-	val load_node : ('i load) -> 'i node' load
+	val load_edge : ('i Utils.load) -> 'i edge' Utils.load
+	val load_node : ('i Utils.load) -> 'i node' Utils.load
 
 	(* assert(x |> dump |> load = x) && assert(x |> load |> dump |> stream) *)
 	val __check_reverse__ : bool
@@ -43,9 +39,23 @@ sig
 	val push : manager -> node' -> ident
 	val pull : manager -> ident -> node'
 
+	val dump_ident : ident Utils.dump
+	val load_ident : ident Utils.load
+
+	val dump_next : next' Utils.dump
+	val load_next : next' Utils.load
+
+	val dump_edge : edge' Utils.dump
+	val load_edge : edge' Utils.load
+
+	val dump_node : node' Utils.dump
+	val load_node : node' Utils.load
+
 	val push_edge : edge' -> Bitv.t
 	val pull_edge : Bitv.t -> edge'
 	
+	val push_node : node' -> Bitv.t
+	val pull_node : Bitv.t -> node'
 end
 
 module MODULE(M0:MODELE) =
@@ -72,29 +82,29 @@ struct
 	let dump_ident = BinDump.int
 	let load_ident = BinLoad.int
 
-	let push' node = M.dump_node dump_ident node [] |> Bitv.L.of_bool_list
-	let pull' bitv =
+	let push_node node = M.dump_node dump_ident node [] |> Bitv.L.of_bool_list
+	let pull_node bitv =
 		let node, stream = M.load_node load_ident (Bitv.L.to_bool_list bitv) in
 		assert(stream = []);
 		node
 
 	let push man node =
-		let bitv = push' node in
+		let bitv = push_node node in
 		if M.__check_reverse__
 		then
 		(
-			let node' = pull' bitv in
+			let node' = pull_node bitv in
 			assert(node = node')
 		);
 		H2Table.push man.man bitv
 
 	let pull man ident =
 		let bitv = H2Table.pull man.man ident in
-		let node = pull' bitv in
+		let node = pull_node bitv in
 		if M.__check_reverse__
 		then
 		(
-			let bitv' = push' node in
+			let bitv' = push_node node in
 			assert(bitv = bitv')
 		);
 		node
@@ -300,28 +310,29 @@ struct
 	type manager = {
 		src :  M0.SRC.manager;
 		dst :  M0.DST.manager;
-		(* SRC.ident -> DST.edge' MemoTable.t *)
-		man : (M0.SRC.ident, Bitv.t) MemoTable.t;
+		man : (M0.SRC.ident, M0.SRC.ident, M0.DST.edge', Bitv.t) MemoBTable.t;
 		map_next : M0.SRC.next' -> M0.DST.edge';
 		map_edge : M0.SRC.edge' -> M0.DST.edge';
 		map_node : M0.SRC.ident -> M0.DST.edge';
 	}
 
 	let makeman src dst hsize =
-		let man, apply = MemoTable.make hsize in
+		let dumpA x = x
+		and loadA x = x
+		and dumpB x = M0.DST.push_edge x
+		and loadB x = M0.DST.pull_edge x in
+		let man, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let rec map_next = function
 			| Utils.Leaf leaf -> M0.map_leaf leaf
 			| Utils.Node ident -> map_node ident
 		and     map_edge (edge, next) = M0.map_edge edge (map_next next)
-		and     rec_node ident = apply (fun ident ->
+		and     map_node ident = apply (fun ident ->
 			let (node, edge'0, edge'1) = M0.SRC.pull src ident in
 			let edge', merge = M0.map_node node (map_edge edge'0) (map_edge edge'1) in
-			M0.DST.push_edge (edge', match merge with
+			(edge', match merge with
 				| Utils.MEdge next' -> next'
 				| Utils.MNode node' -> Utils.Node(M0.DST.push dst node'))
 		) ident
-		and		map_node ident =
-			M0.DST.pull_edge (rec_node ident)
 		in {src; dst; man; map_next; map_edge; map_node}
     
 	let default_newman_hsize = 10000
@@ -333,31 +344,3 @@ struct
 	let man_node man = man.map_node
 	
 end
-
-type eval = bool option list
-
-let dump_eval eval stream = none_list (fun elem stream -> match elem with
-	| None -> false::false::stream
-	| Some elem -> match elem with
-		| None -> false::true ::stream
-		| Some elem -> true ::elem ::stream ) eval stream
-
-module BIDIR_MODELE =
-sig
-	module M : MODULE_SIG
-
-	val compose : M.M.edge -> M.edge' -> M.edge'
-	val solver : M.node' ->  M.M.edge * (M.next', M.node')
-
-
-
-	
-
-(* WIP *)
-
-end
-
-module IBOP =
-struct
-	
-end 

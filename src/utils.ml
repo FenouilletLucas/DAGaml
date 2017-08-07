@@ -42,3 +42,7 @@ and  ('edge, 'node, 'leaf, 'link) edge = 'edge * ('edge, 'node, 'leaf, 'link) no
 type ('pnode, 'tnode) pt_node =
 	| PTree of 'pnode
 	| TTree of 'tnode
+
+type stream  = bool list
+type 't dump = 't -> stream -> stream
+type 't load = stream -> 't  * stream
