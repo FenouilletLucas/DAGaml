@@ -30,7 +30,7 @@ let list_of_oplistv3 =
 		| (Some item)::oplist' -> item::(aux oplist')
 	in aux
 
-let list_of_oplistv4 =
+let list_of_oplistv4 : 'a option list -> 'a list =
 	let rec aux carry = function
 		| [] -> List.rev carry
 		| None::oplist' -> aux carry oplist'
@@ -38,6 +38,7 @@ let list_of_oplistv4 =
 	in (fun l -> aux [] l)
 
 let list_of_oplist = list_of_oplistv4
+let unop : 'a option list -> 'a list = list_of_oplist
 
 let opmap opfun liste = list_of_oplist (List.map opfun liste)
 let opmap2 opfun liste1 liste2 = list_of_oplist (List.map2 opfun liste1 liste2)

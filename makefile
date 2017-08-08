@@ -1,6 +1,6 @@
 #NUMS=/usr/lib/ocaml/nums
 #LIBS=-lib /usr/lib64/ocaml/nums
-#LIBS=-lib /usr/lib/ocaml/nums
+LIBS=-lib /usr/lib/ocaml/nums
 SRCS=-Is tools,src
 NPROC=$(shell nproc)
 OB=ocamlbuild -j $(NPROC) -r $(LIBS) $(SRCS)
@@ -10,6 +10,10 @@ all:
 		test/test_udag.native \
 		test/test_urdag.native \
 		test/test_ubdag.native
+
+lucas:
+	$(OB) \
+		icp/main.native
 
 clean:
 	ocamlbuild -clean
