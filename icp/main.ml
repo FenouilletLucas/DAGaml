@@ -5,7 +5,22 @@
 
 (* Data Structure  *)
 type node = int
-type graph = {nodes : node list; edges : node list array } (* G = (V, E)*)
+type graph = {nodes : node list; edges : node list array } (* G = (V, E) *)
+
+(* Dump/Load *)
+
+let strdump_graph graph = Tree.Node [
+	StrTree.of_list StrTree.of_int graph.nodes;
+	StrTree.of_array (StrTree.of_list StrTree.of_int) graph.edges
+]
+
+let strload_graph stree = function
+	| Tree.Node [nodes; edges] ->
+	{
+		nodes = StrTree.to_list StrTree.to_int nodes;
+		edges = StrTree.to_array (StrTree.to_list StrTree.to_int) edges
+	}
+	| _ -> assert false
 
 (* Exemples  *)
 let ex_E = [| 
