@@ -3,13 +3,6 @@ type token =
 	| Sym of char
 	| Ident of string
 
-type module_tacx = {
-	tacx_name : string;
-	tacx_input: string list;
-	tacx_man  : Cp.TACX.manager;
-	tacx_edges: (string * Cp.TACX.edge) list;
-}
-
 let my_lexer stream : token Stream.t =
 	let is_space = function ' ' | '\t' | '\n' -> true | _ -> false in
 	let rec spaces () = match Stream.peek stream with
