@@ -56,6 +56,10 @@ sig
 	
 	val push_node : node' -> Bitv.t
 	val pull_node : Bitv.t -> node'
+
+	val dump : manager -> edge' list -> StrTree.tree
+	val load : StrTree.tree  -> manager * edge' list
+
 end
 
 module MODULE(M0:MODELE) =
@@ -114,6 +118,23 @@ struct
 		let edge, stream = M.load_edge load_ident (Bitv.L.to_bool_list bitv) in
 		assert(stream = []);
 		edge
+
+	let dump man liste =
+		let man = H2Table.strdump Extra.(Bitv.L.to_hexa_string >> StrTree.of_string) man.man
+		and liste = List.map Extra.(push_edge >> Bitv.L.to_hexa_string >> StrTree.of_string) liste in
+		Tree.Node (man::liste)
+
+	let load' hsize = function
+		| Tree.Node (man::liste) ->
+		(
+			let man = H2Table.strload hsize Extra.(StrTree.to_string >> Bitv.L.of_hexa_string) man
+			and liste = List.map Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> pull_edge) liste in
+			({man}, liste)
+		)
+		| _ -> assert false
+
+	let load stree = load' default_newman_hsize stree
+
 end
 
 let default_dump_node dump_core dump_leaf dump_ident (node, (edge0, next0), (edge1, next1)) stream =
@@ -246,6 +267,9 @@ struct
 				assert(edge' = edge'')
 			);
 			edge
+
+		let dump = M0.SRC.dump
+		let load = M0.SRC.load
 	end
 
 	let export : M0.SRC.manager -> MODULE.manager = fun man -> man
@@ -292,6 +316,39 @@ struct
 	let man_next man = man.map_next
 	let man_edge man = man.map_edge
 	let man_node man = man.map_node
+end
+
+module REMAN(M:MODULE_SIG) =
+struct
+
+	type manager = {
+		src : M.manager;
+		dst : M.manager;
+		mem : (M.ident, M.ident) MemoTable.t;
+		map_node : M.ident -> M.ident;
+		map_edge : M.edge' -> M.edge';
+	}
+
+	let makeman src dst hsize =
+		let mem, apply = MemoTable.make hsize in
+		let rec map_node ident = apply (fun ident ->
+			M.push dst (rec_node (M.pull src ident))
+		) ident
+		and     rec_node (node, edge0, edge1) =
+			(node, map_edge edge0, map_edge edge1)
+		and     map_edge (edge, next) = (edge, map_next next)
+		and     map_next = function
+			| Utils.Leaf leaf -> Utils.Leaf leaf
+			| Utils.Node ident -> Utils.Node (map_node ident)
+		in {src; dst; mem; map_node; map_edge}
+	
+	let default_newman_hsize = 10000
+
+	let newman src dst = makeman src dst default_newman_hsize
+
+	let map_node man = man.map_node
+	let map_edge man = man.map_edge
+
 end
 
 module type SEM_MAP_MODELE =

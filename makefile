@@ -83,17 +83,19 @@ full:
 extra:
 	$(OB) \
 		src/taggedSubdagPropa.native \
-		tools/memoBTable.native \
 		src/binUbdag.native \
-		src/binSubdag.native \
+		src/binUbdagT.native \
+		src/binUbdagTC.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_noreg_cpx2_cons.native \
 		test/test_noreg_cpx2_cons.d.byte \
 		test/test_bin_of_int.native \
 		test/test_downgrade_pure_cpx_to_bryant.native \
+		tools/memoBTable.native \
 		tools/binStream.native \
 		tools/oStream.native \
+		tools/gTree.native \
 		grobdd/cpxUtils2Test.native \
 		grobdd/cpxDumpLoad2Test.native \
 		grobdd/cpxGops2Test.native \

@@ -45,4 +45,6 @@ let sized_int size n stream : bool list =
 
 let pair dumpA dumpB (a, b) stream = dumpA a (dumpB b stream)
 
+let closure dump objet = dump objet [] |> Bitv.L.of_bool_list
+
 	

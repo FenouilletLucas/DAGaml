@@ -1,21 +1,21 @@
 module type MODELE =
 sig
-	module UBDAG : BinUbdag.MODELE with
+	module M : BinUbdag.MODELE with
 		type node = unit
 
-	val push_node : 'i UBDAG.node' -> UBDAG.edge * ('i next', 'i node') Utils.merge
-	val pull_node : 'i UBDAG.edge' -> ('i node', 'i * ('i node' -> 'i node')) Utils.merge
+	val push_node : 'i M.node' -> M.edge * ('i M.next', 'i M.node') Utils.merge
+	val pull_node : 'i M.edge' -> ('i M.node', 'i * ('i M.node' -> 'i M.node')) Utils.merge
 
-	val compose : edge -> 'i edge' -> 'i edge'
+	val compose : M.edge -> 'i M.edge' -> 'i M.edge'
 end
 
 module type MODULE_SIG =
 sig
 	module M : MODELE
 	module G : BinUbdag.MODULE_SIG with
-		    type M.leaf = M.leaf
-		and type M.edge = M.edge
-		and type M.node = M.node
+		    type M.leaf = M.M.leaf
+		and type M.edge = M.M.edge
+		and type M.node = M.M.node
 
 	type manager
 
@@ -31,7 +31,7 @@ end
 module MODULE(M0:MODELE) =
 struct
 	module M = M0
-	module G = BinUbdag.MODULE(M0)
+	module G = BinUbdag.MODULE(M0.M)
 
 	type manager = G.manager
 
@@ -59,7 +59,7 @@ module type BINOP_MODELE =
 sig
 	module M : MODULE_SIG
 	
-	val solver : M.G.node' -> M.M.edge * (M.G.next', M.G.node', M.G.node') Utils.merge3
+	val solver : M.G.node' -> M.M.M.edge * (M.G.next', M.G.node', M.G.node') Utils.merge3
 
 end
 
@@ -115,16 +115,16 @@ sig
 
 	type next = peval option * M.G.ident
 
-	type next' = next M.M.next'
-	type edge' = next M.M.edge'
-	type node' = next M.M.node'
+	type next' = next M.M.M.next'
+	type edge' = next M.M.M.edge'
+	type node' = next M.M.M.node'
 
 	val eval_edge : peval -> edge' ->  edge'
 	val eval_node : peval -> node' -> (edge', node') Utils.merge
 	
 end
 
-
+(*
 module PEVAL(M:PEVAL_MODELE) =
 struct
 	
@@ -141,6 +141,7 @@ struct
 	
 	
 end
+*)
 
 (*module type BIDIR =
 sig

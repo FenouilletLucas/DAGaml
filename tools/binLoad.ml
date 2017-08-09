@@ -89,4 +89,8 @@ let pair loadA loadB stream =
 	let a, stream = loadA stream in
 	let b, stream = loadB stream in
 	(a, b), stream
-	
+
+let closure load bitv =
+	let objet, stream = bitv |> Bitv.L.to_bool_list |> load in
+	assert(stream = []);
+	objet

@@ -29,10 +29,6 @@ type ('edge, 'cons, 'node) merge3 =
 	| M3Cons of 'cons
 	| M3Node of 'node
 
-let pnode_of_node = function
-	| Leaf leaf -> Leaf leaf
-	| Node node -> Node (None, node)
-
 type ('edge, 'node, 'leaf, 'link) node =
 	| TNode of ('node * (('edge, 'node, 'leaf, 'link) edge * ('edge, 'node, 'leaf, 'link) edge))
 	| TLeaf of 'leaf
@@ -46,3 +42,13 @@ type ('pnode, 'tnode) pt_node =
 type stream  = bool list
 type 't dump = 't -> stream -> stream
 type 't load = stream -> 't  * stream
+
+let pnext_of_next = function
+	| Leaf leaf -> Leaf leaf
+	| Node node -> Node (None, node)
+
+let pedge_of_edge (edge, next) =
+	(edge, pnext_of_next next)
+
+let pnode_of_node (node, edge0, edge1) =
+	(node, pedge_of_edge edge0, pedge_of_edge edge1)

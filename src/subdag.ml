@@ -5,7 +5,7 @@ module type MODELE = sig
 	type edge
 	type node
 
-	type 't gn = (leaf, 't) Utils.gnode
+	type 't gn = (leaf, 't) gnode
 	type 't n = node * 't gn * 't gn
 	type 't e = edge * 't gn
 
@@ -70,7 +70,7 @@ struct
 		type edge = M0.edge
 		type node = M0.node
 
-		type 't gn = (leaf, 't) Utils.gnode
+		type 't gn = (leaf, 't) gnode
 		type 't n = node * 't gn * 't gn
 		type 't e = edge * 't gn
 
@@ -101,18 +101,18 @@ struct
 	let newman = G.newman
 	let makeman = G.makeman
 
-	let push_leaf (e:M.edge) (l:M.leaf) = ((e, ((Utils.Leaf l):G.tree)):edge)
+	let push_leaf (e:M.edge) (l:M.leaf) = ((e, ((Leaf l):G.tree)):edge)
 	let pull_node man (n:G.pnode) = M.pull_node G.get_ident (G.pull man n)
 
 	let push man x y = match M.push G.get_ident x y with
 		| MEdge e -> e
-		| MNode (e, (n:G.node)) -> (e, Utils.Node (G.push man (n:G.node)))
+		| MNode (e, (n:G.node)) -> (e, Node (G.push man (n:G.node)))
 
 	let pull man ((_, n)as e) = match M.pull G.get_ident e with
 		| MEdge (x, y) -> (x, y)
 		| MNode f -> match n with
-			| Utils.Leaf _ -> assert false
-			| Utils.Node p -> f(G.pull man p)
+			| Leaf _ -> assert false
+			| Node p -> f(G.pull man p)
 
 	let compose = M.compose
 		
@@ -125,7 +125,7 @@ struct
 		type extra
 
 		val do_leaf : extra -> M.leaf -> xnode 
-		val do_node : extra -> M.node -> (xnode, xnode -> xnode -> xnode) Utils.merge
+		val do_node : extra -> M.node -> (xnode, xnode -> xnode -> xnode) merge
 		val do_edge : extra -> M.edge -> xnode -> xedge
 
 	end
@@ -148,15 +148,15 @@ struct
 			and memoEdge, applyEdge = MemoTable.make hsize
 			and memoNode, applyNode = MemoTable.make hsize in
 			let rec calcrec = function
-				| Utils.Leaf leaf -> calcleaf leaf
-				| Utils.Node node -> calcnode node
+				| Leaf leaf -> calcleaf leaf
+				| Node node -> calcnode node
 			and		calcedge edge = applyEdge (fun (edge, gnode) -> D0.do_edge extra edge (calcrec gnode)) edge
 			and		calcleaf leaf = applyLeaf (D0.do_leaf extra) leaf
 			and		calcnode node = applyNode (fun node ->
 				let (node:M.node), (nx:G.tree), (ny:G.tree) = G.pull man node in
 				match D0.do_node extra node with
-				| Utils.MEdge xnode -> xnode
-				| Utils.MNode merger -> merger (calcrec nx) (calcrec ny)) node
+				| MEdge xnode -> xnode
+				| MNode merger -> merger (calcrec nx) (calcrec ny)) node
 			in
 			{
 				man  = man;
@@ -182,7 +182,7 @@ struct
 		type extra
 
 		val do_leaf: extra -> M.edge -> M.leaf -> xedge
-		val do_node: extra -> M.edge -> (xedge, (xedge -> xedge -> xedge)) Utils.merge
+		val do_node: extra -> M.edge -> (xedge, (xedge -> xedge -> xedge)) merge
 	end
 
 
@@ -201,12 +201,12 @@ struct
 			let memo0, apply0 = MemoTable.make hsize
 			and memo1, apply1 = MemoTable.make hsize in
 			let rec calcrec (edge, gnode) = match gnode with
-				| Utils.Leaf leaf -> apply0 fun0 (edge, leaf)
-				| Utils.Node node -> apply1 fun1 (edge, node)
+				| Leaf leaf -> apply0 fun0 (edge, leaf)
+				| Node node -> apply1 fun1 (edge, node)
 			and fun0 (edge, leaf) = D0.do_leaf extra edge leaf
 			and fun1 (edge, node) = match D0.do_node extra edge with
-				| Utils.MEdge xedge -> xedge
-				| Utils.MNode merger ->
+				| MEdge xedge -> xedge
+				| MNode merger ->
 				(
 					let edge0, edge1 = pull_node man node in
 					merger (calcrec edge0) (calcrec edge1)
@@ -236,7 +236,7 @@ struct
 		type extra
 
 
-		val do_edge: extra -> edge -> (xedge, xresi * edge) Utils.merge
+		val do_edge: extra -> edge -> (xedge, xresi * edge) merge
 		val push : extra -> xedge -> xedge -> xedge
 		val compose : extra -> xresi -> xedge -> xedge
 	end
@@ -256,8 +256,8 @@ struct
 			let memo, apply = MemoTable.make hsize in
 			let rec calcrec edge = apply (fun edge ->
 				match D0.do_edge extra edge with
-				| Utils.MEdge xedge -> xedge
-				| Utils.MNode (xresi, edge) ->
+				| MEdge xedge -> xedge
+				| MNode (xresi, edge) ->
 				(
 					let edge0, edge1 = pull man edge in
 					D0.compose extra xresi (D0.push extra (calcrec edge0) (calcrec edge1))
@@ -292,7 +292,7 @@ struct
 		type extra
 		val compose : extra -> transform -> extern -> extern
 		val  decomp : extra -> G.tree -> t -> t1 * t2 * edge
-		val  solver : extra -> t2 -> edge  -> (extern, (transform * (t * G.tree))) Utils.merge
+		val  solver : extra -> t2 -> edge  -> (extern, (transform * (t * G.tree))) merge
 		val  merger : extra -> t1 -> extern -> extern -> extern
 	end
 	
@@ -313,8 +313,8 @@ struct
 			and memo1, apply1 = MemoTable.make hsize in
 			let pull = pull man in
 			let rec calcrec t2 x = match D0.solver extra t2 x with
-			| Utils.MEdge f -> f
-			| Utils.MNode (t, (c, n)) -> D0.compose extra t (match n with
+			| MEdge f -> f
+			| MNode (t, (c, n)) -> D0.compose extra t (match n with
 				| Leaf (l:M.leaf)	-> apply0 fun0 (c, l)
 				| Node (n:G.pnode)	-> apply1 fun1 (c, n))
 			and fun0 (c, l) = calc c (Leaf l)
@@ -357,12 +357,12 @@ struct
 			| Some x -> x
 
 		let do_leaf extra edge leaf =
-			((dump_edge edge, Utils.Leaf (dump_leaf leaf)):Udag.StrTree.edge_t)
+			((dump_edge edge, Leaf (dump_leaf leaf)):Udag.StrTree.edge_t)
 
 		let do_node extra edge =
 			let merger edge0 edge1 =
-				((dump_edge edge, Utils.Node (Udag.StrTree.push extra (Tree.Node [], [edge0; edge1]))):Udag.StrTree.edge_t)
-			in ((Utils.MNode merger):(xedge, (xedge -> xedge -> xedge))Utils.merge)
+				((dump_edge edge, Node (Udag.StrTree.push extra (Tree.Node [], [edge0; edge1]))):Udag.StrTree.edge_t)
+			in ((MNode merger):(xedge, (xedge -> xedge -> xedge))merge)
 
 	end
 
@@ -387,13 +387,13 @@ struct
 			| Some x -> x
 
 		let do_leaf extra leaf =
-			Utils.Leaf (dump_leaf leaf)
+			Leaf (dump_leaf leaf)
 
 		let do_node (extra:extra) node =
 			let tnode, tedge0, tedge1 = dump_node node in
 			let merger next0 next1 =
-				Utils.Node (Udag.String.push extra ((None, tnode), [(tedge0, next0); (tedge1, next1)]))
-			in ((Utils.MNode merger):(xnode, (xnode -> xnode -> xnode))Utils.merge)
+				Node (Udag.String.push extra ((None, tnode), [(tedge0, next0); (tedge1, next1)]))
+			in ((MNode merger):(xnode, (xnode -> xnode -> xnode))merge)
 
 		let do_edge extra edge next =
 			(dump_edge edge, next)
@@ -429,10 +429,10 @@ struct
 			| Some f -> f
 			| None -> (fun _ -> assert false)
 
-		let do_leaf extra leaf = Utils.Leaf (dump_leaf leaf)
-		let do_node extra node : (xnode, xnode -> xnode -> xnode) Utils.merge =
+		let do_leaf extra leaf = Leaf (dump_leaf leaf)
+		let do_node extra node : (xnode, xnode -> xnode -> xnode) merge =
 			let node = dump_node node in
-			Utils.MNode(fun son0 son1 -> Utils.Node (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
+			MNode(fun son0 son1 -> Node (Udag.StrTree.push extra (node, [(Tree.Node[], son0); (Tree.Node[], son1)])))
 
 		let do_edge (extra:extra) edge son = (Tree.Node [dump_edge edge], son)
 
@@ -488,7 +488,7 @@ struct
 		type t2
 		val compose : transform -> edge -> edge
 		val  decomp : G.tree -> t -> t1 * t2 * edge
-		val  solver : t2 -> edge -> (edge, (transform * (t*G.tree))) Utils.merge
+		val  solver : t2 -> edge -> (edge, (transform * (t*G.tree))) merge
 		val  merger : t1 -> edge -> edge -> edge
 	end
 
@@ -537,7 +537,7 @@ struct
 		type transform
 		val compose : transform -> edge -> edge
 		val  decomp : G.tree -> G.tree -> t -> edge * edge
-		val  solver : (G.pnode -> G.ident) -> edge * edge -> (edge, (transform * (t*G.tree*G.tree))) Utils.merge
+		val  solver : (G.pnode -> G.ident) -> edge * edge -> (edge, (transform * (t*G.tree*G.tree))) merge
 	end
 	
 	module IBOP(D0:MODELE_IBOP) =
@@ -556,8 +556,8 @@ struct
 			let push = push man
 			and pull = pull man in
 				let rec calcrec (x:edge) (y:edge) = match D0.solver G.get_ident (x, y) with
-				| Utils.MEdge f -> f
-				| Utils.MNode (t, (c, n1, n2)) -> D0.compose t (apply calc (c, n1, n2))
+				| MEdge f -> f
+				| MNode (t, (c, n1, n2)) -> D0.compose t (apply calc (c, n1, n2))
 				and calc (compact, nx, ny) =
 					let fx, fy = D0.decomp nx ny compact in
 					let fx0, fx1 = pull fx
@@ -588,16 +588,16 @@ struct
 		val  solver : (G.pnode -> G.ident) -> edge -> edge -> (
 			M.edge * ((eval option) * G.tree),
 			M.edge * ((M.edge * (eval option * G.tree)) * (M.edge * (eval option * G.tree))),
-			residual * ( compact * ((eval option) * G.tree) * ((eval option) * G.tree))) Utils.merge3
+			residual * ( compact * ((eval option) * G.tree) * ((eval option) * G.tree))) merge3
 
-		val solver' : (G.pnode -> G.ident) -> compact -> (edge, G.tree) Utils.merge -> (edge, G.tree) Utils.merge -> (
+		val solver' : (G.pnode -> G.ident) -> compact -> (edge, G.tree) merge -> (edge, G.tree) merge -> (
 			M.edge * ((eval option) * G.tree),
 			M.edge * ((M.edge * (eval option * G.tree)) * (M.edge * (eval option * G.tree))),
-			residual * ( compact * ((eval option) * G.tree) * ((eval option) * G.tree))) Utils.merge3
+			residual * ( compact * ((eval option) * G.tree) * ((eval option) * G.tree))) merge3
 
 		val eval : eval -> edge -> M.edge * ((eval option) * G.tree) (* apply the evaluation sequence on the descriptor *)
 
-		val read : eval -> (unit, eval, eval, eval * eval) Utils.binpull (* read the first symbole of the evaluation sequence *)
+		val read : eval -> (unit, eval, eval, eval * eval) binpull (* read the first symbole of the evaluation sequence *)
 		
 		val  decomp : G.tree -> G.tree -> compact -> edge * edge
 		val compose : residual -> edge -> edge
@@ -622,22 +622,22 @@ struct
 			let push = push man
 			and pull = pull man
 			and pull_node = function
-				| Utils.Leaf _		-> assert false
-				| Utils.Node node	-> pull_node man node in
+				| Leaf _		-> assert false
+				| Node node	-> pull_node man node in
 			let rec	read (set:D0.eval) (gtree:G.tree) =
 				apply_eval (fun (set, gtree) -> match D0.read set with
-				| Utils.MStop () -> assert false
-				| Utils.Go0 set ->
+				| MStop () -> assert false
+				| Go0 set ->
 				(
 					let edge, _ = pull_node gtree in
 					eval set edge
 				)
-				| Utils.Go1 set ->
+				| Go1 set ->
 				(
 					let _, edge = pull_node gtree in
 					eval set edge
 				)
-				| Utils.MPull (set0, set1) ->
+				| MPull (set0, set1) ->
 				(
 					let edge0, edge1 = pull_node gtree in
 					push (eval set0 edge0) (eval set1 edge1)
@@ -654,9 +654,9 @@ struct
 				| Some set -> compose edge (read set gtree)
 			in
 			let rec calcrec (edgeX:edge) (edgeY:edge) = match D0.solver G.get_ident edgeX edgeY with
-				| Utils.M3Edge eog -> eval_eog eog
-				| Utils.M3Cons (edge, (eogX, eogY)) -> compose edge (push (eval_eog eogX) (eval_eog eogY))
-				| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> ((D0.compose residual (propa compact nodeX nodeY)):edge)
+				| M3Edge eog -> eval_eog eog
+				| M3Cons (edge, (eogX, eogY)) -> compose edge (push (eval_eog eogX) (eval_eog eogY))
+				| M3Node (residual, (compact, nodeX, nodeY)) -> ((D0.compose residual (propa compact nodeX nodeY)):edge)
 			and		propa compact (opevaX, gtreeX) (opevaY, gtreeY) = 
 				if opevaX = None && opevaY = None
 				then
@@ -667,12 +667,12 @@ struct
 				else
 				(
 (*					print_string "{SUBDAG.IBOP_EVAL} not(opevax = None && opevay = None)"; print_newline();*)
-					let edgeX = match opevaX with None -> Utils.MNode gtreeX | Some set -> Utils.MEdge (read set gtreeX)
-					and edgeY = match opevaY with None -> Utils.MNode gtreeY | Some set -> Utils.MEdge (read set gtreeY) in
+					let edgeX = match opevaX with None -> MNode gtreeX | Some set -> MEdge (read set gtreeX)
+					and edgeY = match opevaY with None -> MNode gtreeY | Some set -> MEdge (read set gtreeY) in
 					match D0.solver' G.get_ident compact edgeX edgeY with
-					| Utils.M3Edge eog -> eval_eog eog
-					| Utils.M3Cons (edge, (eogX, eogY)) -> compose edge (push (eval_eog eogX) (eval_eog eogY))
-					| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
+					| M3Edge eog -> eval_eog eog
+					| M3Cons (edge, (eogX, eogY)) -> compose edge (push (eval_eog eogX) (eval_eog eogY))
+					| M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
 				)
 			and		calc (compact, gtreeX, gtreeY) =
 				let fx, fy = D0.decomp gtreeX gtreeY compact in
@@ -703,18 +703,18 @@ struct
 		type residual
 		type eval
 
-		type pnode = (M.leaf, eval option * G.pnode) Utils.gnode
+		type pnode = (M.leaf, eval option * G.pnode) gnode
 		type pedge = M.edge * pnode
 
 		val  solver : (G.pnode -> G.ident) -> pedge -> pedge ->
-			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) Utils.merge3
+			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) merge3
 
-		val solver' : (G.pnode -> G.ident) -> compact -> (edge, G.tree) Utils.merge -> (edge, G.tree) Utils.merge ->
-			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) Utils.merge3
+		val solver' : (G.pnode -> G.ident) -> compact -> (edge, G.tree) merge -> (edge, G.tree) merge ->
+			(pedge, M.edge * (pedge * pedge), residual * (compact * pnode * pnode)) merge3
 
 		val eval : eval -> pedge -> pedge (* apply the evaluation sequence on the descriptor *)
 
-		val read : eval -> (unit, eval, eval, eval * eval) Utils.binpull (* read the first symbole of the evaluation sequence *)
+		val read : eval -> (unit, eval, eval, eval * eval) binpull (* read the first symbole of the evaluation sequence *)
 		
 		val  decomp : G.tree -> G.tree -> compact -> edge * edge
 		val compose : residual -> edge -> edge
@@ -738,15 +738,14 @@ struct
 			let push = push man
 			and pull = pull man
 			and pull_node = function
-				| Utils.Leaf _		-> assert false
-				| Utils.Node node	-> pull_node man node in
-			let pedge_of_edge (block, node) = (block, pnode_of_node node) in
+				| Leaf _		-> assert false
+				| Node node	-> pull_node man node in
 			let rec	read (peval:D0.eval) (node:G.tree) =
 				apply_eval (fun (peval, node) -> match D0.read peval with
-				| Utils.MStop () -> assert false
-				| Utils.Go0 peval -> eval peval (pull_node node |> fst)
-				| Utils.Go1 peval -> eval peval (pull_node node |> snd)
-				| Utils.MPull (peval0, peval1) ->
+				| MStop () -> assert false
+				| Go0 peval -> eval peval (pull_node node |> fst)
+				| Go1 peval -> eval peval (pull_node node |> snd)
+				| MPull (peval0, peval1) ->
 				(
 					let edge0, edge1 = pull_node node in
 					push (eval peval0 edge0) (eval peval1 edge1)
@@ -755,34 +754,34 @@ struct
 			and		eval (peval:D0.eval) (edge:edge) =
 				eval_pedge (D0.eval peval (pedge_of_edge edge))
 			and   eval_pedge (block, pnode) : edge = match pnode with
-				| Utils.Leaf leaf -> (block, Utils.Leaf leaf)
-				| Utils.Node (peval, node) -> match peval with
-					| None -> (block, Utils.Node node)
-					| Some peval -> compose block (read peval (Utils.Node node))
+				| Leaf leaf -> (block, Leaf leaf)
+				| Node (peval, node) -> match peval with
+					| None -> (block, Node node)
+					| Some peval -> compose block (read peval (Node node))
 			in
 			let rec calcrec (edgeX:edge) (edgeY:edge) : edge = match D0.solver G.get_ident (pedge_of_edge edgeX) (pedge_of_edge edgeY) with
-				| Utils.M3Edge pedge -> eval_pedge pedge
-				| Utils.M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
-				| Utils.M3Node (residual, (compact, pnodeX, pnodeY)) -> ((D0.compose residual (propa compact pnodeX pnodeY)):edge)
-			and eval_pnode : D0.pnode -> (edge, G.tree) Utils.merge = function
-				| Utils.Leaf leaf -> Utils.MNode (Utils.Leaf leaf)
-				| Utils.Node (peval, node) -> match peval with
-					| None -> Utils.MNode (Utils.Node node)
-					| Some peval -> Utils.MEdge (read peval (Utils.Node node))
+				| M3Edge pedge -> eval_pedge pedge
+				| M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
+				| M3Node (residual, (compact, pnodeX, pnodeY)) -> ((D0.compose residual (propa compact pnodeX pnodeY)):edge)
+			and eval_pnode : D0.pnode -> (edge, G.tree) merge = function
+				| Leaf leaf -> MNode (Leaf leaf)
+				| Node (peval, node) -> match peval with
+					| None -> MNode (Node node)
+					| Some peval -> MEdge (read peval (Node node))
 			and		propa compact pnodeX pnodeY = match pnodeX, pnodeY with
-				| Utils.Node(Some _, _), _
-				| _, Utils.Node(Some _, _) ->
+				| Node(Some _, _), _
+				| _, Node(Some _, _) ->
 				(
 					match D0.solver' G.get_ident compact (eval_pnode pnodeX) (eval_pnode pnodeY) with
-					| Utils.M3Edge pedge -> eval_pedge pedge
-					| Utils.M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
-					| Utils.M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
+					| M3Edge pedge -> eval_pedge pedge
+					| M3Cons (block, (pedgeX, pedgeY)) -> compose block (push (eval_pedge pedgeX) (eval_pedge pedgeY))
+					| M3Node (residual, (compact, nodeX, nodeY)) -> D0.compose residual (propa compact nodeX nodeY)
 				)
 				| _ ->
 				(
 					let unp = function
-						| Utils.Leaf leaf -> Utils.Leaf leaf
-						| Utils.Node(none, node) -> (assert(none = None); Utils.Node node)
+						| Leaf leaf -> Leaf leaf
+						| Node(none, node) -> (assert(none = None); Node node)
 					in
 					apply calc (compact, unp pnodeX, unp pnodeY)
 				)
@@ -816,7 +815,7 @@ struct
 			edge,
 			back * pars,
 			back * pars,
-			back * pars * pars ) Utils.binpull
+			back * pars * pars ) binpull
 		val back : back -> edge -> edge
 	end
 
@@ -835,22 +834,22 @@ struct
 			let apply f x = f x in
 			let push = push man
 			and pull = function
-				| Utils.Leaf _    -> assert false
-				| Utils.Node node -> pull_node man node
+				| Leaf _    -> assert false
+				| Node node -> pull_node man node
 			in
 			let rec calcrec (pars:D0.pars) (e:edge) = apply (fun (pars, ((ex, ix) as e)) -> match D0.pars G.get_ident pars e with
-				| Utils.MStop e -> e
-				| Utils.Go0 (b, p) ->
+				| MStop e -> e
+				| Go0 (b, p) ->
 				(
 					let e0, _  = pull ix in
 					D0.back b (calcrec p e0)
 				)
-				| Utils.Go1 (b, p) ->
+				| Go1 (b, p) ->
 				(
 					let _ , e1 = pull ix in
 					D0.back b (calcrec p e1)
 				)
-				| Utils.MPull (b, p0, p1) ->
+				| MPull (b, p0, p1) ->
 				(
 					let e0, e1 = pull ix in
 					D0.back b (push (calcrec p0 e0) (calcrec p1 e1))
