@@ -1,27 +1,12 @@
 module type MODELE =
 sig
-	type leaf
-	type edge
-	type node = unit
+	module UBDAG : BinUbdag.MODELE with
+		type node = unit
 
-	type 'i next' = (leaf, 'i) Utils.gnode
-	type 'i edge' = edge * 'i next'
-	type 'i node' = node * 'i edge' * 'i edge'
-
-	val dump_edge : ('i Utils.dump) -> 'i edge' Utils.dump
-	val dump_node : ('i Utils.dump) -> 'i node' Utils.dump
-	
-	val load_edge : ('i Utils.load) -> 'i edge' Utils.load
-	val load_node : ('i Utils.load) -> 'i node' Utils.load
-
-	val push_node : 'i node' -> edge * ('i next', 'i node') Utils.merge
-	val pull_node : 'i edge' -> ('i node', 'i * ('i node' -> 'i node')) Utils.merge
+	val push_node : 'i UBDAG.node' -> UBDAG.edge * ('i next', 'i node') Utils.merge
+	val pull_node : 'i UBDAG.edge' -> ('i node', 'i * ('i node' -> 'i node')) Utils.merge
 
 	val compose : edge -> 'i edge' -> 'i edge'
-
-	(* assert(x |> dump |> load = x) && assert(x |> load |> dump |> stream) *)
-	val __check_reverse__ : bool
-
 end
 
 module type MODULE_SIG =
@@ -148,11 +133,16 @@ struct
 		mem : (M.peval * M.M.G.ident, Bitv.t, M.M.edge', Bitv.t) MemoBTable.t;
 		map : M.peval -> M.M.edge' -> M.M.edge';
 	}
+
+	let makeman man hsize =
+		let mem, apply = 
+
+
 	
 	
 end
 
-module type BIDIR =
+(*module type BIDIR =
 sig
 	
-end
+end*)

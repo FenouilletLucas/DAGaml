@@ -31,7 +31,6 @@ let my_lexer stream : token Stream.t =
 	in
 	let rec aux x : token option=
 		spaces ();
-		print_string " ";
 		match Stream.peek stream with
 		| None -> None
 		| Some head ->
@@ -52,8 +51,10 @@ type expr =
 	| PUop of (uop * expr)
 	| PBop of (bop * expr * expr)
 
-let pstring x = print_string x; print_string " "; flush stdout
-let pchar x = print_char x; print_char ' '; flush stdout
+(*let pstring x = print_string x; print_string " "; flush stdout*)
+let pstring _ = ()
+(*let pchar x = print_char x; print_char ' '; flush stdout*)
+let pchar _ = ()
 
 let rec parse_leaf stream = match Stream.next stream with
 	| Ident var -> pstring var; PVar var
