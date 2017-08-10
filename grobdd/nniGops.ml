@@ -193,8 +193,8 @@ let binload_node_and = Bitv.L.to_bool_array >> Array.to_list >> (function bx::by
 let bindump_node_xor l = bindump_pair l |> Array.of_list |> Bitv.L.of_bool_array
 let binload_node_xor = Bitv.L.to_bool_array >> Array.to_list >> binload_pair
 
-let bindump_tacx (t, l) = CpGops.bindump_ttag (bindump_pair l) t |> Array.of_list |> Bitv.L.of_bool_array
-let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> CpGops.binload_ttag >> (fun (t, l) -> (t, binload_pair l))
+let bindump_tacx (t, l) = TacxTypes.bindump_ttag t (bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
+let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> TacxTypes.binload_ttag >> (fun (t, l) -> (t, binload_pair l))
 
 let expand_uniq : uniq -> uniq=
 	let aux0 =
@@ -516,7 +516,7 @@ let node_push_cons gid x y = match solve_cons gid x y with
 
 let tacx_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TCons b, l), x, y))
+	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TCons b, l), x, y))
 
 let get_root_n b n = ((b, MyList.ntimes (P(false, None)) n), Utils.Leaf ())
 
@@ -589,31 +589,31 @@ let node_pull getid ((bx, lx), i) = match lx with
 let tacx_split (t, lxy) =
 	let lx, ly = pair_split lxy in
 	match t with
-	| CpTypes.TAnd (bx, by) -> (CpTypes.And,  (bx, lx), (by, ly))
-	| CpTypes.TCons by		-> (CpTypes.Cons, (false, lx), (by, ly))
-	| CpTypes.TXor			-> (CpTypes.Xor,  (false, lx), (false, ly))
+	| TacxTypes.TAnd (bx, by) -> (TacxTypes.And,  (bx, lx), (by, ly))
+	| TacxTypes.TCons by	  -> (TacxTypes.Cons, (false, lx), (by, ly))
+	| TacxTypes.TXor		  -> (TacxTypes.Xor,  (false, lx), (false, ly))
 
 let tacx_pull_node _ (c, ix, iy) =
 	let t, ex, ey = tacx_split (binload_tacx c) in
 	(t, (ex, ix), (ey, iy))
 
-let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) : (op_tag, 't edge, 't cnode) Utils.unmerge_tagged = match lx with
+let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) = match lx with
 	| [] -> assert false
 	| h::lx' -> match h with
 		| S b -> Utils.MNode (fun node ->
 			let t, x', y' = tacx_pull_node getid node in
 			let e' = match t with
-				| CpTypes.Cons	-> (bx, lx')
+				| TacxTypes.Cons	-> (bx, lx')
 				| _		-> (bx, lx )
 			in
 			let a, b = Tools.cswap b ((compose e' x'), (compose e' y')) in
 			(t, a, b))
 		| P(b, opv) -> Utils.MEdge (match opv with
-			| None -> CpTypes.Cons, ((bx, lx'), i), ((bx<>b, lx'), i)
+			| None -> TacxTypes.Cons, ((bx, lx'), i), ((bx<>b, lx'), i)
 			| Some v ->
 			(
 				let lx'' = apply_reduced_phase (Bitv.L.to_bool_list v) lx' in
-				CpTypes.Cons, ((bx, lx'), i), ((bx<>b, lx''), i)
+				TacxTypes.Cons, ((bx, lx'), i), ((bx<>b, lx''), i)
 			))
 
 let uniqY_of_pair = List.map (function
@@ -642,7 +642,7 @@ let solve_and gid (eX, iX) (eY, iY) =
 
 let tacx_push_and gid x y = match solve_and gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TAnd (bx, by), lxy), x, y))
+	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TAnd (bx, by), lxy), x, y))
 
 let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (Bitv.t * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode)) Utils.merge =
 	fun gid (x, y) -> match solve_and gid x y with
@@ -668,13 +668,13 @@ let solve_xor gid (eX, iX) (eY, iY) =
 
 let tacx_push_xor gid x y = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_tacx (CpTypes.TXor, l), x, y))
+	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TXor, l), x, y))
 
 let node_solve_xor gid (x, y) = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
 	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_node_xor l, x, y))
 
 let tacx_push gid = function
-	| CpTypes.And  -> tacx_push_and  gid
-	| CpTypes.Cons -> tacx_push_cons gid
-	| CpTypes.Xor  -> tacx_push_xor  gid
+	| TacxTypes.And  -> tacx_push_and  gid
+	| TacxTypes.Cons -> tacx_push_cons gid
+	| TacxTypes.Xor  -> tacx_push_xor  gid

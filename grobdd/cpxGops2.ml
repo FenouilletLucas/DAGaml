@@ -695,19 +695,19 @@ let tacx_propa_cons _ x y =
 	| Utils.MEdge (block, pnode) ->
 		Utils.MEdge(block, pnode)
 	| Utils.MNode (block, ((block0, block1), pnode0, pnode1)) -> 
-		Utils.MNode(block, (CpTypes.Cons, (block0, pnode0), (block1, pnode1)))
+		Utils.MNode(block, (TacxTypes.Cons, (block0, pnode0), (block1, pnode1)))
 
 let tacx_propa_and _ x y = match solve_and x y with
 	| Utils.M3Edge edge -> Utils.MEdge edge
-	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (CpTypes.Cons, pedge0, pedge1))
-	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (CpTypes.And, (block0, pnode0), (block1, pnode1)))
+	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (TacxTypes.Cons, pedge0, pedge1))
+	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (TacxTypes.And, (block0, pnode0), (block1, pnode1)))
 
 let tacx_propa_xor _ x y = match solve_xor x y with
 	| Utils.M3Edge edge -> Utils.MEdge edge
-	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (CpTypes.Cons, pedge0, pedge1))
-	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (CpTypes.Xor, (block0, pnode0), (block1, pnode1)))
+	| Utils.M3Cons (block, (pedge0, pedge1)) -> Utils.MNode (block, (TacxTypes.Cons, pedge0, pedge1))
+	| Utils.M3Node (block, ((block0, block1), pnode0, pnode1)) -> Utils.MNode (block, (TacxTypes.Xor, (block0, pnode0), (block1, pnode1)))
 
-let tacx_propa gid = CpTypes.(function
+let tacx_propa gid = TacxTypes.(function
 	| Cons -> tacx_propa_cons gid
 	| And  -> tacx_propa_and  gid
 	| Xor  -> tacx_propa_xor  gid)

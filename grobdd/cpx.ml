@@ -27,13 +27,13 @@ let strdump_leaf = (fun () -> Tree.Node [])
 let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
 module GroBdd_M : Subdag.MODELE with
-		type node = CpxTypes.node_cstate
+		type node = Bitv.t
 	and	type edge = CpxTypes.edge_state
 	and type leaf = unit
 =
 struct
 	
-	type node = CpxTypes.node_cstate
+	type node = Bitv.t
 	type edge = CpxTypes.edge_state
 	type leaf = unit
 
@@ -124,17 +124,17 @@ module XOR = GroBdd.IBOP(XOR_M);;
 
 
 module TACX_M : TaggedSubdag.MODELE with
-		type node = CpxTypes.tacx_cstate
+		type node = Bitv.t
 	and	type edge = CpxTypes.edge_state
 	and type leaf = unit
-	and type tag  = CpTypes.op_tag
+	and type tag  = TacxTypes.tag
 =
 struct
 	
-	type node = CpxTypes.tacx_cstate
+	type node = Bitv.t
 	type edge = CpxTypes.edge_state
 	type leaf = unit
-	type tag  = CpTypes.op_tag
+	type tag  = TacxTypes.tag
 
 	type 't gn = (leaf, 't) Utils.gnode
 	type 't n = node * 't gn * 't gn	
@@ -158,7 +158,7 @@ struct
 	let load_leaf   = Some strload_leaf
 	let dot_of_leaf = Some (fun () -> "0")
 
-	let dot_of_tag = Some Extra.(CpTypes.(function And -> "A" | Cons -> "C" | Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
+	let dot_of_tag = Some Extra.(TacxTypes.strdump_tag >> (fun x -> "[label = \""^x^"\"];"))
 end
 
 module TACX =
@@ -176,9 +176,9 @@ struct
 		man, edges
 end
 
-let ( *! ) man x y = TACX.push man CpTypes.Cons x y
-let ( &! ) man x y = TACX.push man CpTypes.And x y
-and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
+let ( *! ) man x y = TACX.push man TacxTypes.Cons x y
+let ( &! ) man x y = TACX.push man TacxTypes.And x y
+and ( ^! ) man x y = TACX.push man TacxTypes.Xor x y
 
 module EVAL =
 struct
@@ -194,7 +194,7 @@ struct
 
 		let do_leaf _ () = default_leaf
 		let do_node (a, c, x) = Extra.(CpxDumpLoad.binload_tacx >> CpxUtils.tacx_split >> (fun (tag, edgeX, edgeY) ->
-			let merge = NniTypes.(match tag with CpTypes.And -> a | CpTypes.Cons -> c | CpTypes.Xor -> x) in
+			let merge = NniTypes.(match tag with TacxTypes.And -> a | TacxTypes.Cons -> c | TacxTypes.Xor -> x) in
 			Utils.MNode (fun nodeX nodeY -> merge (CpxUtils.compose edgeX nodeX) (CpxUtils.compose edgeY nodeY))))
 		let do_edge _ = CpxUtils.compose
 	end
@@ -242,7 +242,7 @@ struct
 
 		let do_leaf _ () = default_leaf
 		let do_node (a, c, x) = Extra.(CpxDumpLoad.binload_tacx >> CpxUtils.tacx_split >> (fun (tag, edgeX, edgeY) ->
-			let merge = CpTypes.(match tag with And -> a | Cons -> c | Xor -> x) in
+			let merge = TacxTypes.(match tag with And -> a | Cons -> c | Xor -> x) in
 			Utils.MNode (fun nodeX nodeY -> merge (CpxUtils.compose edgeX nodeX) (CpxUtils.compose edgeY nodeY))))
 		let do_edge _ = CpxUtils.compose
 	end
@@ -646,7 +646,7 @@ struct
 
 		let do_leaf _ () = default_leaf
 		let do_node (a, c, x) = Extra.(CpxDumpLoad.binload_tacx >> CpxUtils.tacx_split >> (fun (tag, edgeX, edgeY) ->
-			let merge = NniTypes.(match tag with CpTypes.And -> a | CpTypes.Cons -> c | CpTypes.Xor -> x) in
+			let merge = NniTypes.(match tag with TacxTypes.And -> a | TacxTypes.Cons -> c | TacxTypes.Xor -> x) in
 			Utils.MNode (fun nodeX nodeY -> merge (CpxUtils.compose edgeX nodeX) (CpxUtils.compose edgeY nodeY))))
 		let do_edge _ = CpxUtils.compose
 	end
@@ -700,12 +700,12 @@ struct
 				| Utils.Leaf () -> assert false
 				| Utils.Node node -> Utils.MNode(ex, (pars, node))
 		let read mess = function
-			| CpTypes.And -> Utils.MPull (CpTypes.And, mess, mess)
-			| CpTypes.Xor -> Utils.MPull (CpTypes.Xor, mess, mess)
-			| CpTypes.Cons -> match mess with
+			| TacxTypes.And -> Utils.MPull (TacxTypes.And, mess, mess)
+			| TacxTypes.Xor -> Utils.MPull (TacxTypes.Xor, mess, mess)
+			| TacxTypes.Cons -> match mess with
 				| [] -> assert false
 				| head::tail -> match head with
-					| None -> Utils.MPull (CpTypes.Cons, mess, mess)
+					| None -> Utils.MPull (TacxTypes.Cons, mess, mess)
 					| Some false -> Utils.Go0 mess
 					| Some true  -> Utils.Go1 mess
 	end
@@ -731,12 +731,12 @@ struct
 			| Utils.Node node -> Utils.MNode(ex, (pars, node))
 
 	let read mess = function
-		| CpTypes.And -> Utils.MPull (CpTypes.And, mess, mess)
-		| CpTypes.Xor -> Utils.MPull (CpTypes.Xor, mess, mess)
-		| CpTypes.Cons -> match mess with
+		| TacxTypes.And -> Utils.MPull (TacxTypes.And, mess, mess)
+		| TacxTypes.Xor -> Utils.MPull (TacxTypes.Xor, mess, mess)
+		| TacxTypes.Cons -> match mess with
 			| [] -> assert false
 			| head::mess' -> match head with
-				| None -> Utils.MPull (CpTypes.Cons, mess', mess')
+				| None -> Utils.MPull (TacxTypes.Cons, mess', mess')
 				| Some false -> Utils.Go0 mess'
 				| Some true  -> Utils.Go1 mess'
 

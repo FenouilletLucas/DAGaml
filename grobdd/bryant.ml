@@ -27,13 +27,13 @@ let strdump_leaf = (fun () -> Tree.Node [])
 let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
 module GroBdd_M : Subdag.MODELE with
-		type node = BryantTypes.node_cstate
+		type node = Bitv.t
 	and	type edge = BryantTypes.edge_state
 	and type leaf = unit
 =
 struct
 	
-	type node = BryantTypes.node_cstate
+	type node = Bitv.t
 	type edge = BryantTypes.edge_state
 	type leaf = unit
 

@@ -109,9 +109,9 @@ let binload_node stream =
 let bindump_tacx (ttag, block) stream =
 	let stream = bindump_block2 block stream in
 	match ttag with
-	| CpTypes.Cons -> false::false::stream
-	| CpTypes.And  -> false::true ::stream
-	| CpTypes.Xor  -> true ::false::stream
+	| TacxTypes.Cons -> false::false::stream
+	| TacxTypes.And  -> false::true ::stream
+	| TacxTypes.Xor  -> true ::false::stream
 
 let bindump_tacx x = bindump_tacx x [] |> Bitv.L.of_bool_list
 
@@ -120,9 +120,9 @@ let binload_tacx = function
 	(
 		let block, stream = binload_block2 stream in
 		((match b0, b1 with
-		| false, false -> CpTypes.Cons
-		| false, true  -> CpTypes.And
-		| true , false -> CpTypes.Xor
+		| false, false -> TacxTypes.Cons
+		| false, true  -> TacxTypes.And
+		| true , false -> TacxTypes.Xor
 		| true , true  -> assert false), block), stream
 	)
 	| _ -> assert false

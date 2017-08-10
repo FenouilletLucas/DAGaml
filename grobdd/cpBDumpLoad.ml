@@ -15,76 +15,61 @@ let strload_uniq_elem = function
 	| 'S' -> S
 	| _   -> assert false
 
-let bindump_uniq_elem = function
-	| P -> false
-	| S -> true
+let bindump_uniq_elem elem stream = match elem with
+	| P -> false::stream
+	| S -> true ::stream
 
 let binload_uniq_elem = function
-	| false -> P
-	| true  -> S
+	| false::stream -> P, stream
+	| true ::stream -> S, stream
+	| _ -> assert false
 
 
 let strdump_uniq = List.map strdump_uniq_elem
 let strload_uniq = List.map strload_uniq_elem
 
-let bindump_uniq = List.map bindump_uniq_elem
-let binload_uniq = List.map binload_uniq_elem
+let bindump_uniq = BinDump.list bindump_uniq_elem
+let binload_uniq = BinLoad.list binload_uniq_elem
 
-let bindump_pair =
-	let rec aux carry = function
-		| h::next -> aux	(match h with
-			| SP -> false::true ::carry
-			| PS -> true ::true ::carry
-			| SS ->        false::carry
-							) next
-		| [] -> List.rev carry
-	in aux []
+let bindump_pair_elem elem stream = match elem with
+	| SP -> false::false::stream
+	| PS -> false::true ::stream
+	| SS -> true ::stream
 
-let binload_pair =
-	let rec aux carry = function
-		| []				 -> List.rev carry
-		| false::next        -> aux (SS::carry) next
-		|  true:: true::next -> aux (PS::carry) next
-		|  true::false::next -> aux (SP::carry) next
-		| _					-> assert false
-	in aux []
+let binload_pair_elem = function
+	| false::false::stream -> SP, stream
+	| false::true ::stream -> PS, stream
+	| true ::stream        -> SS, stream
+	| _ -> assert false
 
-let merge_uniq (uniqX, uniqY) =
-	let uniqXY, uniqXY' = List.split(List.map2(fun x y -> match x, y with
-		| P, P -> P, None
-		| S, P -> S, Some SP
-		| P, S -> S, Some PS
-		| S, S -> S, Some SS) uniqX uniqY) in
-	uniqXY, (MyList.list_of_oplist uniqXY')
+let bindump_pair = BinDump.list bindump_pair_elem
+let binload_pair = BinLoad.list binload_pair_elem
 
-let split_pair uniqXY = List.split(List.map (function
-	| SP -> S, P
-	| PS -> P, S
-	| SS -> S, S) uniqXY)
+let bindump_edge = BinDump.pair BinDump.bool bindump_uniq
+let binload_edge = BinLoad.pair BinDump.bool binload_uniq
 
-let merge_pair uniqX uniqY = List.map2 (fun x y -> match x, y with
-	| P, P -> assert false
-	| S, P -> SP
-	| P, S -> PS
-	| S, S -> SS) uniqX uniqY
+let bindump_node ((), edge0, edge1) stream =
+	BinDump.pair bindump_edge bindump_edge (edge0, edge1) stream
 
-let bindump_edge (b, l) = b::(bindump_uniq l) |> Array.of_list |> Bitv.L.of_bool_array 
-let binload_edge = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_uniq l) | _ -> assert false)
+let binload_node stream =
+	let (edge0, edge1), stream = BinLoad.pair binload_edge binload_edge stream in
+	((), edge0, edge1), stream
 
-let strdump_edge (b, l) = String.concat "" ((if b then "-" else "+")::(strdump_uniq l))
-let strload_edge data = StrUtil.explode >> (function b::l -> ((match b with '-' -> false | '+' -> true | _ -> assert false), strload_uniq l) | _ -> assert false)
 
-let bindump_node (b, l) = b::(bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
-let binload_node = Bitv.L.to_bool_array >> Array.to_list >> (function b::l -> (b, binload_pair l) | _ -> assert false)
 
-let bindump_node_and ((bx, by), l) = bx::by::(bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
-let binload_node_and = Bitv.L.to_bool_array >> Array.to_list >> (function bx::by::l -> ((bx, by), binload_pair l) | _ -> assert false)
+let bindump_ttag carry = function
+	| TAnd (b0, b1) -> false::b0   ::b1   ::carry
+	| TCons b		-> true ::false::b    ::carry
+	| TXor			-> true ::true ::carry
 
-let bindump_node_xor l = bindump_pair l |> Array.of_list |> Bitv.L.of_bool_array
-let binload_node_xor = Bitv.L.to_bool_array >> Array.to_list >> binload_pair
+let binload_ttag = function
+	| false::b0   ::b1   ::carry -> (TAnd (b0, b1)), carry
+	| true ::false::b    ::carry -> (TCons b      ), carry
+	| true ::true ::carry        -> (TXor         ), carry
+	| _ -> assert false
 
-let bindump_tacx (t, l) = TacxTypes.bindump_ttag t (bindump_pair l) |> Array.of_list |> Bitv.L.of_bool_array
-let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> TacxTypes.binload_ttag >> (fun (t, l) -> (t, binload_pair l))
+let bindump_tacx (t, l) = bindump_ttag (bindump_pair l) t |> Array.of_list |> Bitv.L.of_bool_array
+let binload_tacx = Bitv.L.to_bool_array >> Array.to_list >> binload_ttag >> (fun (t, l) -> (t, binload_pair l))
 
 let cmp x y =
 	if x = y
@@ -113,7 +98,7 @@ let node_push_cons gid x y = match solve_cons gid x y with
 
 let tacx_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TCons b, l), x, y))
+	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (bindump_tacx (TCons b, l), x, y))
 
 let get_root b ((_, l), _) = ((b, MyList.ntimes P (List.length l)), Utils.Leaf ())
 
@@ -144,7 +129,7 @@ let solve_and gid (((bx, lx), ix) as x) (((by, ly), iy) as y) =
 
 let tacx_push_and gid x y = match solve_and gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TAnd (bx, by), lxy), x, y))
+	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (bindump_tacx (TAnd (bx, by), lxy), x, y))
 
 let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (Bitv.t * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode)) Utils.merge =
 	fun gid (x, y) -> match solve_and gid x y with
@@ -178,16 +163,16 @@ let solve_xor gid ((((bx, lx)), ix)as x) ((((by, ly)), iy)as y) =
 
 let tacx_push_xor gid x y = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_tacx (TacxTypes.TXor, l), x, y))
+	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_tacx (TXor, l), x, y))
 
 let node_solve_xor gid (x, y) = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
 	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (bindump_node_xor l, x, y))
 
 let tacx_push gid = function
-	| TacxTypes.And  -> tacx_push_and  gid
-	| TacxTypes.Cons -> tacx_push_cons gid
-	| TacxTypes.Xor  -> tacx_push_xor  gid
+	| And  -> tacx_push_and  gid
+	| Cons -> tacx_push_cons gid
+	| Xor  -> tacx_push_xor  gid
 
 
 let compose (bx, lx) ((by, ly), i) =
@@ -221,24 +206,24 @@ let node_pull getid ((bx, lx), i) = match lx with
 let tacx_split (t, lxy) =
 	let lx, ly = split_pair lxy in
 	match t with
-	| TacxTypes.TAnd (bx, by) -> (TacxTypes.And,  (bx, lx), (by, ly))
-	| TacxTypes.TCons by	  -> (TacxTypes.Cons, (false, lx), (by, ly))
-	| TacxTypes.TXor		  -> (TacxTypes.Xor,  (false, lx), (false, ly))
+	| TAnd (bx, by) -> (And,  (bx, lx), (by, ly))
+	| TCons by		-> (Cons, (false, lx), (by, ly))
+	| TXor			-> (Xor,  (false, lx), (false, ly))
 
 let tacx_pull_node _ (c, ix, iy) =
 	let t, ex, ey = tacx_split (binload_tacx c) in
 	(t, (ex, ix), (ey, iy))
 
-let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) = match lx with
+let tacx_pull (getid:'t -> 'i) (((bx, lx), i):'t edge) : (op_tag, 't edge, 't cnode) Utils.unmerge_tagged = match lx with
 	| [] -> assert false
 	| h::lx' ->  match h with
-		| P -> let e' = (bx, lx') in Utils.MEdge (TacxTypes.Cons, (e', i), (e', i))
+		| P -> let e' = (bx, lx') in Utils.MEdge ((Cons, (e', i), (e', i)):op_tag * 't edge * 't edge)
 		| S -> Utils.MNode (fun node ->
 			let t, x', y' = tacx_pull_node getid node in
 			let e' = match t with
-				| TacxTypes.Cons	-> (bx, lx')
+				| Cons	-> (bx, lx')
 				| _		-> (bx, lx )
 			in
-			(t, (compose e' x'), (compose e' y')))
+			((t, (compose e' x'), (compose e' y')): op_tag * 't edge * 't edge))
 
 

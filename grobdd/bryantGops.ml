@@ -48,12 +48,8 @@ let binload_node_and stream =
 let bindump_node_xor = bindump_pair
 let binload_node_xor = binload_pair
 
-let bindump_tacx (ttag, p) stream = CpGops.bindump_ttag (bindump_pair p stream) ttag
-let binload_tacx stream =
-	let ttag, stream = CpGops.binload_ttag stream in
-	let p, stream = binload_pair stream in
-	(ttag, p), stream
-
+let bindump_tacx = BinDump.pair TacxTypes.bindump_ttag bindump_pair
+let binload_tacx = BinLoad.pair TacxTypes.binload_ttag binload_pair
 
 
 let strdump_edge (b, (i, j)) = (GUtils.mp_of_bool b)^" "^(string_of_int i)^" -> "^(string_of_int j)
@@ -78,7 +74,7 @@ let node_push_cons gid x y = match solve_cons gid x y with
 
 let tacx_push_cons gid x y = match solve_cons gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (((CpTypes.TCons b, l) |> dump_stream bindump_tacx), x, y))
+	| Utils.MNode (e, ((b, l), x, y)) -> Utils.MNode (e, (((TacxTypes.TCons b, l) |> dump_stream bindump_tacx), x, y))
 
 let get_root b ((_, (xX, _)), _) = ((b, (xX, 0)), Utils.Leaf())
 let get_const b (_, (xX, _)) = (b, (xX, 0))
@@ -104,7 +100,7 @@ let solve_and gid (((bX, (xX, yX)), iX) as x) (((bY, (xY, yY)), iY) as y)=
 
 let tacx_push_and gid x y = match solve_and gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (((CpTypes.TAnd (bx, by), lxy) |> dump_stream bindump_tacx), x, y))
+	| Utils.MNode (e, (((bx, by), lxy), x, y)) -> Utils.MNode (e, (((TacxTypes.TAnd (bx, by), lxy) |> dump_stream bindump_tacx), x, y))
 
 let node_solve_and : ('t -> 'i) -> 't edge * 't edge -> ('t edge, edge_state * (Bitv.t * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode)) Utils.merge =
 	fun gid (x, y) -> match solve_and gid x y with
@@ -132,16 +128,16 @@ let solve_xor gid (((bX, (xX, yX)), iX) as x) (((bY, (xY, yY)), iY) as y)=
 
 let tacx_push_xor gid x y = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
-	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (dump_stream bindump_tacx (CpTypes.TXor, l), x, y))
+	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (dump_stream bindump_tacx (TacxTypes.TXor, l), x, y))
 
 let node_solve_xor gid (x, y) = match solve_xor gid x y with
 	| Utils.MEdge e -> Utils.MEdge e
 	| Utils.MNode (e, (l, x, y)) -> Utils.MNode (e, (dump_stream bindump_node_xor l, x, y))
 
 let tacx_push gid = function
-	| CpTypes.And  -> tacx_push_and  gid
-	| CpTypes.Cons -> tacx_push_cons gid
-	| CpTypes.Xor  -> tacx_push_xor  gid
+	| TacxTypes.And  -> tacx_push_and  gid
+	| TacxTypes.Cons -> tacx_push_cons gid
+	| TacxTypes.Xor  -> tacx_push_xor  gid
 
 
 let compose (bC, (xC, yC)) ((bc, (xc, yc)), i) =
@@ -177,9 +173,9 @@ let node_pull getid ((b, (x, y)), i) =
 let tacx_split (t, lxy) =
 	let lx, ly = split_pair lxy in
 	match t with
-	| CpTypes.TAnd (bx, by) -> (CpTypes.And,  (bx, lx), (by, ly))
-	| CpTypes.TCons by		-> (CpTypes.Cons, (false, lx), (by, ly))
-	| CpTypes.TXor			-> (CpTypes.Xor,  (false, lx), (false, ly))
+	| TacxTypes.TAnd (bx, by) -> (TacxTypes.And,  (bx, lx), (by, ly))
+	| TacxTypes.TCons by		-> (TacxTypes.Cons, (false, lx), (by, ly))
+	| TacxTypes.TXor			-> (TacxTypes.Xor,  (false, lx), (false, ly))
 
 let tacx_pull_node _ (c, ix, iy) =
 	let t, ex, ey = tacx_split (load_stream binload_tacx c) in

@@ -43,8 +43,11 @@ let sized_int size n stream : bool list =
 		assert(false)
 	))
 
+
 let pair dumpA dumpB (a, b) stream = dumpA a (dumpB b stream)
 
 let closure dump objet = dump objet [] |> Bitv.L.of_bool_list
 
-	
+let list dump liste stream = int (List.length liste) (sized_list dump liste stream)
+
+let array dump vect stream = list dump (Array.to_list vect) stream

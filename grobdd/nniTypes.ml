@@ -18,14 +18,11 @@ type pair_elem =
 type uniq = uniq_elem list
 type pair = pair_elem list
 
-type op_tag = CpTypes.op_tag
-type ttag = CpTypes.ttag
-
 type edge_state = bool * uniq
 type node_state = bool * pair
 type node_and_state = bool * bool * pair
 type node_xor_state =               pair
-type tacx_state = ttag * pair
+type tacx_state = TacxTypes.ttag * pair
 
 type node_cstate = Bitv.t
 type edge_cstate = Bitv.t

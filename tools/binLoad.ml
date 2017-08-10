@@ -94,3 +94,11 @@ let closure load bitv =
 	let objet, stream = bitv |> Bitv.L.to_bool_list |> load in
 	assert(stream = []);
 	objet
+
+let list load stream =
+	let size, stream = int stream in
+	sized_list load size stream
+
+let array load stream =
+	let liste, stream = list load stream in
+	(Array.of_list liste, stream)

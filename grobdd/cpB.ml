@@ -3,6 +3,34 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
+module CpB_M =
+struct
+	type leaf = unit
+	type edge = CpTypes.edge_state
+	type node = unit
+
+	type 'i next' = (leaf, 'i) Utils.gnode
+	type 'i edge' = edge * 'i next'
+	type 'i node' = node * 'i edge' * 'i edge'
+
+	let dump_leaf = BinDump.unit
+	let load_leaf = BinLoad.unit
+
+	let dump_next dump_ident = Utils.dump_gnode dump_leaf dump_ident
+	let load_next load_ident = Utils.load_gnode load_leaf load_ident
+
+	let dump_edge dump_ident = BinDump.pair (edge, next): ('i Utils.dump) -> 'i edge' Utils.dump
+	let dump_node : ('i Utils.dump) -> 'i node' Utils.dump
+	
+	let load_edge : ('i Utils.load) -> 'i edge' Utils.load
+	let load_node : ('i Utils.load) -> 'i node' Utils.load
+
+	(* assert(x |> dump |> load = x) && assert(x |> load |> dump |> stream) *)
+	val __check_reverse__ : bool
+
+end
+
+
 let strdump_node = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
 let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpGops.binload_node >> CpGops.node_split)
 
@@ -27,13 +55,13 @@ let strdump_leaf = (fun () -> Tree.Node [])
 let strload_leaf = (function Tree.Node [] -> default_leaf | _ -> assert false)
 
 module GroBdd_M : Subdag.MODELE with
-		type node = Bitv.t
+		type node = CpTypes.node_cstate
 	and	type edge = CpTypes.edge_state
 	and type leaf = unit
 =
 struct
 	
-	type node = Bitv.t
+	type node = CpTypes.node_cstate
 	type edge = CpTypes.edge_state
 	type leaf = unit
 
@@ -131,17 +159,17 @@ module XOR = GroBdd.IBOP(XOR_M);;
 
 
 module TACX_M : TaggedSubdag.MODELE with
-		type node = Bitv.t
+		type node = CpTypes.tacx_cstate
 	and	type edge = CpTypes.edge_state
 	and type leaf = unit
-	and type tag  = TacxTypes.tag
+	and type tag  = CpTypes.op_tag
 =
 struct
 	
-	type node = Bitv.t
+	type node = CpTypes.tacx_cstate
 	type edge = CpTypes.edge_state
 	type leaf = unit
-	type tag  = TacxTypes.tag
+	type tag  = CpTypes.op_tag
 
 	type 't gn = (leaf, 't) Utils.gnode
 	type 't n = node * 't gn * 't gn	
@@ -165,7 +193,7 @@ struct
 	let load_leaf   = Some strload_leaf
 	let dot_of_leaf = Some (fun () -> "0")
 
-	let dot_of_tag = Some Extra.(TacxTypes.strdump_tag >> (fun x -> "[label = \""^x^"\"];"))
+	let dot_of_tag = Some Extra.(CpTypes.(function And -> "A" | Cons -> "C" | Xor -> "X") >> (fun x -> "[label = \""^x^"\"];"))
 end
 
 module TACX =
@@ -183,9 +211,9 @@ struct
 		man, edges
 end
 
-let ( *! ) man x y = TACX.push man TacxTypes.Cons x y
-let ( &! ) man x y = TACX.push man TacxTypes.And x y
-and ( ^! ) man x y = TACX.push man TacxTypes.Xor x y
+let ( *! ) man x y = TACX.push man CpTypes.Cons x y
+let ( &! ) man x y = TACX.push man CpTypes.And x y
+and ( ^! ) man x y = TACX.push man CpTypes.Xor x y
 
 module EVAL =
 struct
@@ -198,7 +226,7 @@ struct
 
 		let do_leaf _ () = default_leaf
 		let do_node (a, c, x) = Extra.(CpGops.binload_tacx >> CpGops.tacx_split >> (fun (tag, edgeX, edgeY) ->
-			let merge = TacxTypes.(match tag with And -> a | Cons -> c | Xor -> x) in
+			let merge = CpTypes.(match tag with And -> a | Cons -> c | Xor -> x) in
 			Utils.MNode (fun nodeX nodeY -> merge (CpGops.compose edgeX nodeX) (CpGops.compose edgeY nodeY))))
 		let do_edge _ = CpGops.compose
 	end

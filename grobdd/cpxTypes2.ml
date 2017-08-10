@@ -23,28 +23,15 @@ type block = {
 
 type block2 = block * block
 
-type op_tag = CpTypes.op_tag
-type ttag   = CpTypes.ttag
-
 type edge_state = block
 type node_state = block2
 type node_and_state = block2
 type node_xor_state = block2
-type tacx_state = op_tag * block2
-
-type node_cstate = Bitv.t
-type edge_cstate = Bitv.t
-type tacx_cstate = Bitv.t
+type tacx_state = TacxTypes.tag * block2
 
 type 'a edge = edge_state * (unit, 'a) Utils.gnode
 type 'a node = node_state * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
 type 'a tacx = tacx_state * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
-
-
-type 'a cedge = edge_cstate * (unit, 'a) Utils.gnode
-type 'a cnode = node_cstate * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
-type 'a ctacx = tacx_cstate * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
-
 
 type    peval = bool option list option
 type 'a pedge = (peval * 'a) edge

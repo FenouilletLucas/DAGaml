@@ -2,6 +2,23 @@ type ('edge, 'node) merge =
 	| MEdge of 'edge
 	| MNode of 'node
 
+let dump_merge dump_medge dump_mnode merge stream = match merge with
+	| MEdge medge -> false::(dump_medge medge stream)
+	| MNode mnode -> true ::(dump_mnode mnode stream)
+
+let load_merge load_medge load_mnode merge = function
+	| false::stream ->
+	(
+		let medge, stream = load_medge stream in
+		(MEdge medge, stream)
+	)
+	| true ::stream ->
+	(
+		let mnode, stream = load_mnode stream in
+		(MNode mnode, stream)
+	)
+	| _ -> assert false
+
 type ('return, 'node) pull_request = ('return, 'node -> 'return) merge
 
 type ('edge, 'node) unmerge = ('edge * 'edge, 'node) pull_request
@@ -11,6 +28,23 @@ type ('tag, 'edge, 'node) unmerge_tagged = ('tag * 'edge * 'edge, 'node) pull_re
 type ('leaf, 'node) gnode =
 	| Leaf of 'leaf
 	| Node of 'node
+
+let dump_gnode dump_leaf dump_node gnode stream = match gnode with
+	| Leaf leaf -> false::(dump_leaf leaf stream)
+	| Node node -> true ::(dump_node node stream)
+
+let load_gnode load_leaf load_node = function
+	| false::stream ->
+	(
+		let leaf, stream = load_leaf stream in
+		(Leaf leaf, stream)
+	)
+	| true ::stream ->
+	(
+		let node, stream = load_node stream in
+		(Node node, stream)
+	)
+	| _ -> assert false
 
 let gnode_is_leaf = function
 	| Leaf _ -> true
