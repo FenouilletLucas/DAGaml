@@ -67,6 +67,10 @@ struct
 	module M = M0
 	type ident = int
 
+	type next' = ident M.next'
+	type edge' = ident M.edge'
+	type node' = ident M.node'
+
 	type manager = {
 		man : Bitv.t H2Table.t;
 	}

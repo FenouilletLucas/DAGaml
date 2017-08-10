@@ -85,6 +85,7 @@ extra:
 		src/taggedSubdagPropa.native \
 		src/binUbdag.native \
 		src/binUbdagT.native \
+		src/binUbdagTE.native \
 		src/binUbdagTC.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \

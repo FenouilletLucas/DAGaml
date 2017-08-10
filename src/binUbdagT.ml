@@ -103,18 +103,10 @@ struct
 	}
 
 	let makeman man hsize =
-		let dumpA (peval, ident) : Bitv.t =
-			BinDump.pair M.dump_peval M.M.G.dump_ident (peval, ident) [] |> Bitv.L.of_bool_list
-		and loadA (stream : Bitv.t) = stream
-			|> Bitv.L.to_bool_list
-			|> BinLoad.pair M.load_peval M.M.G.load_ident
-			|> (fun (pair, stream) -> assert(stream=[]); pair)
-		and dumpB edge = M.M.G.dump_edge edge [] |> Bitv.L.of_bool_list
-		and loadB stream = stream
-			|> Bitv.L.to_bool_list
-			|> M.M.G.load_edge
-			|> (fun (edge, stream) -> assert(stream=[]); edge)
-		 in
+		let dumpA = BinDump.closure (BinDump.pair M.dump_peval M.M.G.dump_ident)
+		and loadA = BinLoad.closure (BinLoad.pair M.load_peval M.M.G.load_ident)
+		and dumpB = BinDump.closure M.M.G.dump_edge
+		and loadB = BinLoad.closure M.M.G.load_edge in
 		let compose = M.M.M.compose in
 		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let rec rec_edge  (edge, next) = match next with
@@ -153,18 +145,17 @@ sig
 	type edge = M.M.M.M.M.edge
 	type node = M.M.M.M.M.node
 
-	type next' = M.M.next'
-	type edge' = M.M.edge'
-	type node' = M.M.node'
-	type tree' = (next', edge, node) GTree.edge
+	type ident = M.M.M.G.ident
+	type next' = M.M.M.G.next'
+	type edge' = M.M.M.G.edge'
+	type node' = M.M.M.G.node'
 
-	val dump_node : node' Utils.dump
-	val load_node : node' Utils.load
+	type next'' = M.M.next'
+	type edge'' = M.M.edge'
+	type node'' = M.M.node'
+	type tree'' = (next'', edge, node) GTree.edge
 
-	val dump_tree : tree' Utils.dump
-	val load_tree : tree' Utils.load
-
-	val rewrite : node' -> tree'
+	val rewrite : node'' -> tree''
 end
 
 module REWRITE(M0:REWRITE_MODELE) =
@@ -172,16 +163,63 @@ struct
 
 	type manager = {
 		man : M0.M.M.M.manager;
-		mem : (M0.node', Bitv.t, M0.tree', Bitv.t) MemoBTable.t;
-		map : M0.M.M.M.G.edge' -> M0.M.M.M.G.edge';
+		memR : (M0.ident, M0.ident, M0.edge', Bitv.t) MemoBTable.t;
+		memE : (M0.M.M.peval * M0.ident, Bitv.t, M0.edge', Bitv.t) MemoBTable.t;
+		map : M0.M.M.peval option -> M0.edge' -> M0.edge';
 	}
 
 	let makeman man hsize =
-		let dumpA = BinDump.closure M0.dump_node
-		and loadA = BinLoad.closure M0.load_node
-		and dumpB = BinDump.closure M0.dump_tree
-		and loadB = BinLoad.closure M0.load_tree in
-		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
-		()
+		let dumpA x = x
+		and loadA x = x
+		and dumpB = BinDump.closure M0.M.M.M.G.dump_edge
+		and loadB = BinLoad.closure M0.M.M.M.G.load_edge in
+		let memR, applyR = MemoBTable.make dumpA loadA dumpB loadB hsize in
+		let dumpA = BinDump.closure (BinDump.pair M0.M.M.dump_peval M0.M.M.M.G.dump_ident)
+		and loadA = BinLoad.closure (BinLoad.pair M0.M.M.load_peval M0.M.M.M.G.load_ident) in
+		let memE, applyE = MemoBTable.make dumpA loadA dumpB loadB hsize in
+		let compose = M0.M.M.M.M.compose in	
+		let push : M0.node' -> M0.edge' = M0.M.M.M.push man
+		and pull : M0.ident -> M0.node' = M0.M.M.M.pull man in
+		(* goup = go up *)
+		let rec goup_edge ((edge, next) : M0.edge'') : bool * M0.edge'= match next with
+			| Utils.Leaf leaf -> (false, (edge, Utils.Leaf leaf))
+			| Utils.Node (opeval, ident) -> match opeval with
+				| None -> (false, (edge, Utils.Node ident))
+				| Some peval -> (true, compose edge (eval_ident peval ident))
+		and     eval_ident peval ident : M0.edge' = applyE (fun (peval, ident) ->
+			let node = pull ident in
+			match M0.M.M.eval_node peval (Utils.pnode_of_node node) with
+			| Utils.MEdge edge -> goup_edge edge |> snd
+			| Utils.MNode node -> goup_node node
+		) (peval, ident)
+		and     goup_node (node, edge0, edge1) : M0.edge' =
+			let t0, edge0 = goup_edge edge0
+			and t1, edge1 = goup_edge edge1 in
+			let node : M0.node' = (node, edge0, edge1) in
+			if t0||t1
+			then (rewr node)
+			else (push node)
+		and     rewr (node : M0.node') : M0.edge' = read_edge (M0.rewrite (Utils.pnode_of_node node))
+		and     read_edge (edge, node) : M0.edge' = match node with
+			| GTree.Leaf (next : M0.next'') -> goup_edge ((edge, next) : M0.edge'') |> snd
+			| GTree.Node (node, edge0, edge1) ->
+				goup_node (Utils.pnode_of_node (node, read_edge edge0, read_edge edge1))
+		in
+		let rec down_ident ident : M0.edge' = applyR (fun ident ->
+			let (node, edge0, edge1) = pull ident in
+			rewr (node, down_edge edge0, down_edge edge1)
+		) ident
+		and     down_edge ((edge, next) : M0.edge') : M0.edge' = match next with
+			| Utils.Leaf leaf -> (edge, Utils.Leaf leaf)
+			| Utils.Node ident -> compose edge (down_ident ident)
+		in
+		let map opeval edge : M0.edge' =
+			let edge = match opeval with
+				| None -> edge
+				| Some peval -> goup_edge (M0.M.M.eval_edge peval (Utils.pedge_of_edge edge)) |> snd
+			in
+			down_edge edge
+		in
+		{man; memR; memE; map}
 	
 end

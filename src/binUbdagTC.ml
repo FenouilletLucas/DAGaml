@@ -52,6 +52,9 @@ struct
 		match M0.pull_node edge' with
 		| Utils.MEdge node' -> node'
 		| Utils.MNode (ident, func) -> func (G.pull man ident)
+
+	let dump = G.dump
+	let load = G.load
 	
 end
 
