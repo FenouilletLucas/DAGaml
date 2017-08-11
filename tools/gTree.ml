@@ -7,9 +7,9 @@ and  ('leaf, 'edge, 'node) node =
 	'node * ('leaf, 'edge, 'node) edge * ('leaf, 'edge, 'node) edge
 
 let bindump
-	(dump_leaf : 'leaf Utils.dump)
-	(dump_edge : 'edge Utils.dump)
-	(dump_node : 'node Utils.dump) =
+	(dump_leaf : 'leaf BinUtils.dump)
+	(dump_edge : 'edge BinUtils.dump)
+	(dump_node : 'node BinUtils.dump) =
 	let rec dump_next' next stream = match next with
 		| Node node -> false::(dump_node' node stream)
 		| Leaf leaf -> true ::(dump_leaf  leaf stream)
@@ -21,9 +21,9 @@ let bindump
 	(dump_next', dump_edge', dump_node')
 
 let binload
-	(load_leaf : 'leaf Utils.load)
-	(load_edge : 'edge Utils.load)
-	(load_node : 'node Utils.load) =
+	(load_leaf : 'leaf BinUtils.load)
+	(load_edge : 'edge BinUtils.load)
+	(load_node : 'node BinUtils.load) =
 	let rec load_next' = function
 		| false::stream ->
 		(

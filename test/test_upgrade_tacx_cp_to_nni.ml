@@ -7,7 +7,7 @@ let tacx_nni = Nni.TACX.newman () in
 let evaman, mapcalc = Nni.TACX_OF_CP.newman tacx_cp tacx_nni in
 
 let edges = mapcalc edges in
-StrTree.tree_print print_string [Nni.TACX_OF_CP.dump_stat evaman];
+StrTree.tree_print print_string [Nni.TACX_OF_CP.dump_stats evaman];
 
 let file = Sys.argv.(2) in
 Nni.TACX.dumpfile tacx_nni edges file;

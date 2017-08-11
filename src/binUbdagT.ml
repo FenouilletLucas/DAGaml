@@ -28,6 +28,9 @@ sig
 
 	val dump : manager -> G.edge' -> StrTree.tree
 	val load : StrTree.tree  -> manager * G.edge'
+
+	val export : manager -> G.manager
+	val import : G.manager -> manager
 end
 
 module MODULE(M0:MODELE) =
@@ -43,7 +46,7 @@ struct
 
     let newman () = makeman default_newman_hsize
 
-    let dump_stat man = G.dump_stat
+    let dump_stats man = G.dump_stats
 
 	let push man node' =
 		let edge, merge = M.push_node node' in
@@ -55,6 +58,9 @@ struct
 	let dump = G.dump
 	let load = G.load
 	
+	let export man = man
+	let import man = man
+	
 end
 
 module type PEVAL_MODELE =
@@ -63,8 +69,8 @@ sig
 
 	type peval
 
-	val dump_peval : peval Utils.dump
-	val load_peval : peval Utils.load
+	val dump_peval : peval BinUtils.dump
+	val load_peval : peval BinUtils.load
 
 	type next = peval option * M.G.ident
 
@@ -105,8 +111,8 @@ struct
 	let makeman man hsize =
 		let dumpA = BinDump.closure (BinDump.pair M.dump_peval M.M.G.dump_ident)
 		and loadA = BinLoad.closure (BinLoad.pair M.load_peval M.M.G.load_ident)
-		and dumpB = BinDump.closure M.M.G.dump_edge
-		and loadB = BinLoad.closure M.M.G.load_edge in
+		and dumpB = BinDump.closure M.M.G.dump_edge'
+		and loadB = BinLoad.closure M.M.G.load_edge' in
 		let compose = M.M.M.compose in
 		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let rec rec_edge  (edge, next) = match next with
@@ -171,8 +177,8 @@ struct
 	let makeman man hsize =
 		let dumpA x = x
 		and loadA x = x
-		and dumpB = BinDump.closure M0.M.M.M.G.dump_edge
-		and loadB = BinLoad.closure M0.M.M.M.G.load_edge in
+		and dumpB = BinDump.closure M0.M.M.M.G.dump_edge'
+		and loadB = BinLoad.closure M0.M.M.M.G.load_edge' in
 		let memR, applyR = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let dumpA = BinDump.closure (BinDump.pair M0.M.M.dump_peval M0.M.M.M.G.dump_ident)
 		and loadA = BinLoad.closure (BinLoad.pair M0.M.M.load_peval M0.M.M.M.G.load_ident) in

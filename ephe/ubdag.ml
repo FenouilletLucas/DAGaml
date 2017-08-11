@@ -14,7 +14,7 @@ struct
 		clcCnt = ref 0;
 	}
 
-	let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+	let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 	let newman_default_hsize = 10000
 	
@@ -85,7 +85,7 @@ sig
 		val makeman : int -> 'value manager
 		val newman  : unit -> 'value manager
 
-		val dump_stat : 'value manager -> StrTree.tree
+		val dump_stats : 'value manager -> StrTree.tree
 	
 		val test : 'value manager -> bool nnd
 		val push : 'value manager -> ('value -> unit) nnd
@@ -104,7 +104,7 @@ sig
 		val makeman : int -> 'value manager
 		val newman  : unit -> 'value manager
 		
-		val dump_stat : 'value manager -> StrTree.tree
+		val dump_stats : 'value manager -> StrTree.tree
 	
 		val test : 'value manager -> bool nd
 		val push : 'value manager -> ('value -> unit) nd
@@ -121,7 +121,7 @@ sig
 		val makeman : int -> 'value manager
 		val newman : unit -> 'value manager
 
-		val dump_stat : 'value manager -> StrTree.tree
+		val dump_stats : 'value manager -> StrTree.tree
 		val apply : 'value manager -> (H.leaf -> 'value) -> H.leaf -> 'value
 	end
 
@@ -132,7 +132,7 @@ sig
 		val makeman : int -> 'value manager
 		val newman  : unit -> 'value manager
 
-		val dump_stat : 'value manager -> StrTree.tree
+		val dump_stats : 'value manager -> StrTree.tree
 		val apply : 'value manager -> (pnode -> 'value) -> pnode -> 'value
 	end
 
@@ -226,7 +226,7 @@ struct
 			clcCnt = ref 0;
 		}
 
-		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+		let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		
@@ -293,7 +293,7 @@ struct
 			clcCnt : int ref;
 		}
 
-		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+		let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let makeman hsize = {
 			assoc  = MemoN.create hsize;
@@ -301,7 +301,7 @@ struct
 			clcCnt = ref 0;
 		}
 
-		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+		let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		
@@ -367,7 +367,7 @@ struct
 		let makeman = M.makeman
 		let newman = M.newman
 
-		let dump_stat = M.dump_stat
+		let dump_stats = M.dump_stats
 		let apply = M.apply
 	end
 	module MNode =
@@ -379,7 +379,7 @@ struct
 			clcCnt : int ref;
 		}
 
-		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+		let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let makeman hsize = {
 			assoc  = ET.create hsize;
@@ -387,7 +387,7 @@ struct
 			clcCnt = ref 0;
 		}
 
-		let dump_stat man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
+		let dump_stats man = Tree.Leaf ("Hit: "^(string_of_int (!(man.hitCnt)))^"; Clc: "^(string_of_int (!(man.clcCnt))))
 
 		let newman_default_hsize = 10000
 		

@@ -3,7 +3,13 @@
    Copyright (c) 2017 Joan Thibault
 *)
 
-module CpB_M =
+let dump_leaf = BinDump.unit
+let load_leaf = BinLoad.unit
+
+let dump_next' dump_ident next stream = Utils.dump_gnode dump_leaf dump_ident next stream
+let load_next' load_ident      stream = Utils.load_gnode load_leaf load_ident      stream
+
+module M0_M =
 struct
 	type leaf = unit
 	type edge = CpTypes.edge_state
@@ -13,32 +19,116 @@ struct
 	type 'i edge' = edge * 'i next'
 	type 'i node' = node * 'i edge' * 'i edge'
 
-	let dump_leaf = BinDump.unit
-	let load_leaf = BinLoad.unit
+	let dump_leaf = dump_leaf
+	let load_leaf = load_leaf
 
-	let dump_next dump_ident = Utils.dump_gnode dump_leaf dump_ident
-	let load_next load_ident = Utils.load_gnode load_leaf load_ident
+	let dump_edge = CpBDumpLoad.bindump_edge
+	let load_edge = CpBDumpLoad.binload_edge
 
-	let dump_edge dump_ident = BinDump.pair (edge, next): ('i Utils.dump) -> 'i edge' Utils.dump
-	let dump_node : ('i Utils.dump) -> 'i node' Utils.dump
-	
-	let load_edge : ('i Utils.load) -> 'i edge' Utils.load
-	let load_node : ('i Utils.load) -> 'i node' Utils.load
+	let dump_node = BinDump.unit
+	let load_node = BinLoad.unit
 
-	(* assert(x |> dump |> load = x) && assert(x |> load |> dump |> stream) *)
-	val __check_reverse__ : bool
+	let dump_next' = dump_next'
+	let load_next' = load_next'
+
+	let dump_edge' dump_ident edge stream =
+		BinDump.pair dump_edge (dump_next' dump_ident) edge stream
+	let load_edge' load_ident      stream =
+		BinLoad.pair load_edge (load_next' load_ident)      stream
+
+	let dump_node' dump_ident node stream =
+		BinUbdag.default_dump_node CpBDumpLoad.bindump_node BinDump.unit dump_ident node stream
+	let load_node' load_ident      stream =
+		BinUbdag.default_load_node CpBDumpLoad.binload_node BinLoad.unit load_ident      stream
+
+	let __check_reverse__ = true
 
 end
 
+module M0 = BinUbdag.MODULE(M0_M)
 
-let strdump_node = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_node = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpGops.binload_node >> CpGops.node_split)
+module M1_M =
+struct
+	type leaf = unit
+	type edge = CpTypes.edge_state
+	type node = TacxTypes.tag
 
-let strdump_tacx = Extra.(Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_tacx = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpGops.binload_tacx >> CpGops.tacx_split)
+	type 'i next' = (leaf, 'i) Utils.gnode
+	type 'i edge' = edge * 'i next'
+	type 'i node' = node * 'i edge' * 'i edge'
 
-let strdump_edge = Extra.(CpGops.bindump_edge >> Bitv.L.to_hexa_string >> StrTree.of_string)
-let strload_edge = Extra.(StrTree.to_string >> Bitv.L.of_hexa_string >> CpGops.binload_edge)
+	let dump_leaf = dump_leaf
+	let load_leaf = load_leaf
+
+	let dump_edge = CpBDumpLoad.bindump_edge
+	let load_edge = CpBDumpLoad.binload_edge
+
+	let dump_node = TacxTypes.bindump_tag
+	let load_node = TacxTypes.binload_tag
+
+	let dump_next' = dump_next'
+	let load_next' = load_next'
+
+	let dump_edge' dump_ident edge stream =
+		BinDump.pair CpBDumpLoad.bindump_edge (dump_next' dump_ident) edge stream
+	let load_edge' load_ident      stream =
+		BinLoad.pair CpBDumpLoad.binload_edge (load_next' load_ident)      stream
+
+	let dump_node' dump_ident node stream =
+		BinUbdag.default_dump_node CpBDumpLoad.bindump_tacx BinDump.unit dump_ident node stream
+	let load_node' load_ident      stream =
+		BinUbdag.default_load_node CpBDumpLoad.binload_tacx BinLoad.unit load_ident      stream
+
+	let __check_reverse__ = true
+
+end
+
+module M1 = BinUbdag.MODULE(M1_M)
+
+
+module M0TC_M =
+struct
+	module M = M0_M
+
+	let push_node = CpBGops.solve_cons
+	let pull_node = CpBGops.node_pull
+
+	let compose = CpBGops.compose
+end
+
+module GroBdd =
+struct
+	module M0TC = BinUbdagTC.MODULE(M0TC_M)
+	include M0TC
+
+	module REMAN = BinUbdag.REMAN(M0TC.G)
+
+	let dumpfile man edges target =
+		let ubdag = export man in
+		let ubdag' = M0TC.G.newman () in
+		let man = REMAN.newman ubdag ubdag' in
+		let map = REMAN.map_edge man in
+		let edges' = List.map map edges in
+		let stree = M0TC.G.dump ubdag' edges' in
+		StrTree.dumpfile [stree] target
+	
+	let loadfile target =
+		match StrTree.loadfile target with
+		| [objet] -> load objet
+		| _ -> assert false
+
+end
+
+module M1T_M =
+struct
+	module M = M1_M
+	
+	let push_node = CpBGops.solve_tacx
+
+	let compose = CpBGops.compose
+end
+
+module M1T = BinUbdagT.MODULE(M1T_M)
 
 let dot_of_edge_aux color (b, l) =
 	"[label = \""^(String.concat "" ((if b then "-" else "+")::(List.map CpGops.strdump_uniq_elem l)))^"\"; color=\""^color^"\"];"
@@ -254,11 +344,11 @@ struct
 			calc = calc
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
-		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
-		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stats man.grobdd]; *)
+		Tree.Node [Tree.Leaf "andman:"; AND.dump_stats man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stats man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -294,7 +384,7 @@ struct
 	let newman man =
 		CntSat.newman man ()
 	
-	let dump_stat = CntSat.dump_stat
+	let dump_stats = CntSat.dump_stats
 	
 end
 
@@ -334,7 +424,7 @@ struct
 	let newman man =
 		AllSat.newman man ()
 	
-	let dump_stat = AllSat.dump_stat
+	let dump_stats = AllSat.dump_stats
 	
 end
 
@@ -356,7 +446,7 @@ struct
 	let newman man =
 		VISITOR.newman man (ref 0)
 	
-	let dump_stat = VISITOR.dump_stat
+	let dump_stats = VISITOR.dump_stats
 
 	let get man = !(VISITOR.extra man)
 	

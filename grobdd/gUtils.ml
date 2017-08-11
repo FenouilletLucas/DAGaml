@@ -32,3 +32,15 @@ let bool_of_mp_char = function
 	| '-' -> true
 	| _ -> assert false
 
+let consensus0 f x y =
+	let xy, xy' = List.split(List.map f (List.combine x y)) in
+	xy, MyList.list_of_oplist xy'
+
+let consensus f x y =
+	let xy, xy' = List.split(List.map f (List.combine x y)) in
+	xy, List.split(MyList.list_of_oplist xy')
+
+let consensus2 f x y =
+	let xy, xy' = List.split(List.map f (List.combine x y)) in
+	let x', y' = List.split xy' in
+	xy, (MyList.unop x'), (MyList.unop y')

@@ -10,7 +10,7 @@ print_string "#edges = "; print_int (List.length edges); print_newline();
 let getsize, apply = Cp.GetSize.newman pure in
 List.iter apply edges;
 print_string "size = "; print_int (Cp.GetSize.get getsize); print_newline();
-StrTree.tree_print print_string [Cp.GroBdd.dump_stat pure]
+StrTree.tree_print print_string [Cp.GroBdd.dump_stats pure]
 )
 | "--cpx" ->
 (
@@ -19,7 +19,7 @@ print_string "#edges = "; print_int (List.length edges); print_newline();
 let getsize, apply = Cpx.GetSize.newman pure in
 List.iter apply edges;
 print_string "size = "; print_int (Cpx.GetSize.get getsize); print_newline();
-StrTree.tree_print print_string [Cpx.GroBdd.dump_stat pure]
+StrTree.tree_print print_string [Cpx.GroBdd.dump_stats pure]
 )
 | "--nni" ->
 (
@@ -28,7 +28,7 @@ print_string "#edges = "; print_int (List.length edges); print_newline();
 let getsize, apply = Nni.GetSize.newman pure in
 List.iter apply edges;
 print_string "size = "; print_int (Nni.GetSize.get getsize); print_newline();
-StrTree.tree_print print_string [Nni.GroBdd.dump_stat pure]
+StrTree.tree_print print_string [Nni.GroBdd.dump_stats pure]
 )
 | "--bryant" ->
 (
@@ -37,7 +37,7 @@ print_string "#edges = "; print_int (List.length edges); print_newline();
 let getsize, apply = Bryant.GetSize.newman pure in
 List.iter apply edges;
 print_string "size = "; print_int (Bryant.GetSize.get getsize); print_newline();
-StrTree.tree_print print_string [Bryant.GroBdd.dump_stat pure]
+StrTree.tree_print print_string [Bryant.GroBdd.dump_stats pure]
 )
 | "--zdd" ->
 (
@@ -46,7 +46,7 @@ print_string "#edges = "; print_int (List.length edges); print_newline();
 let getsize, apply = Zdd.GetSize.newman pure in
 List.iter apply edges;
 print_string "size = "; print_int (Zdd.GetSize.get getsize); print_newline();
-StrTree.tree_print print_string [Zdd.GroBdd.dump_stat pure]
+StrTree.tree_print print_string [Zdd.GroBdd.dump_stats pure]
 )
 | _ -> assert false;;
 

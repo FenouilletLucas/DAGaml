@@ -9,11 +9,11 @@ let edges = mapcalc edges in
 StrTree.tree_print print_string [
 	Tree.Node [
 		Tree.Leaf "TACX:";
-		Tree.Node [ T.TACX.dump_stat tacx ];
+		Tree.Node [ T.TACX.dump_stats tacx ];
 		Tree.Leaf "TOTAL:";
-		Tree.Node [ T.GroBdd.dump_stat pure ];
+		Tree.Node [ T.GroBdd.dump_stats pure ];
 	];
-	T.EVAL.dump_stat evaman];
+	T.EVAL.dump_stats evaman];
 
 let cntman, cntsat = T.CntSat.newman pure in 
 print_string "CntSat = [";
@@ -24,7 +24,7 @@ print_newline();
 let file = Sys.argv.(2) in
 let strman = T.GroBdd.dumpfile pure edges file in
 
-StrTree.tree_print print_string [Tree.Node[Tree.Leaf "FINAL:"; Tree.Node[Udag.StrTree.dump_stat strman]]];
+StrTree.tree_print print_string [Tree.Node[Tree.Leaf "FINAL:"; Tree.Node[Udag.StrTree.dump_stats strman]]];
 
 
 exit 0;

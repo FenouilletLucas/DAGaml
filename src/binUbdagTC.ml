@@ -26,6 +26,8 @@ sig
 
 	val push : manager -> G.node' -> G.edge'
 	val pull : manager -> G.edge' -> G.node'
+
+	val export : manager -> G.manager
 end
 
 module MODULE(M0:MODELE) =
@@ -41,7 +43,7 @@ struct
 
     let newman () = makeman default_newman_hsize
 
-    let dump_stat man = G.dump_stat
+    let dump_stats man = G.dump_stats
 
 	let push man node' =
 		let edge, merge = M0.push_node node' in
@@ -55,6 +57,8 @@ struct
 
 	let dump = G.dump
 	let load = G.load
+
+	let export man = man
 	
 end
 
@@ -78,10 +82,10 @@ struct
 	}
 
 	let makeman man hsize =
-		let dumpA = M0.M.G.push_node
-		and loadA = M0.M.G.pull_node
-		and dumpB = M0.M.G.push_edge
-		and loadB = M0.M.G.pull_edge in
+		let dumpA = M0.M.G.push_node'
+		and loadA = M0.M.G.pull_node'
+		and dumpB = M0.M.G.push_edge'
+		and loadB = M0.M.G.pull_edge' in
 		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let push = M0.M.push man
 		and pull = M0.M.pull man
@@ -103,7 +107,7 @@ struct
 
     let newman man = makeman man default_newman_hsize
 
-    let dump_stat man = MemoBTable.dump_stat man.mem
+    let dump_stats man = MemoBTable.dump_stats man.mem
 	
 end
 
@@ -113,8 +117,8 @@ sig
 
 	type peval
 
-	val dump_peval : peval Utils.dump
-	val load_peval : peval Utils.load
+	val dump_peval : peval BinUtils.dump
+	val load_peval : peval BinUtils.load
 
 	type next = peval option * M.G.ident
 

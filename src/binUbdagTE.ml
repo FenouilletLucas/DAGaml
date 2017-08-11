@@ -4,14 +4,24 @@ sig
 
 	type peval
 
-	val dump_peval : peval Utils.dump
-	val load_peval : peval Utils.load
+	val dump_peval : peval BinUtils.dump
+	val load_peval : peval BinUtils.load
 
 	type 'i link = peval option * 'i
 	type 'i next'' = 'i link M.next'
 	type 'i edge'' = 'i link M.edge'
 	type 'i node'' = 'i link M.node'
 	type 'i tree'' = ('i next'', M.edge, M.node) GTree.edge
+
+	val dump_next'' : ('i BinUtils.dump) -> 'i next'' BinUtils.dump
+	val dump_edge'' : ('i BinUtils.dump) -> 'i edge'' BinUtils.dump
+	val dump_node'' : ('i BinUtils.dump) -> 'i node'' BinUtils.dump
+	val dump_tree'' : ('i BinUtils.dump) -> 'i tree'' BinUtils.dump
+	
+	val load_next'' : ('i BinUtils.load) -> 'i next'' BinUtils.load
+	val load_edge'' : ('i BinUtils.load) -> 'i edge'' BinUtils.load
+	val load_node'' : ('i BinUtils.load) -> 'i node'' BinUtils.load
+	val load_tree'' : ('i BinUtils.load) -> 'i tree'' BinUtils.load
 
 	val eval_edge : peval -> 'i edge'' ->  'i edge''
 	val eval_node : peval -> 'i node'' -> ('i edge'', 'i node'') Utils.merge
@@ -50,6 +60,9 @@ sig
 	val load : StrTree.tree  -> manager * G.edge'
 
 	val eval : manager -> M.peval -> G.edge' -> G.edge'
+
+	val export : manager -> G.manager
+	val import : G.manager -> manager
 end
 
 module MODULE(M0:MODELE) =
@@ -63,6 +76,16 @@ struct
 	type node'' = G.ident M.node''
 	type tree'' = G.ident M.tree''
 
+	let dump_next'' = M.dump_next'' G.dump_ident
+	let dump_edge'' = M.dump_edge'' G.dump_ident
+	let dump_node'' = M.dump_node'' G.dump_ident
+	let dump_tree'' = M.dump_tree'' G.dump_ident
+
+	let load_next'' = M.load_next'' G.load_ident
+	let load_edge'' = M.load_edge'' G.load_ident
+	let load_node'' = M.load_node'' G.load_ident
+	let load_tree'' = M.load_tree'' G.load_ident
+
     type manager = {
 		man : G.manager;
 		mem : (M.peval * G.ident, Bitv.t, G.edge', Bitv.t) MemoBTable.t;
@@ -70,8 +93,13 @@ struct
 		push : G.node' -> G.edge';
 	}
 
+	let export man = man.man
+
 	let makeman hsize =
 		let man = G.makeman hsize in
+		import' hsize man
+
+	let import' hsize man
 		let dumpA = BinDump.closure (BinDump.pair M.dump_peval G.dump_ident)
 		and loadA = BinLoad.closure (BinLoad.pair M.load_peval G.load_ident)
 		and dumpB = G.push_edge
@@ -112,9 +140,11 @@ struct
 
     let newman () = makeman default_newman_hsize
 
-    let dump_stat man = Tree.Node [
-		G.dump_stat man.man;
-		MemoBTable.dump_stat man.mem;
+	let import = import' default_newman_hsize
+
+    let dump_stats man = Tree.Node [
+		G.dump_stats man.man;
+		MemoBTable.dump_stats man.mem;
 	]
 
 	let push man = man.push
@@ -124,6 +154,8 @@ struct
 	let load = G.load
 
 	let eval man = man.eval
+
+
 	
 end
 

@@ -94,7 +94,7 @@ struct
 	let newman man =
 		VISITOR.newman man (ref 0)
 	
-	let dump_stat = VISITOR.dump_stat
+	let dump_stats = VISITOR.dump_stats
 
 	let get man = !(VISITOR.extra man)
 	

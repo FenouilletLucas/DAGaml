@@ -13,14 +13,6 @@ let ddl_cons = false
 let ddl_and  = false
 let ddl_xor  = false
 
-let consensus f x y =
-	let xy, xy' = List.split(List.map f (List.combine x y)) in
-	xy, List.split(MyList.list_of_oplist xy')
-
-let consensus2 f x y =
-	let xy, xy' = List.split(List.map f (List.combine x y)) in
-	let x', y' = List.split xy' in
-	xy, (MyList.unop x'), (MyList.unop y')
 
 let block_is_singleton block = match block.block with Id _ -> true | _ -> false
 
@@ -189,7 +181,7 @@ let facto_cons_ifspx2 arity neg0 neg1 ((s0, t0, l0), i0) ((s1, t1, l1), i1) =
 				)
 			)
 		in
-		let listeC, (listec0, listec1) = consensus cfun l0 l1 in
+		let listeC, (listec0, listec1) = GUtils.consensus cfun l0 l1 in
 		let arity' = List.length listec0 in
 		assert(arity' = List.length listec1);
 		let blockC = reduce_block_spx neg0         (arity+1)   false                    s0         (S::listeC)
@@ -200,7 +192,7 @@ let facto_cons_ifspx2 arity neg0 neg1 ((s0, t0, l0), i0) ((s1, t1, l1), i1) =
 	| _ ->
 	(
 		let cfun = function (P, P) -> P, None | (x, y) -> (S, Some(x, y)) in
-		let listeC, (listec0, listec1) = consensus cfun l0 l1 in
+		let listeC, (listec0, listec1) = GUtils.consensus cfun l0 l1 in
 		let arity' = List.length listec0 in
 		assert(arity' = List.length listec1);
 		let blockC = reduce_block_spx neg0         (arity+1) false                    false (S::listeC)
@@ -342,7 +334,7 @@ exception Return_False
 
 let factoPP arity neg0 neg1 ((shift0, tag0, liste0), pnode0) ((shift1, tag1, liste1), pnode1) =
 	let cfun = function (P, P) -> P, None | (x, y) -> (S, Some(x, y)) in
-	let listeC, (liste0, liste1) = consensus cfun liste0 liste1 in
+	let listeC, (liste0, liste1) = GUtils.consensus cfun liste0 liste1 in
 	let arity' = List.length liste0 in
 	assert(arity' = List.length liste1);
 	let blockC = reduce_block_spx false arity  false                    false  listeC
@@ -383,7 +375,7 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 			| e       , X(bY, 0) -> X(bY, 0), (Some(Some(not bY), e), None)
 			| eX      , eY       -> S       , (Some(None, eX), Some(None, eY))
 		in
-		let listeC, pevalX_listeX, pevalY_listeY = consensus2 cfun listeX listeY in
+		let listeC, pevalX_listeX, pevalY_listeY = GUtils.consensus2 cfun listeX listeY in
 		let pevalX, listeX = List.split pevalX_listeX
 		and pevalY, listeY = List.split pevalY_listeY in
 		(listeC, (pevalX, listeX), (pevalY, listeY))
@@ -394,7 +386,7 @@ let rec facto_and_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 			| X(b, 0), X(b', 0) when b = b' -> X(b, 0), None
 			| ex, ey -> S, (Some (ex, ey))
 		in
-		consensus cfun listeX listeY
+		GUtils.consensus cfun listeX listeY
 	in
 	let factoXP () =
 		let listeC, peval, liste0 = extractXO liste0 in
@@ -603,7 +595,7 @@ let rec facto_xor_ifspx2 arity neg0 neg1 ((((shift0, tag0, liste0) as spx0), pno
 				)
 			)
 		in
-		let listeC, (liste0, liste1) = consensus cfun liste0 liste1 in
+		let listeC, (liste0, liste1) = GUtils.consensus cfun liste0 liste1 in
 		let blockC = reduce_block_spx (neg0<>neg1) arity false (shift0<>shift1) listeC in
 		match liste0, liste1 with
 		| (X(b, 0))::liste0, (X(b', 0))::liste1 ->

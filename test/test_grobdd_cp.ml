@@ -46,7 +46,7 @@ let nx1 = T.push man nx0 nx0;;
 
 assert(nx01 ^? nx10 =?? x01 ^? x10);;
 
-StrTree.tree_print print_string [Cp.AND.dump_stat and_man; Cp.XOR.dump_stat xor_man];;
+StrTree.tree_print print_string [Cp.AND.dump_stats and_man; Cp.XOR.dump_stats xor_man];;
 
 let dump_man = Udag.StrTree.newman ();;
 let strman = Udag.String.newman ();;

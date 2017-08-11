@@ -23,7 +23,7 @@ sig
     val push : manager -> node -> pnode
     val pull : manager -> pnode -> node
 
-    val dump_stat : manager -> StrTree.tree
+    val dump_stats : manager -> StrTree.tree
 
 end
 
@@ -67,7 +67,7 @@ struct
     
     let pull man pnode = H2Table.pull man.unique pnode
 
-    let dump_stat man = Tree.Node [
+    let dump_stats man = Tree.Node [
         Tree.Leaf "#node: "; Tree.Node [ StrTree.of_int (H2Table.length man.unique) ]
     ]
 

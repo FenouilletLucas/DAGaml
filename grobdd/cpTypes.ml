@@ -16,5 +16,5 @@ type node_xor_state =               pair
 type tacx_state = TacxTypes.ttag * pair
 
 type 'a edge = edge_state * (unit, 'a) Utils.gnode
-type 'a node = node_state * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
-type 'a tacx = tacx_state * (unit, 'a) Utils.gnode * (unit, 'a) Utils.gnode
+type 'a node = unit           * 'a edge * 'a edge
+type 'a tacx = TacxTypes.ttag * 'a edge * 'a edge

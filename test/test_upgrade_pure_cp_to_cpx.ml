@@ -7,7 +7,7 @@ let pure_nni = Cpx.GroBdd.newman () in
 let evaman, mapcalc = Cpx.PURE_OF_CP.newman pure_cp pure_nni in
 
 let edges = mapcalc edges in
-StrTree.tree_print print_string [Cpx.PURE_OF_CP.dump_stat evaman];
+StrTree.tree_print print_string [Cpx.PURE_OF_CP.dump_stats evaman];
 
 let file = Sys.argv.(2) in
 ignore(Cpx.GroBdd.dumpfile pure_nni edges file);

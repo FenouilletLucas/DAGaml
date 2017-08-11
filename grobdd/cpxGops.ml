@@ -8,10 +8,6 @@ open CpxUtils
 
 module CpxDL = CpxDumpLoad
 
-let consensus f x y =
-	let xy, xy' = List.split(List.map f (List.combine x y)) in
-	xy, MyList.list_of_oplist xy'
-
 let block_is_singleton block =
 	let res = List.fold_left (function
 		| None -> fun _ -> None
@@ -88,7 +84,7 @@ let final_solve_cons blockC (blockX, iX) (blockY, iY) =
 			| None -> ( mnode() )
 			| Some(_, b') ->
 			(
-				let subC', subY = consensus (function
+				let subC', subY = GUtils.consensus0 (function
 					| X _, X _ -> X(b', 0), None
 					| _  , y   -> S, (Some y) ) blockX.sub blockY.sub in
 				let negX = blockX.neg = allign in
@@ -112,7 +108,7 @@ let final_solve_cons blockC (blockX, iX) (blockY, iY) =
 			| None -> ( mnode() )
 			| Some(b, _) ->
 			(
-				let subC', subX = consensus (function
+				let subC', subX = GUtils.consensus0 (function
 					| X _, X _ -> X(b, 0), None
 					| x  , _   -> S, (Some x) ) blockX.sub blockY.sub in
 				let negY = blockY.neg = allign in
@@ -154,13 +150,12 @@ let compare_subs = List.fold_left2 (fun (x_sub_y, y_sub_x, max_xy, equal) x y ->
 
 
 let solve_cons_2 (e0, i0) (e1, i1) =
-	let subC, subsub = consensus (function
+	let subC, (subX, subY) = GUtils.consensus (function
 		| P, P -> (P, None)
 		| X(b, i), X(b', i') -> assert(b = b' && i = i'); (X(b, i), None)
 		| X _, _
 		| _, X _ -> assert false
 		| (x, y) -> (S, Some(x, y))) e0.sub e1.sub in
-	let subX, subY = List.split subsub in
 	final_solve_cons
 	{
 		neg		= e0.neg;
@@ -180,11 +175,10 @@ let solve_cons_2 (e0, i0) (e1, i1) =
 	
 
 let solve_cons_1 rank (e0, i0) (e1, i1) =
-	let sub, subsub = consensus (function
+	let sub, (sub0, sub1) = GUtils.consensus (function
 		| P, P -> (P, None)
 		| X(b, i), X(b', i') when (b = b') && (i = i') && (i <= rank) -> (X(b, i), None)
 		| (x, y) -> (S, Some(x, y))) e0.sub e1.sub in
-	let sub0, sub1 = List.split subsub in
 	final_solve_cons {
 		neg		= e0.neg;
 		shift	= e0.shift;
@@ -204,11 +198,10 @@ let solve_cons_1 rank (e0, i0) (e1, i1) =
 
 let solve_cons_0 (e0, i0) (e1, i1) =
 	(* X-less merging *)
-	let subC, subXY = consensus ( function
+	let subC, (subX, subY) = GUtils.consensus ( function
 		| (P, P) -> (P, None)
 		| (x, y) -> (S, Some(x, y))
 	) e0.sub e1.sub in
-	let subX, subY = List.split subXY in
 	final_solve_cons
 	{
 		neg = e0.neg;
@@ -234,7 +227,7 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	then if (cmp = None)
 		(* the first variable is not significant *)
 		then (Utils.MEdge (push_P e0, i0))
-		(* the first variable is significant, the consensus is obvious *)
+		(* the first variable is significant, the GUtils.consensus is obvious *)
 		else (Utils.MNode (push_S e0, (cmake_nSS (e0.sub), i0, i1)))
 	else	  match block_is_const e0 with
 	(* f0 is a constant, thus mergeable *)
@@ -243,7 +236,7 @@ let solve_cons getid ((e0, i0) as f0) ((e1, i1) as f1) =
 	(* f1 is a constant, thus mergeable *)
 	| Some tB -> (Utils.MEdge (push_X true  0 tB e0, i0))
 	| None ->
-	(* at this point all trivial merging & consensus have been eliminated *)
+	(* at this point all trivial merging & GUtils.consensus have been eliminated *)
 	if ((e0.neg <> e0.shift) = (e1.neg <> e1.shift))
 	then
 	(
@@ -327,7 +320,7 @@ let node_pull getid (b, i) = match b.sub with
 
 
 let solve_and_1 (ex, ix) (ey, iy) =
-	let sub, subXY = consensus(function
+	let sub, subXY = GUtils.consensus0(function
 		| (P, P) -> P, None
 		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
 	Utils.MNode (
@@ -350,7 +343,7 @@ let solve_and_1 (ex, ix) (ey, iy) =
 	)
 
 let solve_and_2 (ex, ix) (ey, iy) =
-	let sub, subXY = consensus(function
+	let sub, subXY = GUtils.consensus0(function
 		| (P, P)			-> P, None
 		| X(b, 0), X(b', 0) -> assert(b = b'); X(b, 0), None
 		| (x, y)			-> S, Some(x, y)
@@ -375,7 +368,7 @@ let solve_and_2 (ex, ix) (ey, iy) =
 	)
 
 let solve_and_3 (ex, ix) (ey, iy) =
-	let sub, subXY = consensus(function
+	let sub, subXY = GUtils.consensus0 (function
 		| (P, P)						-> P, None
 		| X(b, 0), X(b', 0) when b = b'	-> X(b, 0), None
 		| (x, y)						-> S, Some(x, y)
@@ -649,7 +642,7 @@ let assign_dummydump = function
 
 
 let solve_ande_P2 (ex, ix) (ey, iy) =
-	let sub, subXY = consensus(function
+	let sub, subXY = GUtils.consensus0 (function
 		| (P, P) -> P, None
 		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in
 	Utils.M3Node (
@@ -673,7 +666,7 @@ let solve_ande_P2 (ex, ix) (ey, iy) =
 
 let solve_ande_P2X2_11 (ex, ix) (ey, iy) =
 	(*print_string "solve_ande_P2PX2_11"; print_newline();*)
-	let sub, subXY = consensus(function
+	let sub, subXY = GUtils.consensus0 (function
 		| P, P -> P, None
 		| X(b, 0), X(b', 0) when b = b' -> X(b, 0), None
 		| (x, y) -> S, Some(x, y)) ex.sub ey.sub in

@@ -153,9 +153,9 @@ struct
 
 	let compose = M.compose
 
-	let dump_stat man = Tree.Node [
-		G.dump_stat man.gman;
-		Tree.Node [Tree.Leaf "#eval: "; MemoTable.dump_stat man.memo_peval]
+	let dump_stats man = Tree.Node [
+		G.dump_stats man.gman;
+		Tree.Node [Tree.Leaf "#eval: "; MemoTable.dump_stats man.memo_peval]
 	]
 	
 
@@ -210,10 +210,10 @@ struct
 			}, calcedge
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memoLeaf];
-			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memoEdge];
-			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stat man.memoNode]
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stats man.memoLeaf];
+			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stats man.memoEdge];
+			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stats man.memoNode]
 		]
 	end
 
@@ -265,9 +265,9 @@ struct
 
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "man edge leaf:"; MemoTable.dump_stat man.memo0];
-			Tree.Node [Tree.Leaf "man edge node:"; MemoTable.dump_stat man.memo1];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "man edge leaf:"; MemoTable.dump_stats man.memo0];
+			Tree.Node [Tree.Leaf "man edge node:"; MemoTable.dump_stats man.memo1];
 		]
 		
 	end
@@ -428,8 +428,8 @@ struct
 
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.memo];
 		]
 		
 	end
@@ -507,9 +507,9 @@ struct
 		let newman man = makeman man 10000
 		let calc man = man.calc
 		let eval man = man.eval
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.meval];
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.mcalc];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stats man.meval];
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.mcalc];
 		]
 	end
 	

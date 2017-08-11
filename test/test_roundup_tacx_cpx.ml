@@ -28,7 +28,7 @@ let roundup edge =
 				print_string "step: "; print_int k; print_newline();
 				let edge0 = peval set0 edge
 				and edge1 = peval set1 edge in
-				StrTree.tree_print print_string [Cpx.TACX.dump_stat tacx; Cpx.TACX_PROPA.dump_stat pman];
+				StrTree.tree_print print_string [Cpx.TACX.dump_stats tacx; Cpx.TACX_PROPA.dump_stats pman];
 				propa (aux (k-1) (edge0 *! edge1))
 			)
 		in aux n edge
@@ -38,7 +38,7 @@ in
 print_string "propa : start"; print_newline();
 let edges = List.map propa edges in
 print_string "propa : done"; print_newline();
-StrTree.tree_print print_string [Cpx.TACX_PROPA.dump_stat pman];
+StrTree.tree_print print_string [Cpx.TACX_PROPA.dump_stats pman];
 print_string "roundup : start"; print_newline();
 let edges = List.map roundup edges in
 print_string "roundup : start"; print_newline();

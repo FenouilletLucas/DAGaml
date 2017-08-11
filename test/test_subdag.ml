@@ -106,6 +106,6 @@ module IBA = T.IBOP(IBA_M);;
 let iba_man, iba = IBA.newman man;;
 let xy = iba x y;;
 let yy = iba y y;;
-StrTree.tree_print print_string [IBA.dump_stat iba_man];;
+StrTree.tree_print print_string [IBA.dump_stats iba_man];;
 
 exit 0;;

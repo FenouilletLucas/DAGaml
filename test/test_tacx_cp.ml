@@ -69,5 +69,5 @@ let dump_edges = Udag.StrTree.dump dump_man dump_edges;;
 StrTree.tree_print print_string [dump_edges];;
 StrTree.dumpfile [dump_edges] "test.cp.pure";;
 
-(*StrTree.tree_print print_string [AND.dump_stat and_man; XOR.dump_stat xor_man];;*)
+(*StrTree.tree_print print_string [AND.dump_stats and_man; XOR.dump_stats xor_man];;*)
 

@@ -222,10 +222,10 @@ struct
 			calc = calc
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
-		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+		Tree.Node [Tree.Leaf "andman:"; AND.dump_stats man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stats man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -270,10 +270,10 @@ struct
 			calc = calc
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-		Tree.Node [Tree.Leaf "andman:"; AND.dump_stat man.andman];
-		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stat man.xorman];
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+		Tree.Node [Tree.Leaf "andman:"; AND.dump_stats man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XOR.dump_stats man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -321,8 +321,8 @@ struct
 			calc   = calc;
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -371,8 +371,8 @@ struct
 			calc   = calc;
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -424,7 +424,7 @@ struct
 	let newman man =
 		CntSat.newman man ()
 	
-	let dump_stat = CntSat.dump_stat
+	let dump_stats = CntSat.dump_stats
 	
 end
 
@@ -503,7 +503,7 @@ struct
 	let newman man =
 		AllSat.newman man ()
 	
-	let dump_stat = AllSat.dump_stat
+	let dump_stats = AllSat.dump_stats
 	
 end
 
@@ -674,11 +674,11 @@ struct
 			calc = calc
 		}, List.map calc
 	
-	let dump_stat man = Tree.Node [
-(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stat man.grobdd]; *)
-		Tree.Node [Tree.Leaf "andman:"; ANDE.dump_stat man.andman];
-		Tree.Node [Tree.Leaf "xorman:"; XORE.dump_stat man.xorman];
-		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stat man.theman];
+	let dump_stats man = Tree.Node [
+(*		Tree.Node [Tree.Leaf "grobdd:"; GroBdd.dump_stats man.grobdd]; *)
+		Tree.Node [Tree.Leaf "andman:"; ANDE.dump_stats man.andman];
+		Tree.Node [Tree.Leaf "xorman:"; XORE.dump_stats man.xorman];
+		Tree.Node [Tree.Leaf "theman:"; EVAL.dump_stats man.theman];
 	]
 
 
@@ -801,7 +801,7 @@ struct
 	let newman man =
 		VISITOR.newman man (ref 0)
 	
-	let dump_stat = VISITOR.dump_stat
+	let dump_stats = VISITOR.dump_stats
 
 	let get man = !(VISITOR.extra man)
 	

@@ -7,7 +7,7 @@ let pure_zdd = Zdd.GroBdd.newman () in
 let evaman, calc = Cp.PURE_TO_ZDD.newman pure_cp pure_zdd in
 
 let edges = List.map calc edges in
-StrTree.tree_print print_string [Cp.PURE_TO_ZDD.dump_stat evaman];
+StrTree.tree_print print_string [Cp.PURE_TO_ZDD.dump_stats evaman];
 
 let file = Sys.argv.(2) in
 Zdd.GroBdd.dumpfile pure_zdd edges file;

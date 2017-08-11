@@ -116,7 +116,7 @@ struct
 
 	let compose = M.compose
 		
-	let dump_stat = G.dump_stat
+	let dump_stats = G.dump_stats
 
 	module type MODELE_NODE_VISITOR =
 	sig
@@ -169,10 +169,10 @@ struct
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
 		let extra man = man.extra
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memoLeaf];
-			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memoEdge];
-			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stat man.memoNode]
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stats man.memoLeaf];
+			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stats man.memoEdge];
+			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stats man.memoNode]
 		]
 	end
 
@@ -222,9 +222,9 @@ struct
 
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "man edge leaf:"; MemoTable.dump_stat man.memo0];
-			Tree.Node [Tree.Leaf "man edge node:"; MemoTable.dump_stat man.memo1];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "man edge leaf:"; MemoTable.dump_stats man.memo0];
+			Tree.Node [Tree.Leaf "man edge node:"; MemoTable.dump_stats man.memo1];
 		]
 		
 	end
@@ -274,8 +274,8 @@ struct
 
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "man edge:"; MemoTable.dump_stat man.memo];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "man edge:"; MemoTable.dump_stats man.memo];
 		]
 		
 	end
@@ -334,9 +334,9 @@ struct
 
 		let newman man extra = makeman man extra 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo0:"; MemoTable.dump_stat man.memo0];
-			Tree.Node [Tree.Leaf "memo1:"; MemoTable.dump_stat man.memo1];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo0:"; MemoTable.dump_stats man.memo0];
+			Tree.Node [Tree.Leaf "memo1:"; MemoTable.dump_stats man.memo1];
 		]
 		
 	end
@@ -524,7 +524,7 @@ struct
 
 		let makeman	man = MY_EUOP.makeman man (():MY_MODELE_EUOP.extra)
 		let newman man	= MY_EUOP.newman man ()
-		let dump_stat	= MY_EUOP.dump_stat
+		let dump_stats	= MY_EUOP.dump_stats
 		let calc		= MY_EUOP.calc
 	end
 			
@@ -573,8 +573,8 @@ struct
 			}, calcrec
 		let newman man = makeman man 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.memo];
 		]
 	end
 	
@@ -690,9 +690,9 @@ struct
 		}, calcrec
 		let newman man = makeman man 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
-			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.memo];
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stats man.eval];
 		]
 	end
 	
@@ -801,9 +801,9 @@ struct
 		}, calcrec
 		let newman man = makeman man 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
-			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stat man.eval];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.memo];
+			Tree.Node [Tree.Leaf "eval:"; MemoTable.dump_stats man.eval];
 		]
 	end
 
@@ -863,8 +863,8 @@ struct
 			}, calcrec
 		let newman man = makeman man 10000
 		let calc man = man.calc
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stat man.memo];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo:"; MemoTable.dump_stats man.memo];
 		]
 	end
 

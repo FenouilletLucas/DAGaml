@@ -29,6 +29,14 @@ type ('leaf, 'node) gnode =
 	| Leaf of 'leaf
 	| Node of 'node
 
+let gnode_leaf = function
+	| Leaf leaf -> leaf
+	| Node _ -> assert false
+
+let gnode_node = function
+	| Leaf _ -> assert false
+	| Node node -> node
+
 let dump_gnode dump_leaf dump_node gnode stream = match gnode with
 	| Leaf leaf -> false::(dump_leaf leaf stream)
 	| Node node -> true ::(dump_node node stream)
@@ -73,9 +81,6 @@ type ('pnode, 'tnode) pt_node =
 	| PTree of 'pnode
 	| TTree of 'tnode
 
-type stream  = bool list
-type 't dump = 't -> stream -> stream
-type 't load = stream -> 't  * stream
 
 let pnext_of_next = function
 	| Leaf leaf -> Leaf leaf

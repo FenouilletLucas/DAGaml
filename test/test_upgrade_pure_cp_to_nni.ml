@@ -7,7 +7,7 @@ let pure_nni = Nni.GroBdd.newman () in
 let evaman, mapcalc = Nni.PURE_OF_CP.newman pure_cp pure_nni in
 
 let edges = mapcalc edges in
-StrTree.tree_print print_string [Nni.PURE_OF_CP.dump_stat evaman];
+StrTree.tree_print print_string [Nni.PURE_OF_CP.dump_stats evaman];
 
 let file = Sys.argv.(2) in
 ignore(Nni.GroBdd.dumpfile pure_nni edges file);

@@ -263,10 +263,10 @@ struct
 
 		let calc man = man.calc
 
-		let dump_stat man = Tree.Node [
-			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stat man.memLeaf];
-			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stat man.memEdge];
-			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stat man.memNode];
+		let dump_stats man = Tree.Node [
+			Tree.Node [Tree.Leaf "memo leaf:"; MemoTable.dump_stats man.memLeaf];
+			Tree.Node [Tree.Leaf "memo edge:"; MemoTable.dump_stats man.memEdge];
+			Tree.Node [Tree.Leaf "memo node:"; MemoTable.dump_stats man.memNode];
 		]
 
 

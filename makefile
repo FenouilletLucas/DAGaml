@@ -82,6 +82,7 @@ full:
 
 extra:
 	$(OB) \
+		grobdd/cpB.native \
 		src/taggedSubdagPropa.native \
 		src/binUbdag.native \
 		src/binUbdagT.native \
