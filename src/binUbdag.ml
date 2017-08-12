@@ -294,6 +294,66 @@ struct
 	
 end
 
+module type EXPORT_MODELE =
+sig
+	module M : MODULE_SIG
+
+	type extra
+	type xnode
+	type xnode'
+	type xedge
+
+	val dump_xnode : xnode -> xnode'
+	val load_xnode : xnode' -> xnode
+
+	type next' = (unit -> xnode) M.M.next'
+	type edge' = (unit -> xnode) M.M.edge'
+	type node' = (unit -> xnode) M.M.node'
+
+	val map_node : extra -> node' -> xnode
+	val map_edge : extra -> edge' -> xedge
+
+end
+
+module EXPORT(M:EXPORT_MODELE) =
+struct
+
+	type manager = {
+		man : M.M.manager;
+		extra : M.extra;
+		mem : (M.M.ident, M.M.ident, M.xnode, M.xnode') MemoBTable.t;
+		rec_edge : M.M.edge' -> M.xedge;
+		rec_node : M.M.ident -> M.xnode;
+	}
+
+	let makeman man extra hsize =
+		let dumpA x = x
+		and loadA x = x
+		and dumpB = M.dump_xnode
+		and loadB = M.load_xnode in
+		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
+		let rec map_next : M.M.next' -> M.next' = function
+			| Utils.Leaf leaf -> Utils.Leaf leaf
+			| Utils.Node link -> Utils.Node (fun () -> rec_node link)
+		and     map_edge ((edge, next) : M.M.edge') : M.edge' =
+			(edge, map_next next)
+		and     map_node ((node, edge0, edge1) : M.M.node') : M.node' =
+			(node, map_edge edge0, map_edge edge1)
+		and     rec_node (ident : M.M.ident) : M.xnode = apply (fun ident ->
+			M.map_node extra (map_node (M.M.pull man ident))
+		) ident
+		in
+		let     rec_edge edge = M.map_edge extra (map_edge edge) in
+		{man; extra; mem; rec_node; rec_edge}
+
+    let default_newman_hsize = 10000
+
+	let newman man extra = makeman man extra default_newman_hsize
+	
+	let rec_edge man = man.rec_edge
+	let rec_node man = man.rec_node
+end
+
 (*
 module type PROXY_MODELE =
 sig

@@ -229,3 +229,38 @@ struct
 		{man; memR; memE; map}
 	
 end
+
+module IMPORT(M0:MODULE_SIG) =
+struct
+	module G = M0
+
+	module MODELE =
+	struct
+		module M = G.G
+
+		type extra  = G.manager
+		type xnode  = M.edge'
+		type xnode' = Bitv.t
+		type xedge  = M.edge'
+
+		let dump_xnode = M.push_edge'
+		let load_xnode = M.pull_edge'
+
+		type next' = (unit -> xnode) M.M.next'
+		type edge' = (unit -> xnode) M.M.edge'
+		type node' = (unit -> xnode) M.M.node'
+
+		let rec_edge (edge, next) = match next with
+			| Utils.Leaf leaf -> (edge, Utils.Leaf leaf)
+			| Utils.Node node -> G.M.compose edge (node())
+
+		let map_node man (node, edge0, edge1) =
+			G.push man (node, rec_edge edge0, rec_edge edge1)
+
+		let map_edge man edge = rec_edge edge
+		
+	end
+
+	include BinUbdag.EXPORT(MODELE)
+
+end

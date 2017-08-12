@@ -95,15 +95,11 @@ struct
 
 	let export man = man.man
 
-	let makeman hsize =
-		let man = G.makeman hsize in
-		import' hsize man
-
-	let import' hsize man
+	let import' hsize man =
 		let dumpA = BinDump.closure (BinDump.pair M.dump_peval G.dump_ident)
 		and loadA = BinLoad.closure (BinLoad.pair M.load_peval G.load_ident)
-		and dumpB = G.push_edge
-		and loadB = G.pull_edge in
+		and dumpB = G.push_edge'
+		and loadB = G.pull_edge' in
 		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let rec push node : G.edge' = read_edge (M.push_node (Utils.pnode_of_node node))
 		and     eval peval (edge : G.edge') : G.edge' =
@@ -135,6 +131,10 @@ struct
 			(node, read_edge edge0, read_edge edge1)
 		in
 		{man; mem; push; eval}
+
+	let makeman hsize =
+		let man = G.makeman hsize in
+		import' hsize man
 
     let default_newman_hsize = 10000
 
@@ -193,8 +193,8 @@ struct
 	let makeman man hsize =
 		let dumpA x = x
 		and loadA x = x
-		and dumpB = BinDump.closure M0.M.G.dump_edge
-		and loadB = BinLoad.closure M0.M.G.load_edge in
+		and dumpB = BinDump.closure M0.M.G.dump_edge'
+		and loadB = BinLoad.closure M0.M.G.load_edge' in
 		let memR, applyR = MemoBTable.make dumpA loadA dumpB loadB hsize in
 		let dumpA = BinDump.closure (BinDump.pair M0.M.M.dump_peval M0.M.G.dump_ident)
 		and loadA = BinLoad.closure (BinLoad.pair M0.M.M.load_peval M0.M.G.load_ident) in

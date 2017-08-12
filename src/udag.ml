@@ -38,7 +38,7 @@ module type GRAPH = sig
     val newman : unit -> manager
 	(* manager method : create (only if necessarry) a new node in the structure, returns its identifier *)
     val push : manager -> node_t -> ident
-	(* manager method : return a node assiated to this identifier
+	(* manager method : return the node associated to this identifier
 		TODO: catch and emit exception if not found *)
     val pull : manager -> ident -> node_t
     

@@ -9,126 +9,177 @@ let load_leaf = BinLoad.unit
 let dump_next' dump_ident next stream = Utils.dump_gnode dump_leaf dump_ident next stream
 let load_next' load_ident      stream = Utils.load_gnode load_leaf load_ident      stream
 
-module M0_M =
-struct
-	type leaf = unit
-	type edge = CpTypes.edge_state
-	type node = unit
-
-	type 'i next' = (leaf, 'i) Utils.gnode
-	type 'i edge' = edge * 'i next'
-	type 'i node' = node * 'i edge' * 'i edge'
-
-	let dump_leaf = dump_leaf
-	let load_leaf = load_leaf
-
-	let dump_edge = CpBDumpLoad.bindump_edge
-	let load_edge = CpBDumpLoad.binload_edge
-
-	let dump_node = BinDump.unit
-	let load_node = BinLoad.unit
-
-	let dump_next' = dump_next'
-	let load_next' = load_next'
-
-	let dump_edge' dump_ident edge stream =
-		BinDump.pair dump_edge (dump_next' dump_ident) edge stream
-	let load_edge' load_ident      stream =
-		BinLoad.pair load_edge (load_next' load_ident)      stream
-
-	let dump_node' dump_ident node stream =
-		BinUbdag.default_dump_node CpBDumpLoad.bindump_node BinDump.unit dump_ident node stream
-	let load_node' load_ident      stream =
-		BinUbdag.default_load_node CpBDumpLoad.binload_node BinLoad.unit load_ident      stream
-
-	let __check_reverse__ = true
-
-end
-
-module M0 = BinUbdag.MODULE(M0_M)
-
-module M1_M =
-struct
-	type leaf = unit
-	type edge = CpTypes.edge_state
-	type node = TacxTypes.tag
-
-	type 'i next' = (leaf, 'i) Utils.gnode
-	type 'i edge' = edge * 'i next'
-	type 'i node' = node * 'i edge' * 'i edge'
-
-	let dump_leaf = dump_leaf
-	let load_leaf = load_leaf
-
-	let dump_edge = CpBDumpLoad.bindump_edge
-	let load_edge = CpBDumpLoad.binload_edge
-
-	let dump_node = TacxTypes.bindump_tag
-	let load_node = TacxTypes.binload_tag
-
-	let dump_next' = dump_next'
-	let load_next' = load_next'
-
-	let dump_edge' dump_ident edge stream =
-		BinDump.pair CpBDumpLoad.bindump_edge (dump_next' dump_ident) edge stream
-	let load_edge' load_ident      stream =
-		BinLoad.pair CpBDumpLoad.binload_edge (load_next' load_ident)      stream
-
-	let dump_node' dump_ident node stream =
-		BinUbdag.default_dump_node CpBDumpLoad.bindump_tacx BinDump.unit dump_ident node stream
-	let load_node' load_ident      stream =
-		BinUbdag.default_load_node CpBDumpLoad.binload_tacx BinLoad.unit load_ident      stream
-
-	let __check_reverse__ = true
-
-end
-
-module M1 = BinUbdag.MODULE(M1_M)
-
-
-module M0TC_M =
-struct
-	module M = M0_M
-
-	let push_node = CpBGops.solve_cons
-	let pull_node = CpBGops.node_pull
-
-	let compose = CpBGops.compose
-end
-
 module GroBdd =
 struct
-	module M0TC = BinUbdagTC.MODULE(M0TC_M)
-	include M0TC
+	module M0 =
+	struct
+		type leaf = unit
+		type edge = CpTypes.edge_state
+		type node = unit
 
-	module REMAN = BinUbdag.REMAN(M0TC.G)
+		type 'i next' = (leaf, 'i) Utils.gnode
+		type 'i edge' = edge * 'i next'
+		type 'i node' = node * 'i edge' * 'i edge'
+
+		let dump_leaf = dump_leaf
+		let load_leaf = load_leaf
+
+		let dump_edge = CpBDumpLoad.bindump_edge
+		let load_edge = CpBDumpLoad.binload_edge
+
+		let dump_node = BinDump.unit
+		let load_node = BinLoad.unit
+
+		let dump_next' = dump_next'
+		let load_next' = load_next'
+
+		let dump_edge' dump_ident edge stream =
+			BinDump.pair dump_edge (dump_next' dump_ident) edge stream
+		let load_edge' load_ident      stream =
+			BinLoad.pair load_edge (load_next' load_ident)      stream
+
+		let dump_node' dump_ident node stream =
+			BinUbdag.default_dump_node CpBDumpLoad.bindump_node dump_node dump_ident node stream
+		let load_node' load_ident      stream =
+			BinUbdag.default_load_node CpBDumpLoad.binload_node load_node load_ident      stream
+
+		let __check_reverse__ = true
+
+	end
+
+	module M1 =
+	struct
+		module M = M0
+
+		let compose = CpBGops.compose
+		let push_node = CpBGops.solve_cons
+		let pull_node = CpBGops.node_pull
+	end
+
+	module G1 = BinUbdagTC.MODULE(M1)
+	module G0 = G1.G
+	include G1
+
+	module REMAN = BinUbdag.REMAN(G1.G)
 
 	let dumpfile man edges target =
-		let ubdag = export man in
-		let ubdag' = M0TC.G.newman () in
+		let ubdag = G1.export man in
+		let ubdag' = G0.newman () in
 		let man = REMAN.newman ubdag ubdag' in
 		let map = REMAN.map_edge man in
 		let edges' = List.map map edges in
-		let stree = M0TC.G.dump ubdag' edges' in
+		let stree = G0.dump ubdag' edges' in
 		StrTree.dumpfile [stree] target
+
+	module IMPORT = BinUbdagTC.IMPORT(G1)
 	
 	let loadfile target =
-		match StrTree.loadfile target with
-		| [objet] -> load objet
-		| _ -> assert false
+		let ubdag', edges' = match StrTree.loadfile target with
+			| [objet] -> G0.load objet
+			| _ -> assert false
+		in
+		let grobdd = G1.newman () in
+		let man = IMPORT.newman ubdag' grobdd in
+		let map = IMPORT.rec_edge man in
+		let edges = List.map map edges' in
+		(grobdd, edges)
+		
+
+	module TO_DOT_MODELE =
+	struct
+		module M = G1.G
+
+		type extra  = Udag.String.manager
+		type xnode  = Udag.String.ident
+		type xnode' = Udag.String.ident
+		type xedge  = Udag.String.edge_t
+
+		type next' = (unit -> xnode) M.M.next'
+		type edge' = (unit -> xnode) M.M.edge'
+		type node' = (unit -> xnode) M.M.node'
+
+		let dump_xnode x = x
+		let load_xnode x = x
+
+		let rec_next = function
+			| Utils.Leaf () -> Utils.Leaf "L0"
+			| Utils.Node node -> Utils.Node (node())
+
+		let rec_edge color (edge, next) = (
+			"[label = \""^(CpBDumpLoad.strdump_edge edge)^"\"; color=\""^color^"\"];",
+			rec_next next
+		)
+		
+		let rec_node ((), edge0, edge1) =
+			((None, ""), [rec_edge "red" edge0; rec_edge "blue" edge1])
+
+		let map_edge man edge = rec_edge "black" edge
+		let map_node man node = Udag.String.push man (rec_node node)
+		
+	end
+
+	module TO_DOT = BinUbdag.EXPORT(TO_DOT_MODELE)
+
+	let dotfile grobdd edges target =
+		let strman = Udag.String.newman () in
+		let man = TO_DOT.newman grobdd strman in
+		let map = TO_DOT.rec_edge man in
+		let edges' = List.map map edges in
+		
 
 end
 
-module M1T_M =
+module TACX =
 struct
-	module M = M1_M
-	
-	let push_node = CpBGops.solve_tacx
 
-	let compose = CpBGops.compose
+	module M0 =
+	struct
+		type leaf = unit
+		type edge = CpTypes.edge_state
+		type node = TacxTypes.tag
+
+		type 'i next' = (leaf, 'i) Utils.gnode
+		type 'i edge' = edge * 'i next'
+		type 'i node' = node * 'i edge' * 'i edge'
+
+		let dump_leaf = dump_leaf
+		let load_leaf = load_leaf
+
+		let dump_edge = CpBDumpLoad.bindump_edge
+		let load_edge = CpBDumpLoad.binload_edge
+
+		let dump_node = TacxTypes.bindump_tag
+		let load_node = TacxTypes.binload_tag
+
+		let dump_next' = dump_next'
+		let load_next' = load_next'
+
+		let dump_edge' dump_ident edge stream =
+			BinDump.pair CpBDumpLoad.bindump_edge (dump_next' dump_ident) edge stream
+		let load_edge' load_ident      stream =
+			BinLoad.pair CpBDumpLoad.binload_edge (load_next' load_ident)      stream
+
+		let dump_node' dump_ident node stream =
+			BinUbdag.default_dump_node CpBDumpLoad.bindump_tacx BinDump.unit dump_ident node stream
+		let load_node' load_ident      stream =
+			BinUbdag.default_load_node CpBDumpLoad.binload_tacx BinLoad.unit load_ident      stream
+
+		let __check_reverse__ = true
+
+	end
+
+	module M1 =
+	struct
+		module M = M0
+		
+		let push_node = CpBGops.solve_tacx
+
+		let compose = CpBGops.compose
+	end
+
+	module G1 = BinUbdagT.MODULE(M1)
+
 end
-
-module M1T = BinUbdagT.MODULE(M1T_M)
 
 let dot_of_edge_aux color (b, l) =
 	"[label = \""^(String.concat "" ((if b then "-" else "+")::(List.map CpGops.strdump_uniq_elem l)))^"\"; color=\""^color^"\"];"
@@ -182,13 +233,13 @@ module GroBdd =
 struct
 	include Subdag.MODULE(GroBdd_M)
 	let dumpfile man edges target =
-		let strman = Udag.StrTree.newman() in
+		let strman = Udag.String.newman() in
 		let stredges = dump man strman edges in
-		Udag.StrTree.dumpfile strman stredges target;
+		Udag.String.dumpfile strman stredges target;
 		strman
 	
 	let loadfile target =
-		let strman, stredges = Udag.StrTree.loadfile target in
+		let strman, stredges = Udag.String.loadfile target in
 		let man = newman () in
 		let edges = load man strman stredges in
 		man, edges
@@ -290,12 +341,12 @@ module TACX =
 struct
 	include TaggedSubdag.MODULE(TACX_M)
 	let dumpfile man edges target =
-		let strman = Udag.StrTree.newman() in
+		let strman = Udag.String.newman() in
 		let stredges = dump man strman edges in
-		Udag.StrTree.dumpfile strman stredges target
+		Udag.String.dumpfile strman stredges target
 	
 	let loadfile target =
-		let strman, stredges = Udag.StrTree.loadfile target in
+		let strman, stredges = Udag.String.loadfile target in
 		let man = newman () in
 		let edges = load man strman stredges in
 		man, edges

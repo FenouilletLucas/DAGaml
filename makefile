@@ -82,12 +82,12 @@ full:
 
 extra:
 	$(OB) \
-		grobdd/cpB.native \
-		src/taggedSubdagPropa.native \
 		src/binUbdag.native \
 		src/binUbdagT.native \
 		src/binUbdagTE.native \
 		src/binUbdagTC.native \
+		grobdd/cpB.native \
+		src/taggedSubdagPropa.native \
 		test/test_test_cpx.d.byte \
 		test/test_noreg_cpx_cons.native \
 		test/test_noreg_cpx2_cons.native \

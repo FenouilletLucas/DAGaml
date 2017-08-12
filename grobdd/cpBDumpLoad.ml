@@ -15,6 +15,9 @@ let strload_uniq_elem = function
 	| 'S' -> S
 	| _   -> assert false
 
+let strdump_edge (neg, sub) =
+	String.concat "" ((if neg then "-" else "+")::(List.map CpGops.strdump_uniq_elem sub))
+
 let bindump_uniq_elem elem stream = match elem with
 	| P -> false::stream
 	| S -> true ::stream
