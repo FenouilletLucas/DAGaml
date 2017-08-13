@@ -54,3 +54,6 @@ let closure dump objet = dump objet [] |> Bitv.L.of_bool_list
 let list dump liste stream = int (List.length liste) (sized_list dump liste stream)
 
 let array dump vect stream = list dump (Array.to_list vect) stream
+
+
+let bool_option_list = list (option bool)

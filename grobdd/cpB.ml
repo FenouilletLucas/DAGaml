@@ -149,8 +149,8 @@ struct
 
 		type peval = bool option list
 
-		let dump_peval = BinDump.list (BinDump.option BinDump.bool)
-		let load_peval = BinLoad.list (BinLoad.option BinLoad.bool)
+		let dump_peval = BinDump.bool_option_list
+		let load_peval = BinLoad.bool_option_list
 
 		type next = peval option * M.G.ident
 
@@ -372,6 +372,10 @@ struct
 		let map = COMPILE.rec_edge man in
 		{grobdd; tacx; push; man; map}
 
+    let default_newman_hsize = 10000
+
+	let newman grobdd = makeman grobdd default_newman_hsize
+
 end
 
 let newman = GroBdd.newman
@@ -384,8 +388,8 @@ let arity ((_, l), _) = List.length l
 
 let push_pass ((b, l), i) = ((b, CpTypes.P::l), i)
 
-let no ((b, l), i) = ((not b, l), i)
-let cno b' ((b, l), i) = ((b' <> b, l), i)
+let neg ((b, l), i) = ((not b, l), i)
+let cneg b' ((b, l), i) = ((b' <> b, l), i)
 
 let is_root = function
 	| ((b, _), Utils.Leaf ()) -> Some b

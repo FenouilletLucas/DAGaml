@@ -101,6 +101,8 @@ extra:
 		grobdd/cpxUtils2Test.native \
 		grobdd/cpxDumpLoad2Test.native \
 		grobdd/cpxGops2Test.native \
+		test/test_upgrade_benchmark_cnf_to_tacx_cpB.native \
+		test/test_eval_tacx_to_pure_cpB.native \
 
 extraephe:
 		$(OB) \

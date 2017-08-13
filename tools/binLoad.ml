@@ -108,3 +108,5 @@ let list (load : 'a BinUtils.load) : 'a list BinUtils.load = fun stream ->
 let array (load : 'a BinUtils.load) : 'a array BinUtils.load = fun stream ->
 	let liste, stream = list load stream in
 	(Array.of_list liste, stream)
+
+let bool_option_list = list (option bool)

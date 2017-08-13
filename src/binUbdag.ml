@@ -330,6 +330,8 @@ struct
 		rec_node : M.M.ident -> M.xnode;
 	}
 
+	let dump_stats man = MemoBTable.dump_stats man.mem
+
 	let makeman man extra hsize =
 		let dumpA x = x
 		and loadA x = x
