@@ -31,9 +31,20 @@ let pull tbl indx =
 let length tbl =
 	Hashtbl.length tbl.access
 
-
 let iter tbl fonc =
 	Hashtbl.iter fonc tbl.access
+
+let map tbl fonc =
+	let stack = ref [] in
+	let push obj = stack := obj::(!stack) in
+	Hashtbl.iter (fun key obj -> push(fonc key obj)) tbl.revers;
+	!stack
+
+let mapreduce tbl init map reduce =
+	let stack = ref init in
+	let push obj = stack := reduce obj !stack in
+	Hashtbl.iter (fun key obj -> push(map key obj)) tbl.revers;
+	!stack
 
 let strdump (dumpA : 'a -> StrTree.tree) (tbl : 'a t) : StrTree.tree =
 	let stack = ref [] in

@@ -44,3 +44,33 @@ let consensus2 f x y =
 	let xy, xy' = List.split(List.map f (List.combine x y)) in
 	let x', y' = List.split xy' in
 	xy, (MyList.unop x'), (MyList.unop y')
+
+let consensus3 f x y =
+	let x', y' = List.split(List.map f (List.combine x y)) in
+	(MyList.unop x', MyList.unop y')
+
+let compose s lC lc =
+	let rec aux carry = function
+		| [] -> (function
+			| [] -> []
+			| _ -> assert false
+		)
+		| x::x' -> if x = s
+			then (function
+				| []     -> assert false
+				| y::y'  -> aux (y::carry) x' y'
+			)
+			else (fun y' -> aux (x::carry) x' y')
+	in aux [] lC lc
+
+type peval = bool option list
+
+let compose_peval : peval -> peval -> peval = fun pevalC pevalc -> compose None pevalc pevalC
+
+let compose_opeval opevalC opevalc = match (opevalC, opevalc) with
+	| Some pevalC, Some pevalc -> Some(compose_peval pevalC pevalc)
+	| Some peval, None
+	| None, Some peval -> Some peval
+	| None, None -> None
+	
+

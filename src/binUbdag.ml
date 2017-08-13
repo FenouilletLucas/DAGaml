@@ -93,8 +93,12 @@ struct
 
     let newman () = makeman default_newman_hsize
 
+	let getsize man =
+		H2Table.mapreduce man.man 0 (fun _ -> Bitv.length) (+)
+
     let dump_stats man = Tree.Node [
-        Tree.Leaf "#node: "; Tree.Node [ StrTree.of_int (H2Table.length man.man) ]
+        Tree.Node [Tree.Leaf "#node: "; StrTree.of_int (H2Table.length man.man) ];
+		Tree.Node [Tree.Leaf "size:  "; StrTree.of_int (getsize man)            ];
     ]
 
 	let dump_ident = BinDump.int
@@ -352,6 +356,65 @@ struct
 	
 	let rec_edge man = man.rec_edge
 	let rec_node man = man.rec_node
+end
+
+module type TO_DOT_MODELE =
+sig
+	module M : MODULE_SIG
+
+	val string_of_leaf : M.M.leaf -> string
+	val string_of_edge : bool option -> M.M.edge -> string
+(*"[label = \""^(CpBDumpLoad.strdump_edge edge)^"\"; color=\""^color^"\"];",*)
+	val string_of_node : M.M.node -> string
+end
+
+module TO_DOT(M0:TO_DOT_MODELE) = 
+struct
+	
+	module M = M0
+	
+	module MODELE =
+	struct
+		module M = M.M
+
+		type extra  = Udag.String.manager
+		type xnode  = Udag.String.ident
+		type xnode' = Udag.String.ident
+		type xedge  = Udag.String.edge_t
+
+		type next' = (unit -> xnode) M.M.next'
+		type edge' = (unit -> xnode) M.M.edge'
+		type node' = (unit -> xnode) M.M.node'
+
+		let dump_xnode x = x
+		let load_xnode x = x
+
+		let rec_next = function
+			| Utils.Leaf leaf -> Utils.Leaf (M0.string_of_leaf leaf)
+			| Utils.Node node -> Utils.Node (node())
+
+		let rec_edge pos (edge, next) = (
+			M0.string_of_edge pos edge,
+			rec_next next
+		)
+		
+		let rec_node (node, edge0, edge1) =
+			((None, M0.string_of_node node), [rec_edge (Some false) edge0; rec_edge (Some true) edge1])
+
+		let map_edge man edge = rec_edge None edge
+		let map_node man node = Udag.String.push man (rec_node node)
+		
+	end
+
+	module MODULE = EXPORT(MODELE)
+
+	let dotfile grobdd edges target =
+		let strman = Udag.String.newman () in
+		let man = MODULE.newman grobdd strman in
+		let map = MODULE.rec_edge man in
+		let edges' = List.map map edges in
+		Udag.String.to_dot_file strman edges' target;
+		()
 end
 
 (*

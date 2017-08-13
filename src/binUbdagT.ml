@@ -26,8 +26,8 @@ sig
 	val push : manager -> G.node' -> G.edge'
 	val pull : manager -> G.ident -> G.node'
 
-	val dump : manager -> G.edge' -> StrTree.tree
-	val load : StrTree.tree  -> manager * G.edge'
+	val dump : manager -> G.edge' list -> StrTree.tree
+	val load : StrTree.tree  -> manager * G.edge' list
 
 	val export : manager -> G.manager
 	val import : G.manager -> manager
@@ -46,7 +46,7 @@ struct
 
     let newman () = makeman default_newman_hsize
 
-    let dump_stats man = G.dump_stats
+    let dump_stats = G.dump_stats
 
 	let push man node' =
 		let edge, merge = M.push_node node' in
@@ -263,4 +263,34 @@ struct
 
 	include BinUbdag.EXPORT(MODELE)
 
+end
+
+module STDIO(M1:MODELE) =
+struct
+	module G1 = MODULE(M1)
+	module G0 = G1.G
+
+	module REMAN = BinUbdag.REMAN(G0)
+
+	let dumpfile man edges target =
+		let ubdag = G1.export man in
+		let ubdag' = G0.newman () in
+		let man = REMAN.newman ubdag ubdag' in
+		let map = REMAN.map_edge man in
+		let edges' = List.map map edges in
+		let stree = G0.dump ubdag' edges' in
+		StrTree.dumpfile [stree] target
+
+	module IMPORT = IMPORT(G1)
+	
+	let loadfile target =
+		let ubdag', edges' = match StrTree.loadfile target with
+			| [objet] -> G0.load objet
+			| _ -> assert false
+		in
+		let grobdd = G1.newman () in
+		let man = IMPORT.newman ubdag' grobdd in
+		let map = IMPORT.rec_edge man in
+		let edges = List.map map edges' in
+		(grobdd, edges)
 end

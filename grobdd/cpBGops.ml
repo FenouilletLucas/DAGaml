@@ -120,3 +120,18 @@ let node_pull (((bx, lx), i) : 'i CpTypes.edge) : ('i CpTypes.node, 'i * ('i CpT
 		| S -> Utils.MNode (Utils.gnode_node i, fun ((), edge0, edge1) ->
 			((), (compose e' edge0), (compose e' edge1))
 		)
+
+let assign peval ((neg, sub), next) =
+	let sub, peval = GUtils.consensus3 (function
+		| None, x -> Some x, Some None
+		| Some b, x -> (None, match x with P -> None | S -> Some (Some b))
+	) peval sub in
+	let edge = (neg, sub) in
+	let opevalC = if List.for_all ((=)None) peval
+		then None
+		else (Some peval)
+	in
+	match next with
+	| Utils.Leaf ()   -> assert(opevalC = None); (edge, Utils.Leaf ())
+	| Utils.Node (opevalc, node) -> (edge, Utils.Node (GUtils.compose_opeval opevalC opevalc, node))
+	

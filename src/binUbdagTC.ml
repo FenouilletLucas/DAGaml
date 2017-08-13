@@ -70,7 +70,7 @@ sig
 
 end
 
-module IBOP(M0:BINOP_MODELE) =
+module BINOP(M0:BINOP_MODELE) =
 struct
 	
 	module M = M0
@@ -108,6 +108,8 @@ struct
     let newman man = makeman man default_newman_hsize
 
     let dump_stats man = MemoBTable.dump_stats man.mem
+
+	let map man = man.map
 	
 end
 
@@ -129,6 +131,71 @@ sig
 	val eval_edge : peval -> edge' ->  edge'
 	val eval_node : peval -> node' -> (edge', node') Utils.merge
 	
+end
+
+module type PEVAL_SIG =
+sig
+	module M : PEVAL_MODELE
+	
+	type manager
+	
+	val rec_edge : manager -> M.edge' -> M.M.G.edge'
+	val rec_node : manager -> M.peval -> M.M.G.ident -> M.M.G.edge'
+
+	val map_edge : manager -> M.peval -> M.M.G.edge' -> M.M.G.edge'
+	val map_node : manager -> M.peval -> M.M.G.node' -> M.M.G.edge'
+
+end
+
+
+module PEVAL(M:PEVAL_MODELE) =
+struct
+	type manager = {
+		man : M.M.manager;
+		mem : (M.peval * M.M.G.ident, Bitv.t, M.M.G.edge', Bitv.t) MemoBTable.t;
+		rec_edge : M.edge' -> M.M.G.edge';
+		rec_node : M.peval -> M.M.G.ident -> M.M.G.edge';
+		map_edge : M.peval -> M.M.G.edge' -> M.M.G.edge';
+		map_node : M.peval -> M.M.G.node' -> M.M.G.edge';
+	}
+
+	let makeman man hsize =
+		let dumpA = BinDump.closure (BinDump.pair M.dump_peval M.M.G.dump_ident)
+		and loadA = BinLoad.closure (BinLoad.pair M.load_peval M.M.G.load_ident)
+		and dumpB = BinDump.closure M.M.G.dump_edge'
+		and loadB = BinLoad.closure M.M.G.load_edge' in
+		let compose = M.M.M.compose in
+		let pull =
+			let man = M.M.export man in
+			M.M.G.pull man
+		in
+		let mem, apply = MemoBTable.make dumpA loadA dumpB loadB hsize in
+		let rec rec_edge  (edge, next) = match next with
+			| Utils.Leaf leaf -> (edge, Utils.Leaf leaf)
+			| Utils.Node (opeval, ident) -> match opeval with
+				| None -> (edge, Utils.Node ident)
+				| Some peval -> compose edge (rec_node peval ident)
+		and     rec_node peval ident = apply (fun (peval, ident) ->
+			map_node peval (pull ident)
+		) (peval, ident)
+		and     map_node peval node = 
+			match M.eval_node peval (Utils.pnode_of_node node) with
+			| Utils.MEdge edge -> rec_edge edge
+			| Utils.MNode (node, edge0, edge1) ->
+				M.M.push man (node, rec_edge edge0, rec_edge edge1)
+		in
+		let map_edge peval edge = rec_edge (M.eval_edge peval (Utils.pedge_of_edge edge)) in
+		{man; mem; rec_edge; rec_node; map_edge; map_node}
+
+    let default_newman_hsize = 10000
+
+    let newman man = makeman man default_newman_hsize
+
+	let rec_edge man = man.rec_edge
+	let rec_node man = man.rec_node
+	let map_edge man = man.map_edge
+	let map_node man = man.map_node
+
 end
 
 module IMPORT(M0:MODULE_SIG) =
@@ -164,6 +231,36 @@ struct
 
 	include BinUbdag.EXPORT(MODELE)
 
+end
+
+module STDIO(M1:MODELE) =
+struct
+	module G1 = MODULE(M1)
+	module G0 = G1.G
+
+	module REMAN = BinUbdag.REMAN(G0)
+
+	let dumpfile man edges target =
+		let ubdag = G1.export man in
+		let ubdag' = G0.newman () in
+		let man = REMAN.newman ubdag ubdag' in
+		let map = REMAN.map_edge man in
+		let edges' = List.map map edges in
+		let stree = G0.dump ubdag' edges' in
+		StrTree.dumpfile [stree] target
+
+	module IMPORT = IMPORT(G1)
+	
+	let loadfile target =
+		let ubdag', edges' = match StrTree.loadfile target with
+			| [objet] -> G0.load objet
+			| _ -> assert false
+		in
+		let grobdd = G1.newman () in
+		let man = IMPORT.newman ubdag' grobdd in
+		let map = IMPORT.rec_edge man in
+		let edges = List.map map edges' in
+		(grobdd, edges)
 end
 
 

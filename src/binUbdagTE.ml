@@ -56,8 +56,8 @@ sig
 	val push : manager -> G.node' -> G.edge'
 	val pull : manager -> G.ident -> G.node'
 
-	val dump : manager -> G.edge' -> StrTree.tree
-	val load : StrTree.tree  -> manager * G.edge'
+	val dump : manager -> G.edge' list -> StrTree.tree
+	val load : StrTree.tree  -> manager * G.edge' list
 
 	val eval : manager -> M.peval -> G.edge' -> G.edge'
 
@@ -148,10 +148,12 @@ struct
 	]
 
 	let push man = man.push
-	let pull man ident = G.pull man ident
+	let pull man ident = G.pull man.man ident
 
-	let dump = G.dump
-	let load = G.load
+	let dump man = G.dump man.man
+	let load stree =
+		let man, edges = G.load stree in
+		(import man, edges)
 
 	let eval man = man.eval
 
@@ -244,4 +246,69 @@ struct
 		in
 		{man; memR; memE; map}
 	
+end
+
+module IMPORT(M0:MODULE_SIG) =
+struct
+	module G = M0
+
+	module MODELE =
+	struct
+		module M = G.G
+
+		type extra  = G.manager
+		type xnode  = M.edge'
+		type xnode' = Bitv.t
+		type xedge  = M.edge'
+
+		let dump_xnode = M.push_edge'
+		let load_xnode = M.pull_edge'
+
+		type next' = (unit -> xnode) M.M.next'
+		type edge' = (unit -> xnode) M.M.edge'
+		type node' = (unit -> xnode) M.M.node'
+
+		let rec_edge (edge, next) : M.edge' = match next with
+			| Utils.Leaf leaf -> (edge, Utils.Leaf leaf)
+			| Utils.Node node -> G.M.compose edge (node())
+
+		let map_node man (node, edge0, edge1) : M.edge' =
+			G.push man (node, rec_edge edge0, rec_edge edge1)
+
+		let map_edge man edge : M.edge' = rec_edge edge
+		
+	end
+
+	include BinUbdag.EXPORT(MODELE)
+
+end
+
+module STDIO(M1:MODELE) =
+struct
+	module G1 = MODULE(M1)
+	module G0 = G1.G
+
+	module REMAN = BinUbdag.REMAN(G0)
+
+	let dumpfile man edges target =
+		let ubdag = G1.export man in
+		let ubdag' = G0.newman () in
+		let man = REMAN.newman ubdag ubdag' in
+		let map = REMAN.map_edge man in
+		let edges' = List.map map edges in
+		let stree = G0.dump ubdag' edges' in
+		StrTree.dumpfile [stree] target
+
+	module IMPORT = IMPORT(G1)
+	
+	let loadfile target =
+		let ubdag', edges' = match StrTree.loadfile target with
+			| [objet] -> G0.load objet
+			| _ -> assert false
+		in
+		let grobdd = G1.newman () in
+		let man = IMPORT.newman ubdag' grobdd in
+		let map = IMPORT.rec_edge man in
+		let edges = List.map map edges' in
+		(grobdd, edges)
 end
